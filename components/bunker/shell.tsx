@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Shield, FlaskConical, Menu } from "lucide-react";
+import { NavLinks } from "./nav-links";
 export function Mark({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand ${small ? "small" : ""}`}>
@@ -22,10 +23,7 @@ export function Header() {
           <Mark />
         </Link>
         <nav aria-label="Main navigation">
-          <Link href="/demo">Demo</Link>
-          <Link href="/check">Check a wallet</Link>
-          <Link href="/docs">How it works</Link>
-          <Link href="/security">Security</Link>
+          <NavLinks />
         </nav>
         <div className="header-actions">
           <Link className="button compact light" href="/vault">
@@ -36,11 +34,7 @@ export function Header() {
               <Menu size={20} />
             </summary>
             <nav aria-label="Mobile navigation">
-              <Link href="/demo">Demo</Link>
-              <Link href="/check">Check a wallet</Link>
-              <Link href="/docs">How it works</Link>
-              <Link href="/security">Security</Link>
-              <Link href="/verify">Verify</Link>
+              <NavLinks extra={[["/verify", "Verify"]]} />
             </nav>
           </details>
         </div>
@@ -51,21 +45,41 @@ export function Header() {
 export function Footer() {
   return (
     <footer className="site-footer">
-      <div>
+      <div className="footer-brand">
         <Link href="/" aria-label="Bunker home">
           <Mark small />
         </Link>
         <p>Prepare. Don’t panic.</p>
       </div>
-      <div className="footer-links">
-        <Link href="/security">Security & limitations</Link>
-        <Link href="/verify">Verify the program</Link>
-        <a href="https://github.com/plantsweb3/bunker">Source on GitHub</a>
-        <a href="https://x.com/BunkerModeIO" target="_blank" rel="noreferrer">
-          @BunkerModeIO on X
-        </a>
+      <div className="footer-columns">
+        <div>
+          <span className="mono">PRODUCT</span>
+          <Link href="/demo">Demo</Link>
+          <Link href="/check">Check a wallet</Link>
+          <Link href="/vault">App preview</Link>
+          <Link href="/docs">How it works</Link>
+        </div>
+        <div>
+          <span className="mono">TRUST</span>
+          <Link href="/security">Security & limitations</Link>
+          <Link href="/verify">Verify the program</Link>
+          <a href="https://github.com/plantsweb3/bunker">Source on GitHub</a>
+          <a href="https://github.com/plantsweb3/bunker/security/advisories/new">
+            Report a vulnerability
+          </a>
+        </div>
+        <div>
+          <span className="mono">FOLLOW</span>
+          <a href="https://x.com/BunkerModeIO" target="_blank" rel="noreferrer">
+            @BunkerModeIO on X
+          </a>
+          <a href="https://github.com/plantsweb3/bunker/releases">Releases</a>
+        </div>
       </div>
-      <span className="mono">EXPERIMENTAL · MAINNET CUSTODY LOCKED</span>
+      <span className="mono footer-status">
+        EXPERIMENTAL · MAINNET CUSTODY LOCKED · BUNKER ONLY LIVES AT
+        BUNKERMODE.IO
+      </span>
     </footer>
   );
 }

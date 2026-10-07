@@ -193,6 +193,37 @@ export default function Home() {
             <MoveUpRight size={16} />
           </Link>
         </section>
+        <section className="check-teaser section">
+          <div>
+            <div className="eyebrow">TEN SECONDS, NOTHING TO CONNECT</div>
+            <h2>
+              What could one signature
+              <br />
+              take from your wallet?
+            </h2>
+            <p>
+              Paste any Solana address. See everything a single approval could
+              move, and any token approvals that are already open.
+            </p>
+          </div>
+          <form className="check-form" action="/check" method="get">
+            <label className="field">
+              <span>Solana wallet address</span>
+              <input
+                name="a"
+                required
+                autoComplete="off"
+                autoCapitalize="off"
+                spellCheck={false}
+                placeholder="Paste a wallet address"
+              />
+            </label>
+            <button className="button light">Check wallet</button>
+            <span className="micro">
+              Read-only. Public chain data. Nothing is stored.
+            </span>
+          </form>
+        </section>
         <section className="intro section" id="how">
           <div className="eyebrow">A SEPARATE LINE OF DEFENSE</div>
           <div className="split-title">

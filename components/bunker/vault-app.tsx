@@ -48,6 +48,7 @@ import {
   assertNetwork,
 } from "@/sdk/client";
 import { hex, unhex, parseAmount, formatAmount } from "@/sdk/bytes";
+import { mintLabel } from "@/sdk/known-mints";
 import { generateKey } from "@/sdk/winternitz";
 import {
   RecoveryKit,
@@ -1302,7 +1303,7 @@ function AssetTable({ assets, empty }: { assets: Asset[]; empty: string }) {
                   <div className="asset-name">
                     <span className="asset-logo">{a.mint ? "◈" : "≋"}</span>
                     <div>
-                      {a.mint ? "SPL token" : "Solana"}
+                      {a.mint ? (mintLabel(a.mint) ?? "SPL token") : "Solana"}
                       <small>
                         {a.frozen ? "Frozen" : a.mint ? "Classic token" : "SOL"}
                       </small>

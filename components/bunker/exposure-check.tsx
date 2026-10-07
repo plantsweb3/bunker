@@ -1,6 +1,6 @@
 "use client";
 import "@/sdk/polyfill";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { PublicKey } from "@solana/web3.js";
 import {
@@ -11,11 +11,15 @@ import {
   Eye,
   Check,
   Minus,
+  Link2,
+  KeyRound,
+  ArrowRight,
 } from "lucide-react";
 import { useHydrated } from "./use-hydrated";
 import { createConnection } from "@/sdk/client";
 import { TOKEN_PROGRAM_ID } from "@/sdk/classic-token";
 import { formatAmount } from "@/sdk/bytes";
+import { mintLabel } from "@/sdk/known-mints";
 import {
   Exposure,
   ParsedTokenInfo,
@@ -45,10 +49,22 @@ export default function ExposureCheck() {
     address: string;
     exposure: Exposure;
   } | null>(null);
-  async function check() {
+  const [copied, setCopied] = useState(false);
+  const started = useRef(false);
+  useEffect(() => {
+    // A shared or submitted link carries the address as ?a=.
+    const a = new URLSearchParams(window.location.search).get("a");
+    if (!a || started.current) return;
+    started.current = true;
+    setInput(a);
+    void check(a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  async function check(address = input) {
     let owner: PublicKey;
+    setCopied(false);
     try {
-      owner = new PublicKey(input.trim());
+      owner = new PublicKey(address.trim());
     } catch {
       setResult(null);
       setError("That is not a valid Solana address. Paste the full address.");
@@ -76,6 +92,7 @@ export default function ExposureCheck() {
         address: owner.toBase58(),
         exposure: summarizeExposure(lamports, classic, token2022),
       });
+      window.history.replaceState(null, "", `/check?a=${owner.toBase58()}`);
     } catch (e) {
       setError(problem(e));
     } finally {
@@ -84,6 +101,8 @@ export default function ExposureCheck() {
   }
   const e = result?.exposure;
   const nothing = e && e.lamports === 0n && e.movable.length === 0;
+  const kinds = e ? e.movable.length + (e.lamports > 0n ? 1 : 0) : 0;
+  const held = e ? e.supported.length + (e.lamports > 0n ? 1 : 0) : 0;
   return (
     <div className="check-wrap">
       <div className="page-heading">
@@ -145,6 +164,18 @@ export default function ExposureCheck() {
           <div className="check-address">
             <span className="mono">WALLET</span>
             <code>{result.address}</code>
+            <button
+              className="text-button"
+              onClick={() =>
+                navigator.clipboard
+                  .writeText(window.location.href)
+                  .then(() => setCopied(true))
+                  .catch(() => {})
+              }
+            >
+              <Link2 size={14} />
+              {copied ? "Link copied" : "Copy link to this result"}
+            </button>
           </div>
           {nothing ? (
             <div className="check-empty">
@@ -157,6 +188,53 @@ export default function ExposureCheck() {
             </div>
           ) : (
             <>
+              <h2 className="check-verdict">
+                One signature moves{" "}
+                <span className="ice">
+                  {kinds === 1 ? "everything" : `all ${kinds} balances`}
+                </span>{" "}
+                in this wallet.
+              </h2>
+              <div className="check-compare">
+                <div className="compare-row today">
+                  <span className="mono">TODAY</span>
+                  <div className="compare-key">
+                    <KeyRound size={15} />
+                    Wallet key
+                  </div>
+                  <ArrowRight size={15} />
+                  <div className="compare-target">
+                    {formatAmount(e.lamports, 9)} SOL
+                    {e.movable.length > 0 &&
+                      ` + ${plural(e.movable.length, "token balance")}`}
+                  </div>
+                </div>
+                <div className="compare-row bunkered">
+                  <span className="mono">WITH A BUNKER</span>
+                  <div className="compare-key">
+                    <KeyRound size={15} />
+                    Wallet key
+                  </div>
+                  <ArrowRight size={15} />
+                  <div className="compare-target">
+                    Only what you leave out for spending
+                  </div>
+                  <span aria-hidden="true" />
+                  <div className="compare-key ice">
+                    <Shield size={15} />
+                    Bunker key
+                  </div>
+                  <ArrowRight size={15} />
+                  <div className="compare-target">
+                    Everything else: {held} of {kinds} balances here can go
+                    in
+                  </div>
+                </div>
+                <p>
+                  Design goal, not a guarantee, and not open for real funds
+                  yet. <Link href="/#limits">Where the protection stops.</Link>
+                </p>
+              </div>
               <div className="check-grid">
                 <section className="check-card exposed">
                   <span className="mono">ONE SIGNATURE CAN MOVE</span>
@@ -183,8 +261,8 @@ export default function ExposureCheck() {
                 <section className="check-card safe">
                   <span className="mono">A BUNKER IS BUILT TO HOLD</span>
                   <strong>
-                    {e.supported.length + (e.lamports > 0n ? 1 : 0)}
-                    <small> of {e.movable.length + (e.lamports > 0n ? 1 : 0)}</small>
+                    {held}
+                    <small> of {kinds}</small>
                   </strong>
                   <p>
                     SOL and classic SPL tokens.{" "}
@@ -218,8 +296,9 @@ export default function ExposureCheck() {
             {e.frozen > 0 && `${plural(e.frozen, "frozen balance")} excluded. `}
             {e.emptyAccounts > 0 &&
               `${plural(e.emptyAccounts, "empty token account")} ignored. `}
-            Token names and prices are not shown because they can be spoofed;
-            mints are shown instead. NFTs with custom programs, staked SOL and
+            Only a short list of well-known tokens is named, matched by mint
+            address; other names and all prices are left out because they can
+            be spoofed. NFTs with custom programs, staked SOL and
             positions inside other protocols are not included.
           </p>
         </div>
@@ -253,13 +332,18 @@ function Holdings({
   approvals?: boolean;
 }) {
   const [all, setAll] = useState(false);
-  const shown = all ? rows : rows.slice(0, SHOWN);
+  const ordered = [
+    ...rows.filter((t) => mintLabel(t.mint)),
+    ...rows.filter((t) => !mintLabel(t.mint)),
+  ];
+  const shown = all ? ordered : ordered.slice(0, SHOWN);
   return (
     <>
       <ul className="holding-list">
         {shown.map((t) => (
           <li key={t.account}>
             <div>
+              {mintLabel(t.mint) && <strong>{mintLabel(t.mint)}</strong>}
               <code title={t.mint}>{brief(t.mint)}</code>
               <span>
                 {t.program === "classic" ? "Classic SPL" : "Token-2022"}
