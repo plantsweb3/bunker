@@ -9,7 +9,7 @@
     "url": "https://github.com/plantsweb3/bunker.git"
   },
   "engines": {
-    "node": ">=22.13.0 <25"
+    "node": "22.x"
   },
   "type": "module",
   "scripts": {
