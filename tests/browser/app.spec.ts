@@ -64,7 +64,11 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/docs",
     "/verify",
   ]) {
-    await page.goto(path);
+    const response = await page.goto(path);
+    expect(
+      response!.headers()["content-security-policy"],
+      `${path} policy`,
+    ).toContain("'strict-dynamic'");
     await expect(page.locator("h1")).toBeVisible();
     await expect(page.locator("body")).not.toContainText(
       "Unhandled Script Error",
@@ -137,6 +141,16 @@ test("wallet check summarises balances and open approvals without a wallet", asy
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
   );
   expect(overflow).toBe(false);
+});
+test("unknown paths are served with the browser policy too", async ({
+  page,
+}) => {
+  const response = await page.goto("/no-such-page");
+  expect(response!.status()).toBe(404);
+  expect(response!.headers()["content-security-policy"]).toContain(
+    "'strict-dynamic'",
+  );
+  await expect(page.locator("h1")).toBeVisible();
 });
 test("server rejects mainnet transaction submission", async ({ request }) => {
   const r = await request.post("/api/rpc", {
