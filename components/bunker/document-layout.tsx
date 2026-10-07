@@ -28,6 +28,9 @@ export function DocumentLayout({
             <Link href="/security">Security & limitations</Link>
             <Link href="/verify">Verification & review</Link>
             <Link href="/docs">How Bunker works</Link>
+            <Link href="/emergency">My wallet was drained</Link>
+            <Link href="/terms">Terms & risks</Link>
+            <Link href="/privacy">Privacy</Link>
             <a href="/source/bunker-source.tar.gz" download>
               Download the source
             </a>

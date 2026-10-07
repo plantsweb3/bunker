@@ -58,6 +58,7 @@ export function Footer() {
           <Link href="/check">Check a wallet</Link>
           <Link href="/vault">App preview</Link>
           <Link href="/docs">How it works</Link>
+          <Link href="/emergency">My wallet was drained</Link>
         </div>
         <div>
           <span className="mono">TRUST</span>
@@ -67,6 +68,8 @@ export function Footer() {
           <a href="https://github.com/plantsweb3/bunker/security/advisories/new">
             Report a vulnerability
           </a>
+          <Link href="/terms">Terms & risks</Link>
+          <Link href="/privacy">Privacy</Link>
         </div>
         <div>
           <span className="mono">FOLLOW</span>
