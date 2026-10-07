@@ -179,11 +179,15 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
   await page
     .getByLabel("Recipient wallet address")
     .fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(
+    page.getByRole("dialog").getByText(recipient.publicKey.toBase58()),
+  ).toBeVisible();
   await page.getByLabel("Recovery password", { exact: true }).fill(password);
   await page.getByRole("checkbox").check();
   const pendingDownloadPromise = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Save withdrawal recovery file" })
+    .getByRole("button", { name: "Sign and save recovery file" })
     .click();
   const pendingDownload = await pendingDownloadPromise;
   const pendingFile = info.outputPath("pending-test-recovery.json");
@@ -235,11 +239,12 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
   await page
     .getByLabel("Recipient wallet address")
     .fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
   await page.getByLabel("Recovery password", { exact: true }).fill(password);
   await page.getByRole("checkbox").check();
   const nextDownload = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Save withdrawal recovery file" })
+    .getByRole("button", { name: "Sign and save recovery file" })
     .click();
   const nextFile = info.outputPath("second-pending-test-recovery.json");
   await (await nextDownload).saveAs(nextFile);
