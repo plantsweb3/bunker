@@ -428,8 +428,8 @@ export default function Home() {
             <Link href="/demo" className="button light">
               Run the simulation
             </Link>
-            <Link href="/vault" className="button ghost">
-              Preview the app
+            <Link href="/check" className="button ghost">
+              Check a wallet
             </Link>
           </div>
         </section>

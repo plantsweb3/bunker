@@ -23,6 +23,7 @@ export function Header() {
         </Link>
         <nav aria-label="Main navigation">
           <Link href="/demo">Demo</Link>
+          <Link href="/check">Check a wallet</Link>
           <Link href="/docs">How it works</Link>
           <Link href="/security">Security</Link>
         </nav>
@@ -36,6 +37,7 @@ export function Header() {
             </summary>
             <nav aria-label="Mobile navigation">
               <Link href="/demo">Demo</Link>
+              <Link href="/check">Check a wallet</Link>
               <Link href="/docs">How it works</Link>
               <Link href="/security">Security</Link>
               <Link href="/verify">Verify</Link>

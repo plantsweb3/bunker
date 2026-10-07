@@ -56,6 +56,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/",
     "/vault",
     "/demo",
+    "/check",
     "/security",
     "/docs",
     "/verify",
@@ -76,6 +77,63 @@ test("security, documentation, verification and no horizontal overflow", async (
   await expect(
     page.getByText("Not independently verified", { exact: true }),
   ).toBeVisible();
+});
+test("wallet check summarises balances and open approvals without a wallet", async ({
+  page,
+}) => {
+  const owner = "vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg";
+  const mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+  const account = (pubkey: string, info: object) => ({
+    pubkey,
+    account: {
+      data: { parsed: { info, type: "account" }, program: "spl-token", space: 165 },
+      executable: false,
+      lamports: 2039280,
+      owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+      rentEpoch: 0,
+    },
+  });
+  await page.route("**/api/rpc", async (route) => {
+    const body = route.request().postDataJSON();
+    const classic =
+      body.params?.[1]?.programId ===
+      "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+    const value =
+      body.method === "getBalance"
+        ? 1_500_000_000
+        : classic
+          ? [
+              account("So11111111111111111111111111111111111111112", {
+                mint,
+                state: "initialized",
+                tokenAmount: { amount: "25000000", decimals: 6 },
+                delegate: "11111111111111111111111111111111",
+                delegatedAmount: { amount: "25000000", decimals: 6 },
+              }),
+            ]
+          : [];
+    await route.fulfill({
+      json: { jsonrpc: "2.0", id: body.id, result: { context: { slot: 1 }, value } },
+    });
+  });
+  await page.goto("/check");
+  await page.getByLabel("Solana wallet address").fill("not an address");
+  await page.getByRole("button", { name: "Check wallet" }).click();
+  await expect(page.locator(".error-box")).toContainText(
+    "not a valid Solana",
+  );
+  await page.getByLabel("Solana wallet address").fill(owner);
+  await page.getByRole("button", { name: "Check wallet" }).click();
+  await expect(page.getByText(owner, { exact: true })).toBeVisible();
+  await expect(page.locator(".check-card.exposed strong")).toContainText("1.5");
+  await expect(page.locator(".check-card.warn strong")).toHaveText("1");
+  await expect(
+    page.getByRole("heading", { name: "Open approvals" }),
+  ).toBeVisible();
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth > window.innerWidth + 1,
+  );
+  expect(overflow).toBe(false);
 });
 test("server rejects mainnet transaction submission", async ({ request }) => {
   const r = await request.post("/api/rpc", {

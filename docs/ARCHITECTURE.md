@@ -1,6 +1,6 @@
 # Architecture
 
-The frontend uses React/TypeScript and Next.js App Router on Vercel. Six routes: `/`, `/vault`, `/demo`, `/security`, `/verify`, `/docs`. The recovery signer is separated in `sdk/` but still runs in the same browser origin and bundle trust boundary. No production signer isolation is claimed.
+The frontend uses React/TypeScript and Next.js App Router on Vercel. Seven routes: `/`, `/vault`, `/demo`, `/check`, `/security`, `/verify`, `/docs`. `/check` is a read-only inventory of a pasted address: SOL balance, classic SPL and Token-2022 token accounts, and open token delegations, read through the existing `/api/rpc` allowlist (`getBalance`, `getTokenAccountsByOwner`). It connects no wallet, signs nothing, stores nothing, and infers no names or prices; `sdk/exposure.ts` holds the classification and is unit tested. The recovery signer is separated in `sdk/` but still runs in the same browser origin and bundle trust boundary. No production signer isolation is claimed.
 
 `/api/config` exposes network and release status, never RPC credentials. `/api/rpc` proxies an allowlist to one server-configured endpoint, rejects write methods in the production release, enforces origin and request-size checks, and applies upstream timeouts. It is not a durable rate limiter: add edge limits and a dedicated RPC provider before broader publication. The public website is a read-only pre-release.
 

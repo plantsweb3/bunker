@@ -1556,6 +1556,237 @@ svg {
     display: none;
   }
 }
+.check-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 24px;
+  border: 1px solid #303e44;
+  border-radius: 8px;
+  background: #101719;
+}
+.check-form .field {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.check-form input {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+}
+.check-form .button {
+  min-height: 50px;
+  white-space: nowrap;
+}
+.check-result {
+  margin-top: 22px;
+  animation: scene-in 0.45s ease-out both;
+}
+.check-address {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #6f9eaa;
+}
+.check-address code,
+.holding-list code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  color: #d4e9eb;
+  overflow-wrap: anywhere;
+}
+.check-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.check-card {
+  padding: 24px;
+  border: 1px solid #38464c;
+  border-radius: 6px;
+  background: #171f22;
+}
+.check-card > .mono {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: #93a2a8;
+}
+.check-card strong {
+  display: block;
+  margin: 16px 0 12px;
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 40px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.check-card strong small {
+  font-size: 16px;
+  letter-spacing: 0;
+  color: #93a2a8;
+}
+.check-card p {
+  font-size: 13px;
+  line-height: 1.65;
+}
+.check-card.exposed {
+  border-color: #905749;
+  background: #38262077;
+}
+.check-card.exposed > .mono {
+  color: #eeab9b;
+}
+.check-card.warn {
+  border-color: #8a7440;
+  background: #332b1c66;
+}
+.check-card.warn > .mono {
+  color: #d9c08f;
+}
+.check-card.safe {
+  border-color: #638c93;
+  background: #23363780;
+}
+.check-card.safe > .mono {
+  color: #bfe6d9;
+}
+.check-empty {
+  padding: 44px 24px;
+  text-align: center;
+  border: 1px solid #38464c;
+  border-radius: 6px;
+  background: #171f22;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  color: #b4d3d8;
+}
+.check-empty h2 {
+  font-size: 24px;
+  color: #fff;
+}
+.check-table {
+  margin-top: 30px;
+}
+.check-table h2 {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.check-table > p {
+  margin-top: 8px;
+  font-size: 13px;
+  max-width: 640px;
+}
+.holding-list {
+  list-style: none;
+  margin: 16px 0 10px;
+  padding: 0;
+  border: 1px solid #2c3b40;
+  border-radius: 6px;
+  background: #0c1214;
+}
+.holding-list li {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 18px;
+  border-top: 1px solid #1f2a2e;
+  font-size: 13px;
+}
+.holding-list li:first-child {
+  border-top: 0;
+}
+.holding-list li > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  color: #7f9197;
+}
+.holding-list b {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: #eef2f1;
+  overflow-wrap: anywhere;
+}
+.holding-support {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #93a3a8;
+}
+.holding-approval {
+  color: #d9c08f !important;
+}
+.check-foot {
+  margin-top: 18px;
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 860px;
+}
+.check-notes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 44px;
+  padding-top: 28px;
+  border-top: 1px solid #2b3336;
+}
+.check-notes > div {
+  display: flex;
+  gap: 12px;
+  color: #6f9eaa;
+}
+.check-notes svg {
+  margin-top: 4px;
+}
+.check-notes p {
+  font-size: 13px;
+}
+.check-notes strong {
+  font-weight: 500;
+  color: #dfe6e4;
+}
+.check-notes a {
+  color: #dfe9ea;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+@media (max-width: 1000px) {
+  .check-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 700px) {
+  .check-form {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 18px;
+  }
+  .check-address {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .holding-list li {
+    grid-template-columns: 1fr auto;
+    padding: 13px 14px;
+  }
+  .holding-list li > .holding-support,
+  .holding-list li > .holding-approval {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .check-notes {
+    grid-template-columns: 1fr;
+  }
+}
 .text-button {
   border: 0;
   background: none;
