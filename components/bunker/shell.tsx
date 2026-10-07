@@ -59,6 +59,9 @@ export function Footer() {
         <Link href="/security">Security & limitations</Link>
         <Link href="/verify">Verify the program</Link>
         <a href="https://github.com/plantsweb3/bunker">Source on GitHub</a>
+        <a href="https://x.com/BunkerModeIO" target="_blank" rel="noreferrer">
+          @BunkerModeIO on X
+        </a>
       </div>
       <span className="mono">EXPERIMENTAL · MAINNET CUSTODY LOCKED</span>
     </footer>
