@@ -2,7 +2,7 @@
  * is used. Under protocol 2 a withdrawal that cannot land before its expiry
  * leaves the key consumed with no replacement, so anything knowable in advance
  * must stop the flow before signing rather than after. */
-import { Connection, PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "./classic-token";
 import type { Asset } from "./client";
 import { formatAmount } from "./bytes";
@@ -28,6 +28,8 @@ export type PreflightFacts = {
   payerLamports: bigint;
   /** SOL only: current balance of the destination address. */
   destinationLamports: bigint;
+  /** SOL only: false when the address is a program or an account a program owns. */
+  destinationIsWallet: boolean;
   /** Token only: state of the recipient's associated token account. */
   tokenDestination: TokenDestination | null;
   rent: { empty: bigint; proof: bigint; marker: bigint; tokenAccount: bigint };
@@ -37,6 +39,8 @@ const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
 export function withdrawalBlocker(f: PreflightFacts): string | null {
   let needed = f.rent.proof + f.rent.marker + FEE_BUFFER_LAMPORTS;
   if (f.kind === "sol") {
+    if (!f.destinationIsWallet)
+      return "That address is a program or an account controlled by a program, not a wallet. SOL sent there may be unrecoverable. Use a wallet address. Nothing was signed.";
     if (f.destinationLamports + f.amount < f.rent.empty)
       return `The recipient would hold less than the network minimum of ${sol(f.rent.empty)}, so this transfer would be rejected. Send at least ${sol(f.rent.empty - f.destinationLamports)} or choose an address that already holds SOL. Nothing was signed.`;
   } else {
@@ -80,6 +84,8 @@ export async function withdrawalPreflight(
     recipient: recipient.toBase58(),
     payerLamports: BigInt(payerLamports),
     destinationLamports: BigInt(info?.lamports ?? 0),
+    destinationIsWallet:
+      !info || (!info.executable && info.owner.equals(SystemProgram.programId)),
     tokenDestination: !asset.mint
       ? null
       : !info
