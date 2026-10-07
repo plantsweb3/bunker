@@ -175,10 +175,19 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
     page.getByText("Deposit confirmed on the test network.", { exact: true }),
   ).toBeVisible({ timeout: 25000 });
   await page.getByRole("button", { name: "Withdraw", exact: true }).click();
-  await page.getByLabel("Amount", { exact: true }).fill("0.1");
+  // A transfer the network would reject must stop before the key is used.
+  await page.getByLabel("Amount", { exact: true }).fill("0.0001");
   await page
     .getByLabel("Recipient wallet address")
     .fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(
+    page.getByRole("dialog").getByText("network minimum", { exact: false }),
+  ).toBeVisible();
+  expect(
+    parseVault((await c.getAccountInfo(new PublicKey(vaultText)))!.data).nonce,
+  ).toBe(0n);
+  await page.getByLabel("Amount", { exact: true }).fill("0.1");
   await page.getByRole("button", { name: "Review withdrawal" }).click();
   await expect(
     page.getByRole("dialog").getByText(recipient.publicKey.toBase58()),

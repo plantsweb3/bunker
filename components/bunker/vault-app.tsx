@@ -49,6 +49,7 @@ import {
 } from "@/sdk/client";
 import { hex, unhex, parseAmount, formatAmount } from "@/sdk/bytes";
 import { mintLabel } from "@/sdk/known-mints";
+import { withdrawalPreflight } from "@/sdk/preflight";
 import { generateKey } from "@/sdk/winternitz";
 import {
   RecoveryKit,
@@ -402,7 +403,8 @@ function App() {
     await refresh();
     setNotice("Deposit confirmed on the test network.");
   }
-  function reviewWithdrawal() {
+  async function reviewWithdrawal() {
+    const { payer } = requireLive();
     if (!kit?.secret || kit.pending || !selectedAsset)
       throw new Error(
         "Restore the current recovery file or resume your pending withdrawal",
@@ -410,8 +412,23 @@ function App() {
     const qty = parseAmount(amount, selectedAsset.decimals);
     if (qty > selectedAsset.amount || selectedAsset.frozen)
       throw new Error("Insufficient transferable balance");
-    if (new PublicKey(recipient).toBase58() === kit.vault)
+    const recipientKey = new PublicKey(recipient);
+    if (recipientKey.toBase58() === kit.vault)
       throw new Error("Choose a destination outside this Bunker");
+    const dest = await withdrawalDestination(
+      connection,
+      payer,
+      recipientKey,
+      selectedAsset,
+    );
+    await withdrawalPreflight(
+      connection,
+      payer,
+      recipientKey,
+      dest.destination,
+      selectedAsset,
+      qty,
+    );
     setPhase("review");
   }
   async function prepareWithdrawal() {
@@ -441,6 +458,15 @@ function App() {
       payer,
       recipientKey,
       selectedAsset,
+    );
+    // Repeat immediately before the key is consumed; state may have changed.
+    await withdrawalPreflight(
+      connection,
+      payer,
+      recipientKey,
+      dest.destination,
+      selectedAsset,
+      qty,
     );
     if (!/^[1-9][0-9]{0,5}$/.test(expirySlots))
       throw new Error("Choose an authorization lifetime of 1–999999 slots");
@@ -1231,7 +1257,7 @@ function App() {
                 onClick={() =>
                   task(
                     modal === "deposit" ? "Depositing" : "Checking withdrawal",
-                    modal === "deposit" ? deposit : async () => reviewWithdrawal(),
+                    modal === "deposit" ? deposit : reviewWithdrawal,
                   )
                 }
               >
