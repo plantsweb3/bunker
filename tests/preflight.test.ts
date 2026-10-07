@@ -17,6 +17,7 @@ const base: PreflightFacts = {
   recipient: "R",
   payerLamports: 1_000_000_000n,
   destinationLamports: 0n,
+  destinationIsWallet: true,
   tokenDestination: null,
   rent,
 };
@@ -45,6 +46,15 @@ describe("Withdrawal preflight", () => {
     expect(
       withdrawalBlocker({ ...base, amount: 1n, destinationLamports: 890_880n }),
     ).toBeNull();
+  });
+  it("blocks SOL sent to a program or program-owned account", () => {
+    expect(
+      withdrawalBlocker({
+        ...base,
+        destinationIsWallet: false,
+        destinationLamports: 5_000_000n,
+      }),
+    ).toMatch(/not a wallet/);
   });
   it("blocks a fee wallet that cannot fund the proof, marker and fees", () => {
     const needed = rent.proof + rent.marker + FEE_BUFFER_LAMPORTS;

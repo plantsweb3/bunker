@@ -27,6 +27,8 @@ Only ordinary on-curve wallet recipients are supported by the web withdrawal UI.
 
 The canonical signed layout and exact recovery transitions are in `CRYPTOGRAPHY.md`. The v2 encrypted recovery blob is checked against the persistent journal and chain. Signing consumes the journal before cryptographic work; retries load a saved signature. Expiry/failure never resets that consumed state. Web Locks do not synchronize devices or protect against storage rollback.
 
+Because the one-time signature must exist before a withdrawal can be simulated, `sdk/preflight.ts` checks what is knowable beforehand, before the review screen and again immediately before signing: a SOL destination that is a program or program-owned account, a SOL amount that would leave the recipient below the rent minimum, a recipient token account that is frozen, foreign or mismatched, and a fee wallet that cannot fund the proof account, spent marker, token account and fees. These reads trust the RPC and state can change afterwards; they narrow the failure window and do not remove it.
+
 ## Compatibility
 
 Protocol 2 is a breaking test-only format. The payload is 154 bytes and adds version, vault identity and expiry. Vault/proof magic and encrypted recovery envelopes reject v1. There is no automatic migration or reinterpretation of old test keys. Use a fresh isolated ledger and fresh valueless assets for v2; preserve any v1 experiment separately. Do not upgrade an existing program/ledger in place without a reviewed migration.
