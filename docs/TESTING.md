@@ -15,6 +15,18 @@ The Vercel web build is native Next.js 16.4.0. CI runs browser checks against a 
 
 The browser CI job uses the official Playwright 1.56.1 Noble container pinned by digest, with its preinstalled Chromium. Match the container version and npm Playwright version when upgrading. Production smoke tests can run with `BUNKER_E2E_BASE_URL=https://bunkermode.io npm run test:e2e -- tests/browser/app.spec.ts`; they do not sign transactions.
 
+## Protocol 3 draft
+
+The draft program in `programs/bunker3` is not deployed and not used by the web app.
+
+```sh
+cargo test -p bunker3 --locked
+cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy
+cd programs/bunker3-svm-tests && cargo test --locked
+```
+
+The first command exercises the state machine directly. The last loads `target/deploy/bunker3.so` into an in-process Solana VM (LiteSVM) and sets the Clock sysvar to test the waiting period and deadlines to the second. That crate is deliberately outside the workspace and has its own lockfile so the VM's dependency tree stays out of the program's. GitHub CI builds and tests the workspace; it does not run the VM suite.
+
 ## Protocol 2 reproduction
 
 ```sh

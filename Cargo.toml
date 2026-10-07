@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["programs/bunker", "crates/winterwallet-core"]
+members = ["programs/bunker", "programs/bunker3", "crates/winterwallet-core"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
