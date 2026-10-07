@@ -20,8 +20,8 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
   }
   if (
     [
-      "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-      "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+      "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
     ].includes(genesis)
   )
     throw new Error("Custody browser test requires local validator");

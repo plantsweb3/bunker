@@ -1,5 +1,6 @@
-export const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp";
-export const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1";
+// Full getGenesisHash results; these are not truncated CAIP chain identifiers.
+export const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
+export const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 export type BunkerConfig = {
   network: "mainnet-beta" | "devnet" | "localnet";
   custodyEnabled: boolean;

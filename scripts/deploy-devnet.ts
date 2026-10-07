@@ -9,7 +9,7 @@ if (!payer || !program || !existsSync(payer) || !existsSync(program))
 const url = "https://api.devnet.solana.com";
 if (
   (await new Connection(url).getGenesisHash()) !==
-  "EtWTRABZaYq6iMfeYKouRu166VU2xqa1"
+  "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"
 )
   throw new Error("Not devnet");
 if (!existsSync("target/deploy/bunker.so"))

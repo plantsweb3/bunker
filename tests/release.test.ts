@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { configFromEnv, MAINNET_GENESIS } from "../lib/bunker-config";
+import { configFromEnv, MAINNET_GENESIS, DEVNET_GENESIS } from "../lib/bunker-config";
 import { transition } from "../sdk/demo";
 import { assertNetwork } from "../sdk/client";
 import type { Connection } from "@solana/web3.js";
 describe("Release gate", () => {
+  it("pins full RPC genesis hashes and accepts a mainnet read", async () => {
+    expect(MAINNET_GENESIS).toBe("5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d");
+    expect(DEVNET_GENESIS).toBe("EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG");
+    await expect(assertNetwork({ getGenesisHash: async () => MAINNET_GENESIS } as Connection, configFromEnv({}))).resolves.toBeUndefined();
+    await expect(assertNetwork({ getGenesisHash: async () => MAINNET_GENESIS.slice(0, 32) } as Connection, configFromEnv({}))).rejects.toThrow("pinned network");
+  });
   it("defaults to read-only mainnet", () => {
     expect(configFromEnv({})).toMatchObject({
       network: "mainnet-beta",

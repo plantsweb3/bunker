@@ -5,8 +5,8 @@ const program = "AhZPKQAwKeCJ47PVKz5QZmBwf1PE8BHcmcqsjvSdPaZ";
 const genesis = await c.getGenesisHash();
 if (
   [
-    "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp",
-    "EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+    "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
   ].includes(genesis)
 )
   throw new Error("Expected an isolated local validator");

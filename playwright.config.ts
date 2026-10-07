@@ -3,7 +3,7 @@ export default defineConfig({
   testDir: "./tests/browser",
   timeout: 30000,
   use: {
-    baseURL: "http://127.0.0.1:5173",
+    baseURL: process.env.BUNKER_E2E_BASE_URL ?? "http://127.0.0.1:5173",
     trace: "retain-on-failure",
     actionTimeout: 15000,
   },

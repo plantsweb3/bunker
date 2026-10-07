@@ -45,7 +45,7 @@ async function reject(label: string, ixs: TransactionInstruction[]) {
 }
 async function main() {
   const genesis = await c.getGenesisHash();
-  assert(!["5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp", "EtWTRABZaYq6iMfeYKouRu166VU2xqa1"].includes(genesis), "Local tests must never run on a public cluster");
+  assert(!["5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d", "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG"].includes(genesis), "Local tests must never run on a public cluster");
   await c.requestAirdrop(payer.publicKey, 20_000_000_000);
   const deadline = Date.now() + 30000;
   while ((await c.getBalance(payer.publicKey)) === 0) {

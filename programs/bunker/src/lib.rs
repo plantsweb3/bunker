@@ -1,20 +1,18 @@
 //! Experimental devnet custody. Fixed SOL/classic SPL withdrawals only.
 //! Cryptographic verification is vendored unchanged from Winterwallet; see docs/CRYPTOGRAPHY.md.
-use solana_program::{
-    account_info::{next_account_info, AccountInfo},
-    entrypoint::ProgramResult,
-    hash::hashv,
-    program::{invoke, invoke_signed},
-    program_error::ProgramError,
-    program_pack::Pack,
-    pubkey::Pubkey,
-    rent::Rent,
-    system_instruction, system_program,
-    sysvar::Sysvar,
-};
+use solana_account_info::{next_account_info, AccountInfo};
+use solana_program_entrypoint::ProgramResult;
+use solana_sha256_hasher::hashv;
+use solana_cpi::{invoke, invoke_signed};
+use solana_program_error::ProgramError;
+use solana_program_pack::Pack;
+use solana_pubkey::Pubkey;
+use solana_rent::Rent;
+use solana_system_interface::{instruction as system_instruction, program as system_program};
+use solana_sysvar::Sysvar;
 use winterwallet_core::{WinternitzRoot, WinternitzSignature};
 #[cfg(not(feature = "no-entrypoint"))]
-solana_program::entrypoint!(process_instruction);
+solana_program_entrypoint::entrypoint!(process_instruction);
 pub const VAULT_LEN: usize = 81;
 pub const PROOF_LEN: usize = 1162;
 pub const SIGNATURE_LEN: usize = 1088;

@@ -1,6 +1,6 @@
 {
   "network": "local-validator",
-  "genesis": "7FNdE8HDyUELca7UPXfJ423JSuffgi2BjqTv2kAejoho",
+  "genesis": "D1pgtUTsN69wtyYpn3xfdAHHP2ok4r4vSeC9ay2N16Hm",
   "program": "AhZPKQAwKeCJ47PVKz5QZmBwf1PE8BHcmcqsjvSdPaZ",
   "passed": 19,
   "checks": [

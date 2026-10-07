@@ -32,10 +32,28 @@ jobs:
       - run: cargo check -p bunker --locked
       - run: npm run source:bundle
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+  browser-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    container:
+      # Official Playwright 1.56.1 Noble image, matched to package-lock.json.
+      image: mcr.microsoft.com/playwright:v1.56.1-noble@sha256:f1e7e01021efd65dd1a2c56064be399f3e4de00fd021ac561325f2bfbb2b837a
+      options: --ipc=host
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run source:bundle
+      - run: npm run build
       - name: Browser release checks
         run: |
           npm start > /tmp/bunker-preview.log 2>&1 &
-          trap 'kill $!' EXIT
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:5173/ > /dev/null && break; sleep 1; done
           npm run test:e2e

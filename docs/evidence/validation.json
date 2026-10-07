@@ -1,11 +1,11 @@
 {
-  "date_utc": "2026-10-07T20:06:11.712979+00:00",
+  "date_utc": "2026-10-07T20:13:04.100131+00:00",
   "status": "Pre-release; mainnet custody disabled pending independent external review",
   "typescript": "passed",
   "unit_tests": {
-    "passed": 31,
+    "passed": 32,
     "files": 4,
-    "runner": "Vitest"
+    "runner": "Vitest 4.1.11"
   },
   "upstream_rust_tests": {
     "passed": 20,
@@ -34,16 +34,15 @@
   },
   "sbf_build": {
     "status": "passed",
-    "artifact_sha256": "4f173e5b0e2cfebbfa3e6f4fb6da90345820c212ebed3a54e6d1ccf212ee49b4",
+    "artifact_sha256": "5120005ff9ba95ebcda4560803c3bea8492f23cd1777998aea1a78e95cae06ff",
     "tool": "cargo-build-sbf 4.4.0",
     "warnings": [
-      "deprecated Solana system module re-exports",
       "cdylib + lib disables link-time optimization"
     ]
   },
   "independent_audit": "not performed; no reviewer engaged",
   "mainnet_program_deployment": "none",
-  "production_wallet_reads": "Dedicated RPC credentials recommended; public fallback returned an unavailable/rate-limit error during preview",
+  "production_wallet_reads": "Verified full mainnet genesis through the deployed Vercel RPC proxy on bunkermode.io; public RPC remains rate limited and has no service guarantee.",
   "limitations": [
     "Tests are engineering checks, not a security assessment.",
     "Browser custody tests use a disposable local wallet and local RPC; no user wallet or real funds.",
@@ -54,5 +53,13 @@
     "reported": 0,
     "scope": "npm audit --omit=dev",
     "note": "Point-in-time advisory result, not a security audit"
+  },
+  "development_npm_advisories": {
+    "underlying_advisories": 1,
+    "affected_dependency_nodes": 5,
+    "severity": "high",
+    "package": "braces <=3.0.3",
+    "advisory": "GHSA-vfj7-8cjw-p6xm",
+    "exposure": "ESLint/Next lint tooling only; not in production runtime. No upstream patched braces version available at verification time."
   }
 }
