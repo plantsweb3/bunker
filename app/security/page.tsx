@@ -126,9 +126,16 @@ export default function Page() {
           memory.
         </p>
         <p>
-          No security contact or bounty program has been commissioned. Before
-          release, the project owner must appoint a private reporting channel,
-          reviewers, and incident responders.{" "}
+          Report vulnerabilities privately through{" "}
+          <a
+            href="https://github.com/plantsweb3/bunker/security/advisories/new"
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub private vulnerability reporting
+          </a>
+          . There is no funded bounty, guaranteed response time, or named
+          incident responder yet; those are release requirements.{" "}
           <Link href="/verify">See the release requirements.</Link>
         </p>
       </section>
