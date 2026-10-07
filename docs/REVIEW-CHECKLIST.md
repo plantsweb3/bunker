@@ -8,9 +8,10 @@ Scope includes the full repo and its dependency lockfiles, especially:
 - Exact correspondence of browser signer and Rust verifier, including independent test vectors beyond our fixture.
 - Mutable program owner/PDA/account alias validation, SOL rent, classic SPL mint/owner/delegate/close authority, errors and CPI atomicity.
 - Fuzz instruction lengths, account counts, integer bounds, oversized chunks, partial buffers, duplicate metas and adversarial token states.
+- Permanent spent-root markers, failed-transaction rollback, root-reinstallation rejection, slot-boundary expiry and atomic authority over every remaining asset.
 - Browser signing journal crash windows, persistent storage failure, same-origin races, stale recovery files, multi-device state and chain rollback.
 - Recipient binding, trust in RPC, encrypted file parsing and KDF, frontend compromise, supply-chain build provenance and signer isolation.
-- Irrecoverable pending authorizations after token freezes or permanent transfer failures; no cancellation/expiry escape hatch is claimed.
+- Irrecoverable pending authorizations after token freezes or permanent transfer failures; expiry is enforced, with no cancellation or expiry recovery escape hatch.
 - Domain separation for a reviewed production deployment and independently reproducible program build.
 - Upgrade policy, incident response, authenticated release process, security contact, audit scope disclosure and bounty.
 

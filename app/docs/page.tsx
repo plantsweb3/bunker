@@ -22,8 +22,8 @@ export default function Page() {
           In the isolated test build, the browser generates independent random
           one-time key material using its cryptographic random-number generator.
           It is not derived from your Solana wallet. An encrypted recovery file
-          contains the vault identity, current authority, network, and key
-          state.
+          contains its version, vault identity, current and next unused indices,
+          current authority commitment, network, and key state.
         </p>
         <p>
           The file uses Web Crypto AES-256-GCM and PBKDF2-SHA256 with 600,000
@@ -48,16 +48,19 @@ export default function Page() {
       <section>
         <h2>4. Withdraw with an exact authorization</h2>
         <p>
-          The signed message commits to the domain, program, vault, nonce, asset
-          type, mint, exact destination account, amount, and next authorization
-          commitment. A withdrawal moves one asset at a time.
+          The signed message commits to the domain, protocol version, program,
+          vault address and identity, nonce, asset type, mint, exact destination
+          account, amount, expiry slot, and next authorization commitment. A
+          withdrawal moves one asset at a time.
         </p>
         <p>
           A full signature is 1,088 bytes. To stay within legacy transaction
           limits without truncating the digest, the app uploads it in two
           bounded, append-only chunks. A third transaction verifies the complete
           signature, transfers the asset, and rotates authority atomically.
-          Successful completion also reclaims proof-account rent.
+          Successful completion also reclaims proof-account rent. A permanent
+          spent-commitment marker prevents reuse or reinstallation of that
+          authority. All remaining assets come under the next commitment.
         </p>
       </section>
       <section>
@@ -66,12 +69,15 @@ export default function Page() {
           The newest pending recovery file includes the exact signed transfer
           and the next key. Keep it even if your connection drops or your wallet
           rejects a fee transaction. Restore that file and resume the same
-          transfer. If it already completed, the app recognizes the next
-          on-chain authority and restores it.
+          transfer before its expiry slot. If it already completed, the app
+          recognizes the next on-chain authority and restores it.
         </p>
         <p>
-          Never sign a different message with the old key. Browser history alone
-          is not sufficient protection against stale backups on another device.
+          The journal consumes the current index before signing. Failed or
+          unconfirmed submission never makes it unused. An expired authorization
+          cannot be replaced or cancelled and can permanently lock assets. Never
+          sign a different message with the old key. Browser history alone is
+          not sufficient protection against stale backups on another device.
           This limitation is a mandatory part of the external review.
         </p>
       </section>
@@ -83,10 +89,7 @@ export default function Page() {
           configuration. No wallet credentials are shipped. Production mainnet
           custody remains disabled.
         </p>
-        <a
-          href="https://github.com/plantsweb3/bunker"
-          className="button light"
-        >
+        <a href="https://github.com/plantsweb3/bunker" className="button light">
           Get the working repository
         </a>
       </section>

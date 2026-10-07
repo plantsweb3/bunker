@@ -30,6 +30,12 @@ Roll back the website through the Vercel deployment dashboard to a previously ch
 
 The local validator loads `target/deploy/bunker.so` at a fixed **test-only** identity. It needs no program private key. `scripts/setup-local.ts` checks the local program and pins the local genesis hash before creating the ignored `.env.local`. Restart the local app after changing this file; remove it to restore the mainnet read-only configuration.
 
+Protocol 2 is not an in-place v1 migration. Build the new binary and use a **new** `BUNKER_LOCAL_LEDGER` directory; existing validator ledgers keep their old program state. Do not reset another experiment's ledger. Never import v1 recovery material into v2 or fund the public fixture keys. Version 2 adds a permanent spent-root marker (8 bytes, one per successful withdrawal), so local fee payers need marker rent as well as transaction fees. Failed transactions do not persist that marker.
+
+Before any later test deployment, run the workspace Rust tests, regenerate and compare the v2 fixture, build SBF, run isolated-chain tests and browser custody flows, and record the binary SHA-256. The checked-in chain report identifies the tested binary; this is not proof of equivalence to a public deployment. No mainnet program deployment is part of this revision. Real-fund enablement still requires a later reviewed release and an explicit source change; adding an environment bypass is prohibited.
+
+Recovery blobs now use `bunker-encrypted-v2` with authenticated metadata and canonical indices/root. Do not clear or roll back the journal to make a failed signing attempt work. Preserve the exact pending blob; reconcile chain root/nonce before retrying the saved signature. After expiry, stop: there is no supported cancellation or replacement. A deployment rollback cannot unconsume a signing key.
+
 Optional devnet tooling requires dedicated test-only deployment keys explicitly supplied by the operator. It verifies the devnet genesis and never reads the default wallet. The public website does not depend on a devnet deployment.
 
 ## Real-fund launch blockers

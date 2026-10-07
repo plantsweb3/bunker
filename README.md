@@ -52,14 +52,16 @@ npm run dev
 
 Use a disposable Solana Wallet Standard wallet advertising `solana:localnet`, or run the browser custody tests with their generated local test wallet. The local faucet supplies valueless assets. Do not import a real funded wallet to test this software. `setup:local` pins the local chain's genesis hash. Remove `.env.local` to restore the public read-only configuration.
 
-The experimental signature key must never authorize two different messages. One browser's lock/journal cannot protect against stale backups, separate devices, cleared storage, a malicious frontend, or chain rollback. These are unresolved production design issues. A published authorization has no cancellation or expiry path. Read the threat model before experimenting.
+The experimental signature key must never authorize two different messages. One browser's lock/journal cannot protect against stale backups, separate devices, cleared storage, a malicious frontend, or chain rollback. These are unresolved production design issues. Protocol 2 adds an inclusive expiry slot. Expiry never makes a consumed key reusable: there is no cancellation or replacement path, and an expired or irrecoverable authorization can permanently lock assets. Read the threat model before experimenting.
+
+Protocol 2 is a breaking **local test** revision: versioned signed bytes, on-chain spent-commitment markers, slot expiry, and canonical encrypted recovery with consumption before signing. V1 accounts/files are rejected; use a fresh ledger and fresh test keys. See the [byte-level specification](docs/CRYPTOGRAPHY.md) and [reproducible v2 fixtures](fixtures/bunker-v2.json). Fees, account creation and the Solana runtime continue to use ordinary signatures.
 
 ## Verify
 
 ```sh
 npm run typecheck
 npm test
-cargo test -p winterwallet-core --locked
+cargo test --workspace --locked
 npm run test:chain
 npm run test:e2e
 npm run audit:dependencies
