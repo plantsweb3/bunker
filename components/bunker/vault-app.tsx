@@ -71,12 +71,49 @@ import {
 } from "@/sdk/protocol";
 type Modal = "create" | "restore" | "deposit" | "withdraw" | null;
 type Activity = { signature: string; label: string };
+// Approximate only: Solana targets 400 ms per slot but slots are not wall-clock time.
+const SLOT_MS = 400;
+const WINDOWS = [
+  ["9000", "About 1 hour"],
+  ["54000", "About 6 hours"],
+  ["216000", "About 24 hours"],
+] as const;
+const aboutTime = (slots: bigint) => {
+  const minutes = Number(slots) * (SLOT_MS / 60000);
+  if (minutes < 1) return "less than a minute";
+  if (minutes < 90) return `about ${Math.round(minutes)} min`;
+  return `about ${Math.round(minutes / 60)} h`;
+};
+const friendly: [RegExp, string][] = [
+  [
+    /503|RPC unavailable|fetch failed|Failed to fetch/,
+    "The Solana connection is unavailable. Nothing was sent. Try again in a moment.",
+  ],
+  [
+    /Invalid withdrawal intent|Invalid withdrawal encoding/,
+    "This withdrawal could not be prepared. Check the amount and recipient, then try again. Nothing was signed.",
+  ],
+  [
+    /Journal missing/,
+    "This browser has no record of this Bunker. Use Restore and open your newest recovery file to continue.",
+  ],
+  [
+    /Invalid public key input|Non-base58 character/,
+    "That is not a valid Solana address. Paste the full recipient address.",
+  ],
+  [
+    /User rejected|rejected the request/i,
+    "The request was declined in your wallet. Nothing was sent.",
+  ],
+  [
+    /OperationError|decrypt/i,
+    "That password does not open this recovery file. Check the password and the file.",
+  ],
+];
 const errText = (e: unknown) => {
   const m =
     e instanceof Error ? e.message : "The operation could not be completed.";
-  return /503|RPC unavailable|fetch failed|Failed to fetch/.test(m)
-    ? "The Solana connection is unavailable. Try again; the operator may need to configure a dedicated RPC endpoint."
-    : m;
+  return friendly.find(([pattern]) => pattern.test(m))?.[1] ?? m;
 };
 function App() {
   const wallet = useWallet();
@@ -100,8 +137,10 @@ function App() {
   const [assetKey, setAssetKey] = useState("SOL");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
-  const [expirySlots, setExpirySlots] = useState("1500");
-  const [phase, setPhase] = useState<"entry" | "backup">("entry");
+  const [expirySlots, setExpirySlots] = useState<string>("216000");
+  const [checkpointVault, setCheckpointVault] = useState("");
+  const [slotNow, setSlotNow] = useState<bigint | null>(null);
+  const [phase, setPhase] = useState<"entry" | "review" | "backup">("entry");
   const [recoveryFileName, setRecoveryFileName] = useState("");
   const inFlight = useRef(false);
   useEffect(() => {
@@ -196,6 +235,8 @@ function App() {
     setAmount("");
     setAssetKey("SOL");
     setRecipient("");
+    setCheckpointVault("");
+    setExpirySlots("216000");
     setRecoveryFileName("");
   }
   function requireLive() {
@@ -360,6 +401,18 @@ function App() {
     await refresh();
     setNotice("Deposit confirmed on the test network.");
   }
+  function reviewWithdrawal() {
+    if (!kit?.secret || kit.pending || !selectedAsset)
+      throw new Error(
+        "Restore the current recovery file or resume your pending withdrawal",
+      );
+    const qty = parseAmount(amount, selectedAsset.decimals);
+    if (qty > selectedAsset.amount || selectedAsset.frozen)
+      throw new Error("Insufficient transferable balance");
+    if (new PublicKey(recipient).toBase58() === kit.vault)
+      throw new Error("Choose a destination outside this Bunker");
+    setPhase("review");
+  }
   async function prepareWithdrawal() {
     const { program, payer, c } = requireLive();
     if (!kit?.secret || kit.pending || !selectedAsset)
@@ -391,9 +444,11 @@ function App() {
     if (!/^[1-9][0-9]{0,5}$/.test(expirySlots))
       throw new Error("Choose an authorization lifetime of 1–999999 slots");
     const next = generateKey();
+    const signingSlot = BigInt(await connection.getSlot());
+    setSlotNow(signingSlot);
     const payload = encodeIntent({
       vaultId: unhex(kit.vaultId),
-      expirySlot: BigInt(await connection.getSlot()) + BigInt(expirySlots),
+      expirySlot: signingSlot + BigInt(expirySlots),
       nonce: state.nonce,
       kind: selectedAsset.mint ? 1 : 0,
       mint: selectedAsset.mint
@@ -450,6 +505,7 @@ function App() {
     if (!checkpoint)
       throw new Error("Journal missing; explicitly import the recovery blob");
     const slot = BigInt(await connection.getSlot());
+    setSlotNow(slot);
     const current = await adoptRecovery(
       kit,
       checkpoint,
@@ -495,8 +551,11 @@ function App() {
     );
     try {
       for (let i = 0; i < stages.length; i++)
-        await transmit(`Publish authorization ${i + 1}/2`, [stages[i]]);
-      await transmit("Withdraw and rotate authority", [
+        await transmit(
+          `Approval ${i + 1} of 3 · publishing authorization`,
+          [stages[i]],
+        );
+      await transmit("Approval 3 of 3 · withdrawing and changing the lock", [
         computeIx(),
         ...destination.setup,
         withdrawIx(program, payer, v, payload, unhex(kit.root), source),
@@ -520,14 +579,22 @@ function App() {
     setPhase("backup");
     setEncrypted("");
     setVerifiedBackup(false);
+    setSlotNow(null);
+    connection
+      .getSlot()
+      .then((slot) => setSlotNow(BigInt(slot)))
+      .catch(() => {});
   }
+  const pendingIntent = kit?.pending
+    ? decodeIntent(unhex(kit.pending.payload))
+    : null;
   const canCreate = !!config?.custodyEnabled && !!wallet.address && !busy;
   return (
     <main className="vault-page">
       <div className="app-top">
         <div className="app-breadcrumb">
           <Shield size={17} />
-          Your workspace<span>/</span>Overview
+          Vault
         </div>
         <div className="app-top-actions">
           <span className="pill">
@@ -814,9 +881,11 @@ function App() {
               ? "Your wallet approves this deposit. The vault’s recovery key controls withdrawals."
               : modal === "restore"
                 ? "Open your latest encrypted recovery file. Your wallet pays fees; the file supplies independent authorization."
-                : phase === "backup"
-                  ? "Save and re-open the encrypted recovery file before continuing. Keep the password separately."
-                  : "Test custody only. The browser handles sensitive keys. An independent security review is still required."}
+                : phase === "review"
+                  ? "Check every detail. Signing uses up this Bunker key: the withdrawal below is the only one it can ever authorize."
+                  : phase === "backup"
+                    ? "Save and re-open the encrypted recovery file before continuing. Keep the password separately."
+                    : "Test custody only. The browser handles sensitive keys. An independent security review is still required."}
           </DialogDescription>
           {modal === "restore" ? (
             <>
@@ -837,24 +906,29 @@ function App() {
               >
                 Unlock recovery file
               </button>
-              <p className="modal-copy">
-                If a withdrawal was interrupted on this device, you can restore
-                its encrypted checkpoint.
-              </p>
+              <details className="advanced">
+                <summary>
+                  A withdrawal was interrupted and I don’t have its file
+                </summary>
+                <p className="modal-copy">
+                  This browser keeps an encrypted checkpoint of an interrupted
+                  withdrawal. Enter the vault address to load it, then unlock
+                  it with your recovery password above.
+                </p>
               <label className="field">
                 <span>Vault address for local checkpoint</span>
                 <input
-                  value={recipient}
-                  onChange={(e) => setRecipient(e.target.value)}
+                  value={checkpointVault}
+                  onChange={(e) => setCheckpointVault(e.target.value)}
                   placeholder="Bunker vault address"
                 />
               </label>
               <button
                 className="text-button"
-                disabled={!!busy || !recipient}
+                disabled={!!busy || !checkpointVault}
                 onClick={() =>
                   task("Reading checkpoint", async () => {
-                    const v = new PublicKey(recipient);
+                    const v = new PublicKey(checkpointVault);
                     const raw = recoveryCheckpoint({
                       vault: v.toBase58(),
                       program: config!.programId!,
@@ -876,6 +950,7 @@ function App() {
               >
                 Use local encrypted checkpoint
               </button>
+              </details>
             </>
           ) : phase === "backup" ? (
             <>
@@ -893,12 +968,14 @@ function App() {
               {kit?.pending && (
                 <div className="notice">
                   Only resume this exact withdrawal. Do not reuse an older
-                  recovery file to authorize a different transfer. Expiry slot:{" "}
-                  {decodeIntent(
-                    unhex(kit.pending.payload),
-                  ).expirySlot.toString()}
-                  . After expiry, the key stays consumed and assets may remain
-                  locked.
+                  recovery file to authorize a different transfer.{" "}
+                  {pendingIntent && slotNow !== null
+                    ? pendingIntent.expirySlot >= slotNow
+                      ? `Finish within ${aboutTime(pendingIntent.expirySlot - slotNow)}. `
+                      : "This authorization has expired. "
+                    : ""}
+                  Expiry slot: {pendingIntent?.expirySlot.toString()}. After
+                  expiry, the key stays consumed and assets may remain locked.
                 </div>
               )}
               {encrypted && (
@@ -959,6 +1036,81 @@ function App() {
                   ? "Expect 3 wallet approvals: 2 signature uploads, then the atomic withdrawal and key rotation. Failed or timed-out submissions can resume this exact signature only before expiry. An expired authorization has no cancellation or replacement path."
                   : "One wallet approval creates the vault. No assets are deposited automatically."}
               </p>
+            </>
+          ) : phase === "review" && selectedAsset ? (
+            <>
+              <dl className="withdraw-review">
+                <div>
+                  <dt>You are withdrawing</dt>
+                  <dd className="review-amount">
+                    {amount} {selectedAsset.mint ? "tokens" : "SOL"}
+                  </dd>
+                </div>
+                {selectedAsset.mint && (
+                  <div>
+                    <dt>Token mint</dt>
+                    <dd>
+                      <code>{selectedAsset.mint}</code>
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt>To this address</dt>
+                  <dd>
+                    <code>{recipient}</code>
+                  </dd>
+                </div>
+                <div>
+                  <dt>Time to finish</dt>
+                  <dd>
+                    {WINDOWS.find(([v]) => v === expirySlots)?.[1]} ·{" "}
+                    {Number(expirySlots).toLocaleString("en-US")} slots
+                  </dd>
+                </div>
+                <div>
+                  <dt>What happens next</dt>
+                  <dd>
+                    A new recovery file downloads. You re-open it to prove it
+                    is saved, then approve 3 transactions in your wallet.
+                  </dd>
+                </div>
+              </dl>
+              <Password value={password} onChange={setPassword} />
+              <label className="check-label">
+                <Checkbox
+                  checked={ack}
+                  onCheckedChange={(v) => setAck(v === true)}
+                />
+                <span>
+                  I checked the full recipient and amount. This one-time
+                  authorization cannot be replaced with a different withdrawal
+                  after signing begins, even if submission fails or expires.
+                </span>
+              </label>
+              <div className="notice">
+                Use one browser and the latest recovery file. A stale backup or
+                a second device can cause unsafe key reuse.
+              </div>
+              <div className="actions">
+                <button
+                  className="button ghost"
+                  disabled={!!busy}
+                  onClick={() => {
+                    setPhase("entry");
+                    setAck(false);
+                    setError("");
+                  }}
+                >
+                  Back
+                </button>
+                <button
+                  className="button light"
+                  disabled={!!busy || !ack || !password}
+                  onClick={() => task("Preparing withdrawal", prepareWithdrawal)}
+                >
+                  Sign and save recovery file
+                </button>
+              </div>
             </>
           ) : modal === "create" ? (
             <>
@@ -1041,36 +1193,31 @@ function App() {
                     />
                   </label>
                   <label className="field">
-                    <span>Authorization lifetime (slots)</span>
-                    <input
-                      inputMode="numeric"
+                    <span>Time to finish this withdrawal</span>
+                    <select
+                      aria-label="Time to finish this withdrawal"
                       value={expirySlots}
                       onChange={(e) => setExpirySlots(e.target.value)}
-                    />
+                    >
+                      {WINDOWS.map(([slots, label]) => (
+                        <option key={slots} value={slots}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
                     <small>
-                      Slots are not wall-clock time. Expiry can permanently lock
-                      assets; there is no cancellation path.
+                      If the withdrawal is not completed in this window, the
+                      key is used up and assets can be permanently locked.
+                      Times are estimates; the limit is counted in network
+                      slots.
                     </small>
-                  </label>
-                  <Password value={password} onChange={setPassword} />
-                  <label className="check-label">
-                    <Checkbox
-                      checked={ack}
-                      onCheckedChange={(v) => setAck(v === true)}
-                    />
-                    <span>
-                      I checked the full recipient and amount. This one-time
-                      authorization cannot be replaced with a different
-                      withdrawal after signing begins, even if submission fails
-                      or expires.
-                    </span>
                   </label>
                 </>
               )}
               <div className="notice">
                 {modal === "deposit"
                   ? "Network fees and token-account rent are additional. SOL reserved for vault rent is not withdrawable."
-                  : "Use one browser and the latest recovery file. A stale backup or a second device can cause unsafe key reuse."}
+                  : "Nothing is signed yet. You will review every detail on the next screen."}
               </div>
               <button
                 className="button light"
@@ -1078,18 +1225,18 @@ function App() {
                   !!busy ||
                   !amount ||
                   !selectedAsset ||
-                  (modal === "withdraw" && (!ack || !recipient))
+                  (modal === "withdraw" && !recipient)
                 }
                 onClick={() =>
                   task(
-                    modal === "deposit" ? "Depositing" : "Preparing withdrawal",
-                    modal === "deposit" ? deposit : prepareWithdrawal,
+                    modal === "deposit" ? "Depositing" : "Checking withdrawal",
+                    modal === "deposit" ? deposit : async () => reviewWithdrawal(),
                   )
                 }
               >
                 {modal === "deposit"
                   ? "Review deposit in wallet"
-                  : "Save withdrawal recovery file"}
+                  : "Review withdrawal"}
               </button>
             </>
           )}

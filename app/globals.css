@@ -1674,6 +1674,62 @@ svg {
   gap: 12px;
   margin-top: 26px;
 }
+.withdraw-review {
+  margin: 0;
+  border: 1px solid #354249;
+  border-radius: 6px;
+  background: #0e1417;
+}
+.withdraw-review > div {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-top: 1px solid #263135;
+}
+.withdraw-review > div:first-child {
+  border-top: 0;
+}
+.withdraw-review dt {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #6f9eaa;
+}
+.withdraw-review dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #dfe6e4;
+}
+.withdraw-review code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.withdraw-review .review-amount {
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: 26px;
+  letter-spacing: -0.02em;
+  color: #fff;
+}
+details.advanced {
+  border-top: 1px solid #263135;
+  padding-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+details.advanced summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: #adbec4;
+}
+details.advanced[open] summary {
+  margin-bottom: 12px;
+}
+details.advanced .field {
+  margin-bottom: 10px;
+}
 .modal-copy {
   font-size: 14px;
   line-height: 1.65;
