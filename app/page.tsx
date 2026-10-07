@@ -157,6 +157,12 @@ export default function Home() {
               <Shield size={14} />
               Your wallet gets you in. A separate key gets you out.
             </div>
+            <div className="ca-line" aria-label="Contract address coming soon">
+              <span className="ca-label">CA</span>
+              <span className="ca-typed" aria-hidden="true">
+                contract address coming soon...
+              </span>
+            </div>
           </div>
           <div className="architectural-label">
             <span>01 / THE BUNKER</span>
