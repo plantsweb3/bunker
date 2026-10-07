@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     "A separate vault for the Solana you can’t afford to lose. Your wallet key can’t open it. Pre-release: explore the demo, inspect the source, and understand the limits.",
   metadataBase: new URL("https://bunkermode.io"),
   openGraph: { type: "website", siteName: "Bunker", title: "Bunker — Prepare. Don’t panic.", description: "A separate vault for the Solana you can’t afford to lose. Pre-release; real funds not accepted yet.", images: [{ url: "/brand/bunker-x-banner-1500x500.png", width: 1500, height: 500 }] },
-  twitter: { card: "summary_large_image", images: ["/brand/bunker-x-banner-1500x500.png"] },
+  twitter: { card: "summary_large_image", site: "@BunkerModeIO", images: ["/brand/bunker-x-banner-1500x500.png"] },
   icons: {
     icon: [
       { url: "/brand/bunker-favicon-dark-32.png", sizes: "32x32", type: "image/png", media: "(prefers-color-scheme: light)" },

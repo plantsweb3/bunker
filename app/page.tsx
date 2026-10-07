@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Header, Footer } from "@/components/bunker/shell";
 const REPO = "https://github.com/plantsweb3/bunker";
+const X_URL = "https://x.com/BunkerModeIO";
 const stops = [
   "A drainer site that tricks your wallet into signing. A wallet signature alone cannot move what is in the vault.",
   "A stolen or leaked seed phrase. Your seed phrase does not produce the Bunker key.",
@@ -381,11 +382,11 @@ export default function Home() {
               <div className="actions road-actions">
                 <a
                   className="button light"
-                  href={`${REPO}/releases`}
+                  href={X_URL}
                   target="_blank"
                   rel="noreferrer"
                 >
-                  Follow releases on GitHub
+                  Follow @BunkerModeIO on X
                 </a>
                 <Link className="button ghost" href="/verify">
                   Inspect deployment & source
