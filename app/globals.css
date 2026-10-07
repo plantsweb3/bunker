@@ -840,6 +840,51 @@ svg {
 .hero p {
   max-width: 520px;
 }
+.ca-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 26px;
+  padding: 10px 14px;
+  border: 1px solid #36444a;
+  border-radius: 4px;
+  background: #0e1417b3;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #b1c6c8;
+  max-width: 100%;
+}
+.ca-label {
+  color: var(--ice);
+  letter-spacing: 0.15em;
+}
+.ca-typed {
+  display: inline-block;
+  width: 31ch;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: content-box;
+  padding-right: 3px;
+  border-right: 1px solid var(--ice);
+  letter-spacing: 0;
+  animation:
+    ca-type 2.6s steps(31, end) 0.6s both,
+    ca-caret 1s step-end infinite;
+}
+@keyframes ca-type {
+  from {
+    width: 0;
+  }
+  to {
+    width: 31ch;
+  }
+}
+@keyframes ca-caret {
+  50% {
+    border-color: transparent;
+  }
+}
 .drained-row {
   border-color: #5b4039;
 }
