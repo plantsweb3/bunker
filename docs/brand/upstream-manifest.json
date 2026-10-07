@@ -1,0 +1,301 @@
+{
+  "version": 2,
+  "date": "2026-10-07",
+  "source": "User-supplied approved moodboard",
+  "assets": [
+    {
+      "file": "favicons/bunker-favicon-dark-128.png",
+      "width": 128,
+      "height": 128,
+      "transparent": true,
+      "sha256": "b79be286ba3bc7b0cdcd6e55c861ca1a7d2ca50d72e29018b871991062959189"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-16.png",
+      "width": 16,
+      "height": 16,
+      "transparent": true,
+      "sha256": "c11baea43e84c040dd093e39a8d29b78d72e5f5e722462c7bec235d0b5a81e6b"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-180.png",
+      "width": 180,
+      "height": 180,
+      "transparent": true,
+      "sha256": "cf5ad4c18e0f8c2f826cc0425ac29e183839477b3ad69a0691e52127c4210849"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-192.png",
+      "width": 192,
+      "height": 192,
+      "transparent": true,
+      "sha256": "44edbefa84db1dcd7fd59239443b6206030e5ffe787f81277a6322aae04881d4"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-256.png",
+      "width": 256,
+      "height": 256,
+      "transparent": true,
+      "sha256": "a33d005cb2ca2944d6b2af441b6d49d3e0b31780327d547ace28bbae409375fb"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-32.png",
+      "width": 32,
+      "height": 32,
+      "transparent": true,
+      "sha256": "a6df4d303e672d1b234fdfc752a71c6bb581ddbd37efd6eec8c52ee245827e3e"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-48.png",
+      "width": 48,
+      "height": 48,
+      "transparent": true,
+      "sha256": "5a170656de5a323de6122a9b510446728af2c62e27be45bb9f92fea409e5989e"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-512.png",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "sha256": "2af1bca8e113904cf67207f0dcf63ce3fd2dc198d647cc06bf83ed6fdbc5fed8"
+    },
+    {
+      "file": "favicons/bunker-favicon-dark-64.png",
+      "width": 64,
+      "height": 64,
+      "transparent": true,
+      "sha256": "7077bbf84948456f0d1c103b25976a0a406ab6a0284eceb1f8b1cd0d9c0633cf"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-128.png",
+      "width": 128,
+      "height": 128,
+      "transparent": true,
+      "sha256": "84153ffcf058e56ad5cbceac96fc145e76ee7672d284b279e90083de9ecb79a1"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-16.png",
+      "width": 16,
+      "height": 16,
+      "transparent": true,
+      "sha256": "44443e447d217ad3b2f5a4ba26a2bff2a8d85afda0756aabbea5245ba3395a52"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-180.png",
+      "width": 180,
+      "height": 180,
+      "transparent": true,
+      "sha256": "2ce7cdb23c56b49115460b8f7137434094a790f6002d3094c2f2bd47f4f03b19"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-192.png",
+      "width": 192,
+      "height": 192,
+      "transparent": true,
+      "sha256": "16afe936eea7c9ea77ee7ebd426d4868e325b4fa1451fabd9d9340794934d52b"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-256.png",
+      "width": 256,
+      "height": 256,
+      "transparent": true,
+      "sha256": "524489b58cfe2c70790aac69d0dddf96d04f8f51d94cb4f02888a0344ecc28e6"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-32.png",
+      "width": 32,
+      "height": 32,
+      "transparent": true,
+      "sha256": "7b835586691c6d54a12713c038a789e3156bffe3912bf41e3e370aefcc6fdcb9"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-48.png",
+      "width": 48,
+      "height": 48,
+      "transparent": true,
+      "sha256": "e2ecf94a2734009ff45ae950dae99c252834673de4f81325fa3afcfd88f01587"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-512.png",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "sha256": "2d7a972224c288c513391dc47584236ef03bccf05a86ade66798229590587397"
+    },
+    {
+      "file": "favicons/bunker-favicon-light-64.png",
+      "width": 64,
+      "height": 64,
+      "transparent": true,
+      "sha256": "b4a6946d75841ea108ad47135784ecb7b58596f339508dc5b34f62ebf8c7007b"
+    },
+    {
+      "file": "logo-proof.png",
+      "width": 1600,
+      "height": 700,
+      "transparent": false,
+      "sha256": "2c075c82ed1244bccd5a368d68e701061d23f5d3e349ac502c973e09d77054e0"
+    },
+    {
+      "file": "logos/bunker-icon-dark-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent": true,
+      "sha256": "e166b06c3af695248bb262f3b047183f8193e7f2e1bc4b64efa963edaffe4be4"
+    },
+    {
+      "file": "logos/bunker-icon-dark-512.png",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "sha256": "2af1bca8e113904cf67207f0dcf63ce3fd2dc198d647cc06bf83ed6fdbc5fed8"
+    },
+    {
+      "file": "logos/bunker-icon-glacier-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent": true,
+      "sha256": "a5a891b51d09b6ecf84581548cd9967c5c971f517f3981c9a0d01bf1c898c97c"
+    },
+    {
+      "file": "logos/bunker-icon-glacier-512.png",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "sha256": "2a12193703717fd816c594ecad7b52e950e9f408758f23f72c23aaa02c1d3bc3"
+    },
+    {
+      "file": "logos/bunker-icon-stone-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent": true,
+      "sha256": "cb082112365e1496a2f14d2acca3f960e8fbc0f71e6c434ec490aaca076da36a"
+    },
+    {
+      "file": "logos/bunker-icon-stone-512.png",
+      "width": 512,
+      "height": 512,
+      "transparent": true,
+      "sha256": "2d7a972224c288c513391dc47584236ef03bccf05a86ade66798229590587397"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-dark-2610x540.png",
+      "width": 2610,
+      "height": 540,
+      "transparent": true,
+      "sha256": "5de67425705e425e1d1330725aac3c116768c1aeb9151644f99f1d8ca1104aaa"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-dark-870x180.png",
+      "width": 870,
+      "height": 180,
+      "transparent": true,
+      "sha256": "eb833d6f97d1090dc5b1c1b812faaa25733a1b7d5ceb339bc6dbdeed5c3f7c7a"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-glacier-2610x540.png",
+      "width": 2610,
+      "height": 540,
+      "transparent": true,
+      "sha256": "37317123be1ad16f029e226c300da01241326ea30fa538e7ed3ded4c3ab38e32"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-glacier-870x180.png",
+      "width": 870,
+      "height": 180,
+      "transparent": true,
+      "sha256": "4e997f4e10e3d8ae8b7062519cfc83bec30980e253b0e0d789c4d4c8f2b409fe"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-stone-2610x540.png",
+      "width": 2610,
+      "height": 540,
+      "transparent": true,
+      "sha256": "aef254f125037f2d719fc4e4320a9f3b172282b457f682748f2937684e90320b"
+    },
+    {
+      "file": "logos/bunker-logo-horizontal-stone-870x180.png",
+      "width": 870,
+      "height": 180,
+      "transparent": true,
+      "sha256": "331e04df0179129cd6922f22715c8dde9a9ad284eb777bd9d9e57bb41eb97c53"
+    },
+    {
+      "file": "logos/bunker-logo-stacked-dark-1600x1040.png",
+      "width": 1600,
+      "height": 1040,
+      "transparent": true,
+      "sha256": "dc34d48f739a014ffecb027e3db6745075ace33f0c22609283c462a2cc069d11"
+    },
+    {
+      "file": "logos/bunker-logo-stacked-glacier-1600x1040.png",
+      "width": 1600,
+      "height": 1040,
+      "transparent": true,
+      "sha256": "34bb7a152396f48d37e0bb8ecf8a0bfa7b327111e6fb5e1ec1fd28233d38b6d0"
+    },
+    {
+      "file": "logos/bunker-logo-stacked-stone-1600x1040.png",
+      "width": 1600,
+      "height": 1040,
+      "transparent": true,
+      "sha256": "cf5a420d2da072bacc825018992abd829000a18a16c4365e9f2bba92da73361e"
+    },
+    {
+      "file": "logos/bunker-wordmark-dark.png",
+      "width": 2595,
+      "height": 402,
+      "transparent": true,
+      "sha256": "ed57d377735f8c0afda6af94e73382415b0a08b537294ad162e17ad76a95617d"
+    },
+    {
+      "file": "logos/bunker-wordmark-glacier.png",
+      "width": 2595,
+      "height": 402,
+      "transparent": true,
+      "sha256": "4ede857d2fcea8604e0c57ac758feb711102149c589977645d0c96f342b62781"
+    },
+    {
+      "file": "logos/bunker-wordmark-stone.png",
+      "width": 2595,
+      "height": 402,
+      "transparent": true,
+      "sha256": "29a7f9bcc44f1ceebf1a31766900db335071622324edfef5020ed53157dfb1ae"
+    },
+    {
+      "file": "social/bunker-pfp-1024.png",
+      "width": 1024,
+      "height": 1024,
+      "transparent": false,
+      "sha256": "c79b2a62588b4849f1cd932f9ec695b35970271792882fa79660a52aa6f3ae90"
+    },
+    {
+      "file": "social/bunker-pfp-400.png",
+      "width": 400,
+      "height": 400,
+      "transparent": false,
+      "sha256": "31b5ebbd5e114e0a004b7ff512290d75dd041920b76a04532d9ef0f3a6120e42"
+    },
+    {
+      "file": "social/bunker-pfp-master.png",
+      "width": 1254,
+      "height": 1254,
+      "transparent": false,
+      "sha256": "94ebe0cbf57fb6d5edc7506ac2ee99f3b592148a1eb2b48c601158c3484ed138"
+    },
+    {
+      "file": "social/bunker-x-banner-1500x500.png",
+      "width": 1500,
+      "height": 500,
+      "transparent": false,
+      "sha256": "fe883ee2068dd71ac3f8e78cc87486702410c51342737a095ee8151fa4dee777"
+    },
+    {
+      "file": "social/bunker-x-banner-master.png",
+      "width": 2172,
+      "height": 724,
+      "transparent": false,
+      "sha256": "8c50fb41678b0bafca7259a9347761f9c1977688dc4f27c8241379c048e0ef99"
+    }
+  ]
+}

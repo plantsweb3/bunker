@@ -1,0 +1,58 @@
+{
+  "date_utc": "2026-10-07T20:06:11.712979+00:00",
+  "status": "Pre-release; mainnet custody disabled pending independent external review",
+  "typescript": "passed",
+  "unit_tests": {
+    "passed": 31,
+    "files": 4,
+    "runner": "Vitest"
+  },
+  "upstream_rust_tests": {
+    "passed": 20,
+    "crate": "winterwallet-core"
+  },
+  "local_validator": {
+    "passed": 19,
+    "evidence": "local-chain-tests.json"
+  },
+  "browser": {
+    "passed": 12,
+    "skipped": 0,
+    "failed": 0,
+    "projects": [
+      "Chromium desktop",
+      "Chromium iPhone 13 viewport"
+    ],
+    "coverage": [
+      "landing and wallet empty state",
+      "simulation and reset",
+      "six routes and horizontal overflow",
+      "server blocks mainnet submission",
+      "local vault creation, encrypted file verification, SOL deposit, withdrawal, key rotation, stale backup rejection, reload and restore",
+      "fresh Content Security Policy nonce and parser-inserted script rejection"
+    ]
+  },
+  "sbf_build": {
+    "status": "passed",
+    "artifact_sha256": "4f173e5b0e2cfebbfa3e6f4fb6da90345820c212ebed3a54e6d1ccf212ee49b4",
+    "tool": "cargo-build-sbf 4.4.0",
+    "warnings": [
+      "deprecated Solana system module re-exports",
+      "cdylib + lib disables link-time optimization"
+    ]
+  },
+  "independent_audit": "not performed; no reviewer engaged",
+  "mainnet_program_deployment": "none",
+  "production_wallet_reads": "Dedicated RPC credentials recommended; public fallback returned an unavailable/rate-limit error during preview",
+  "limitations": [
+    "Tests are engineering checks, not a security assessment.",
+    "Browser custody tests use a disposable local wallet and local RPC; no user wallet or real funds.",
+    "Mobile layout tested in Chromium emulation, not a physical wallet app."
+  ],
+  "production_web_build": "passed: native Next.js 16.4.0, production webpack build",
+  "runtime_npm_advisories": {
+    "reported": 0,
+    "scope": "npm audit --omit=dev",
+    "note": "Point-in-time advisory result, not a security audit"
+  }
+}

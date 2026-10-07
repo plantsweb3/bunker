@@ -1,0 +1,28 @@
+# Architecture
+
+The frontend uses React/TypeScript and Next.js App Router on Vercel. Six routes: `/`, `/vault`, `/demo`, `/security`, `/verify`, `/docs`. The recovery signer is separated in `sdk/` but still runs in the same browser origin and bundle trust boundary. No production signer isolation is claimed.
+
+`/api/config` exposes network and release status, never RPC credentials. `/api/rpc` proxies an allowlist to one server-configured endpoint, rejects write methods in the production release, enforces origin and request-size checks, and applies upstream timeouts. It is not a durable rate limiter: add edge limits and a dedicated RPC provider before broader publication. The public website is a read-only pre-release.
+
+`/api/verify` reads executable and upgrade-authority state only for the configured test program. Source equivalence and audit status always remain unverified until actual external evidence is supplied.
+
+## On-chain surface
+
+Four instructions in `programs/bunker/src/lib.rs`:
+
+0. Initialize: derive PDA `[b"bunker", random_id_32]`, fund/allocate/assign it and store root. Handles prefunding of the PDA. Requires fee payer signature, never creates a wallet-based withdrawal backdoor.
+1. Stage: proof PDA `[b"proof", fee_payer, SHA256(canonical_message)]`. Two append-only chunks, at most 600 bytes each. Identical chunks can retry. Buffer is bounded to 1,088 signature bytes plus 74 metadata bytes. This publishes a signature, never a secret preimage.
+2. Withdraw: fixed SOL or classic SPL checked transfer after full signature verification. Checks vault owner/PDA/magic/nonce/root, proof owner/magic/length/digest, destination, token program, mint, source owner, delegate/close authority, and rent. Advances root and nonce atomically. No generic CPI routing, arbitrary programs, admin override, token extensions, or relayer.
+3. Close proof: the uploading payer can reclaim its buffer rent. This is a public-signature account, not a vault, and cannot move vault funds. Successful client withdrawals close it in the same final transaction; interrupted uploads may be closed separately through SDK after diagnosis. Closing a buffer does NOT revoke the signature or permit a different signature with the same key.
+
+Vault data is 81 bytes: magic(8), identity(32), root(32), nonce(8 LE), bump(1). Proof data is 1,162 bytes: magic(8), payer(32), message digest(32), used length(2 LE), signature(1,088). Vault rent is intentionally not closable. Standard SPL ATA rent is not reclaimed by this release. Deposits use System/SPL/ATA programs directly.
+
+## Client safety
+
+All amounts are parsed into bigint; exponent notation, negatives, excessive decimals and u64 overflow are rejected. RPC SOL numbers beyond JS's safe integer range fail closed. Transactions remain <=1,232 bytes. Transactions simulate before signing and compare the wallet-returned message bytes to the reviewed message. Genesis is checked before signing and before sending. Confirmation errors retain transaction signatures and pending recovery data; resume checks chain authority before retrying.
+
+Only ordinary on-curve wallet recipients are supported by the web withdrawal UI. For SPL, the exact recipient ATA is signed and the ATA may be created idempotently in the final transaction. Asset names and prices are not inferred; unknown assets display mint identifiers, not potentially spoofed metadata.
+
+## Production gate
+
+Default is mainnet read-only. No variable turns on mainnet custody. Test writes need explicit localnet/devnet selection, explicit enablement, a test program ID, and pinned genesis. Client and server enforce the restriction. A deployment owner could change source; this gate is a release policy, not an on-chain security proof. The experimental program can technically be deployed elsewhere by someone with its source, but doing so does not create an approved release.

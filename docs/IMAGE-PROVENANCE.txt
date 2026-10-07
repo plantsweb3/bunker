@@ -1,0 +1,14 @@
+Asset: bunker-hero.png
+Source: OpenAI built-in image_gen tool, single generation, 2026-10-07.
+No reference images used. No edits performed.
+
+Prompt:
+Use case: ads-marketing
+Asset type: standalone architectural hero photograph for Bunker, a premium Solana security web app.
+Primary request: Monumental brutalist charcoal concrete bunker set into a dark basalt landscape. A recessed tall rectangular entrance emits a restrained icy blue interior light.
+Style/medium: Cinematic architectural photography, exceptionally realistic exact materials, premium calm institutional mood.
+Composition/framing: Wide landscape approximately 16:9; building dominant in right and center, dark low-detail negative space across the left third for future webpage copy, no text actually present. Low architectural viewpoint with straight verticals; massive clean geometric mass and convincing scale.
+Scene/backdrop: Sparse dark basalt terrain, cool overcast sky, subtle atmospheric fog.
+Color palette: Near-black and charcoal, desaturated cool grays, the blue doorway light is subtle and controlled.
+Materials/textures: Cast charcoal concrete with subtle pores, seams and weathering, rough dark basalt with realistic natural textures.
+Constraints: No people, no lettering, no logos, no UI, no watermark. Keep image restrained and architectural, with the tall doorway clearly readable. One finished photograph.

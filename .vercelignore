@@ -1,0 +1,10 @@
+target
+node_modules
+test-results
+playwright-report
+.git
+.env*
+.sites-runtime
+.wrangler
+dist
+.local-validator

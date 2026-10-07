@@ -1,0 +1,27 @@
+{
+  "network": "local-validator",
+  "genesis": "7FNdE8HDyUELca7UPXfJ423JSuffgi2BjqTv2kAejoho",
+  "program": "AhZPKQAwKeCJ47PVKz5QZmBwf1PE8BHcmcqsjvSdPaZ",
+  "passed": 19,
+  "checks": [
+    "prefunded PDA initialization",
+    "duplicate initialization rejected",
+    "SOL deposit",
+    "identical proof chunk retry",
+    "incomplete signature rejected",
+    "proof overwrite rejected",
+    "tampered recipient rejected",
+    "tampered amount rejected",
+    "tampered nonce rejected",
+    "tampered next root rejected",
+    "SOL withdrawal and atomic root rotation",
+    "withdrawal replay rejected",
+    "proof rent reclaim",
+    "classic SPL custody",
+    "Token-2022 substitution rejected",
+    "foreign token source rejected",
+    "SPL withdrawal and rotation",
+    "rent reserve cannot be drained",
+    "failed transfer does not rotate key"
+  ]
+}

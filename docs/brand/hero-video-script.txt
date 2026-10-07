@@ -1,0 +1,64 @@
+Historical creative script supplied with the brand kit; not a product security claim or current release specification. No video is included in this release.
+
+BUNKER — BUILT FOR WHAT’S NEXT
+Hero film script • 35 seconds • 16:9 master • 7 October 2026
+Creative: architectural, restrained, cinematic. A monumental concrete bunker embedded in dark alpine rock, with a small glacier-teal doorway, stays centered throughout the main reveal. Match the supplied moodboard’s natural landscape, heavy architecture and restrained light.
+Status: script only. Product language reflects the prior conversation's devnet-first, in-development scope.
+
+TIMED SCRIPT
+
+00:00–00:04
+PICTURE: Almost black. Wind moves across wet alpine stone. The silhouette of a massive concrete bunker sits dead center. A small glacier-blue doorway appears deep within its entrance. Slow, deliberate push toward the structure.
+VOICE: “What if your wallet key were compromised?”
+ON SCREEN: “What if your wallet key were compromised?”
+SOUND: Low room tone. One distant metallic resonance. No alarm.
+
+00:04–00:10
+PICTURE: A clean, abstract address line appears in the darkness. A subtle annotation connects “wallet address” to “public key.” The bunker stays centered behind it. No fabricated wallet balance or live transaction.
+VOICE: “On Solana, a standard wallet address is already a public key.”
+ON SCREEN: “Wallet address = public key”
+SOUND: Two precise, quiet interface clicks.
+
+00:10–00:15
+PICTURE: The address line fades. Blue light travels around the inner portal. The outer shell remains motionless and substantial.
+VOICE: “Quantum risk is a reason to prepare.”
+ON SCREEN: “Built for what’s next.”
+SOUND: A restrained rising tone, resolving rather than escalating.
+
+00:15–00:23
+PICTURE: Reveal the full bunker. Brief architectural cutaway: a thin outer line labeled “Wallet key” stops at the perimeter; a separate icy-blue authorization path reaches the inner vault. Persistent small label: “CONCEPT ANIMATION.”
+VOICE: “Bunker is being built around separate, hash-based authorization for long-term Solana holdings.”
+ON SCREEN: “Separate authorization.” Then: “Hash-based vault design.”
+SOUND: A deep, soft mechanical engagement; the glacier-blue light becomes steady.
+
+00:23–00:29
+PICTURE: The outer wallet-key line dims. The inner authorization path remains independent. Keep “CONCEPT ANIMATION” visible. Do not show a successful security test or claim a live attack was blocked.
+VOICE: “So an everyday wallet key alone wouldn't authorize a withdrawal.”
+ON SCREEN: “Designed to separate wallet access from vault authorization.”
+SOUND: Music opens into a calm sustained chord. No celebratory effects.
+
+00:29–00:35
+PICTURE: Return to the centered bunker. Blue portal illuminates the ground. BUNKER wordmark resolves below, with a subtle primary call to action. Hold the last frame for two seconds.
+VOICE: “Explore Bunker. Built for what’s next.”
+ON SCREEN: “BUNKER” / “Explore Bunker”
+VISIBLE STATUS LINE: “Devnet first · In development”
+SOUND: One restrained bass resolve. Tail fades naturally.
+
+VOICE-ONLY READ — 53 WORDS
+What if your wallet key were compromised? On Solana, a standard wallet address is already a public key. Quantum risk is a reason to prepare. Bunker is being built around separate, hash-based authorization for long-term Solana holdings. So an everyday wallet key alone wouldn't authorize a withdrawal. Explore Bunker. Built for what’s next.
+
+PERFORMANCE & EDIT
+Calm, low-register, authoritative voice. Approximately 110–120 spoken words per minute with breathing space; time the take to 35 seconds. Keep the architectural bunker centered, with a total push-in of roughly 8%; the building must have believable concrete mass and scale. The camera never turns the logo into a building. Use off-white type and restrained ice-blue emphasis. Cut on meaningful changes, not every beat. Preserve 10% title-safe margins. The on-screen copy carries the film when muted. For a website background loop, use only the central bunker reveal without narration or caption overlays.
+
+CLAIM BASIS & PRODUCTION NOTES
+• Standard keypair wallet addresses are Ed25519 public keys; this does not mean a visible public key is a current private-key compromise. Solana also supports other account addresses, including PDAs.
+• The future quantum threat is a preparation issue, not evidence of an observed break of Solana wallet keys. No countdown or claimed attack date is supported here.
+• Separate hash-based withdrawal authorization is the proposed Bunker design from the referenced conversation. Implementation, audits, deployment and real-fund readiness were not verified for this kit. Keep the future-tense narration and development status.
+• A PDA's lack of a private key does not by itself make a vault secure. Program authorization and implementation determine who can withdraw. The concept does not claim to make Solana consensus, token issuers, bridges or the user's device post-quantum secure.
+• The linked Justin Drake X post could not be retrieved on 7 October 2026. This script neither quotes it nor attributes an endorsement to him; its engagement count was not verified.
+
+PRIMARY SOURCES — CHECKED 7 OCTOBER 2026
+Solana account model: https://solana.com/docs/core/accounts
+Solana program-derived addresses: https://solana.com/docs/core/pda
+NIST post-quantum overview: https://www.nist.gov/cybersecurity-and-privacy/what-post-quantum-cryptography
+NIST migration FAQ (updated June 2026): https://pages.nist.gov/nccoe-migration-post-quantum-cryptography/

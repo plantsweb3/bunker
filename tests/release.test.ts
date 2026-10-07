@@ -1,0 +1,56 @@
+import { describe, it, expect } from "vitest";
+import { configFromEnv, MAINNET_GENESIS } from "../lib/bunker-config";
+import { transition } from "../sdk/demo";
+import { assertNetwork } from "../sdk/client";
+import type { Connection } from "@solana/web3.js";
+describe("Release gate", () => {
+  it("defaults to read-only mainnet", () => {
+    expect(configFromEnv({})).toMatchObject({
+      network: "mainnet-beta",
+      custodyEnabled: false,
+      programId: null,
+    });
+  });
+  it.each(["mainnet", "mainnet-beta", "production", ""])(
+    "cannot enable mainnet with mode %s",
+    (mode) => {
+      expect(
+        configFromEnv({
+          BUNKER_ENABLE_TEST_CUSTODY: "true",
+          BUNKER_TEST_NETWORK: mode,
+          BUNKER_TEST_PROGRAM_ID: "test",
+        }).custodyEnabled,
+      ).toBe(false);
+    },
+  );
+  it("requires explicit test opt-in and program", () => {
+    expect(
+      configFromEnv({ BUNKER_TEST_NETWORK: "devnet" }).custodyEnabled,
+    ).toBe(false);
+  });
+  it("rejects a mainnet RPC even if a caller supplies a forged test config", async () => {
+    const c = { getGenesisHash: async () => MAINNET_GENESIS } as Connection;
+    const config = {
+      ...configFromEnv({}),
+      custodyEnabled: true,
+      network: "devnet" as const,
+      programId: "test",
+    };
+    await expect(assertNetwork(c, config, true)).rejects.toThrow(
+      "Mainnet custody",
+    );
+  });
+});
+describe("Simulation states", () => {
+  it("runs the full educational sequence", () => {
+    let s = transition("wallet", "deposit");
+    s = transition(s, "compromise");
+    s = transition(s, "attack");
+    expect(s).toBe("rejected");
+    expect(transition(s, "withdraw")).toBe("withdrawn");
+  });
+  it("rejects skipped steps and resets", () => {
+    expect(() => transition("wallet", "withdraw")).toThrow();
+    expect(transition("withdrawn", "reset")).toBe("wallet");
+  });
+});

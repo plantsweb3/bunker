@@ -1,0 +1,15 @@
+[package]
+name = "bunker"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+[lib]
+crate-type = ["cdylib", "lib"]
+[features]
+no-entrypoint = []
+[dependencies]
+solana-program = "=2.3.0"
+spl-token = { version = "=8.0.0", features = ["no-entrypoint"] }
+winterwallet-core = { path = "../../crates/winterwallet-core" }
+[lints]
+workspace = true

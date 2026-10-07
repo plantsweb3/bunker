@@ -1,0 +1,51 @@
+BUNKER / BRAND KIT V2
+Built from the user-supplied approved moodboard • 7 October 2026
+
+START HERE
+Open index.html for the visual asset guide. The kit contains transparent PNG logos, favicon sizes, a glowing square PFP, a 3:1 X banner, a 35-second hero-video script and editable SVG logo sources.
+
+IDENTITY
+The mark is the moodboard's nested peaked-arch motif, reconstructed as precise native geometry. The separate custom wordmark uses thin-to-medium geometric uppercase lettering with generous tracking. These are clean reconstructions from a raster reference, not extracted original vector files. All logo shapes and lettering in the SVG files are paths and need no installed font.
+
+LOGOS / TRANSPARENT PNG
+logos/bunker-icon-stone-1024.png — primary white icon, also supplied at 512px.
+logos/bunker-logo-horizontal-stone-2610x540.png — primary website lockup at high resolution; also supplied at 870 × 180.
+logos/bunker-logo-stacked-stone-1600x1040.png — centered stacked brand lockup.
+logos/bunker-wordmark-stone.png — standalone transparent BUNKER wordmark.
+All four forms are also supplied in dark and glacier variants. Stone is the primary mark on dark surfaces. Dark is for light surfaces. Glacier is a secondary accent option.
+
+FAVICONS
+Transparent light and dark PNGs at 16, 32, 48, 64, 128, 180, 192, 256 and 512px.
+favicons/favicon.ico — dark fallback icon with 16, 32 and 48px sizes.
+favicons/install-example.html — copyable HTML links using separate light/dark browser themes. Adjust paths for the site's asset directory. These files are browser favicons; mobile home-screen icons may need an opaque tile depending on the platform.
+
+SOCIAL
+social/bunker-pfp-1024.png — square glowing profile picture. The flat white logo is intentionally centered within ample black space for circular cropping.
+social/bunker-pfp-400.png — compact upload option.
+social/bunker-x-banner-1500x500.png — exact 3:1 X/Twitter banner. Empty lower-left space accommodates profile-picture overlap.
+Both original generated masters are included. PFP master: 1254 × 1254. Banner master: 2172 × 724.
+
+PALETTE FROM THE MOODBOARD
+Stone     #F5F7F6 — primary mark and text
+Void      #0A0A0A — backgrounds
+Glacier   #7DD3C7 — light and secondary accent
+Slate     #1F2937 — dark surfaces
+Mist      #9CA3AF — secondary text
+Green     #00E5A0 — sparse product-state accent
+Use glacier light sparingly. The architecture and terrain carry the visual; the door is a small source of light. Keep the main logo flat and monochrome.
+
+TYPE & SPACING
+Use Space Grotesk for headings and Inter for body/interface copy, as labeled on the moodboard. Font files are not bundled. The custom outlined wordmark is supplied separately and does not rely on either font. Do not retype it for the primary lockup.
+Keep at least one outer-pier width of clearspace around the mark. For a website navigation bar, use the horizontal lockup at roughly 200–260 CSS pixels wide. Use the standalone mark below that size. Favicons are a deliberately compact exception to clearspace guidance.
+
+HERO VIDEO
+video/bunker-hero-script.txt contains the 35-second script, voice read, timed picture and sound cues, and linked factual sources. Only the script is delivered; no video was generated.
+Creative line: Built for what's next.
+CTA: Explore Bunker.
+Product status on the end card: Devnet first · In development.
+
+COPY SCOPE
+The supplied moodboard contains example claims such as audited, quantum-ready and secured balances. Those claims are not treated as verified product facts. The script describes the prior conversation's proposed separate hash-based authorization design in development. Mainnet readiness, deployed features and audits were not independently verified.
+
+PRODUCTION
+The flat mark and custom wordmark were authored as precise path geometry and exported to transparent PNGs. The two social visuals were made with the built-in image_gen tool using the supplied moodboard and final logo as references. The prompt set is in source/generation-prompts.json. Source SVGs are included for clean future exports.
