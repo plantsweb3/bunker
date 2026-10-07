@@ -8,6 +8,7 @@ crate-type = ["cdylib", "lib"]
 [features]
 no-entrypoint = []
 [dependencies]
+solana-clock = "=2.2.3"
 solana-account-info = "=2.3.0"
 solana-program-entrypoint = "=2.3.0"
 solana-sha256-hasher = { workspace = true }
@@ -22,3 +23,6 @@ spl-token = { version = "=8.0.0", features = ["no-entrypoint"] }
 winterwallet-core = { path = "../../crates/winterwallet-core" }
 [lints]
 workspace = true
+
+[dev-dependencies]
+serde_json = "=1.0.151"

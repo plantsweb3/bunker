@@ -2,7 +2,12 @@ import { describe, it, expect } from "vitest";
 import { PublicKey } from "@solana/web3.js";
 import { parseAmount, formatAmount, hex, unhex } from "../sdk/bytes";
 import { rootFromSecret, signOnce, verify } from "../sdk/winternitz";
-import { encodeIntent, decodeIntent, message } from "../sdk/protocol";
+import {
+  encodeIntent,
+  decodeIntent,
+  message,
+  vaultAddress,
+} from "../sdk/protocol";
 import { encryptKit, decryptKit } from "../sdk/recovery";
 import fixture from "../fixtures/winterwallet-n32.json";
 describe("Exact amounts", () => {
@@ -57,8 +62,11 @@ describe("Winterwallet N=32 interoperability", () => {
 describe("Canonical withdrawal", () => {
   it("binds each field including program and vault", () => {
     const p = new PublicKey(new Uint8Array(32).fill(1)),
-      v = new PublicKey(new Uint8Array(32).fill(2));
+      id = new Uint8Array(32).fill(2),
+      v = vaultAddress(p, id);
     const i = {
+      vaultId: id,
+      expirySlot: 1000n,
       nonce: 1n,
       kind: 0 as const,
       mint: PublicKey.default,
@@ -67,16 +75,18 @@ describe("Canonical withdrawal", () => {
       nextRoot: new Uint8Array(32).fill(3),
     };
     const wire = encodeIntent(i);
-    expect(wire.length).toBe(113);
+    expect(wire.length).toBe(154);
     expect(decodeIntent(wire)).toEqual(i);
-    expect(hex(message(p, v, wire))).not.toBe(hex(message(v, p, wire)));
+    expect(() => message(v, p, wire)).toThrow();
+    expect(message(p, v, wire).length).toBe(238);
     for (const patch of [
       { nonce: 2n },
       { amount: 101n },
       { destination: v },
       { nextRoot: new Uint8Array(32).fill(4) },
       { kind: 1 as const },
-      { mint: v },
+      { expirySlot: 1001n },
+      { vaultId: new Uint8Array(32).fill(9) },
     ])
       expect(hex(encodeIntent({ ...i, ...patch }))).not.toBe(hex(wire));
   });
@@ -84,12 +94,17 @@ describe("Canonical withdrawal", () => {
 describe("Encrypted recovery", () => {
   it("round-trips and rejects wrong password or tampering", async () => {
     const kit = {
-      version: 1 as const,
+      version: 2 as const,
+      currentIndex: "0",
+      nextUnusedIndex: "1",
       network: "devnet" as const,
       genesis: "test",
-      program: "test",
+      program: PublicKey.default.toBase58(),
       vaultId: "01".repeat(32),
-      vault: "test",
+      vault: vaultAddress(
+        PublicKey.default,
+        new Uint8Array(32).fill(1),
+      ).toBase58(),
       nonce: "0",
       root: fixture.root,
       secret: fixture.secret,

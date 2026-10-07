@@ -24,7 +24,9 @@ export async function POST(request: Request) {
     try {
       body = JSON.parse(await boundedText(request.body, 18000));
     } catch (e) {
-      return new Response("Invalid or oversized RPC request", { status: e instanceof BodyLimitError ? 413 : 400 });
+      return new Response("Invalid or oversized RPC request", {
+        status: e instanceof BodyLimitError ? 413 : 400,
+      });
     }
     if (
       Array.isArray(body) ||
@@ -54,7 +56,19 @@ export async function POST(request: Request) {
         { headers: h },
       );
     const origin = request.headers.get("origin");
-    if (origin && origin !== new URL(request.url).origin)
+    // Next's internal URL can use localhost while the browser addresses 127.0.0.1.
+    // Browsers cannot set Host; compare Origin with the incoming authority and
+    // request scheme. Do not trust arbitrary forwarded-host headers. This is
+    // browser-origin filtering, never authentication or the custody release gate.
+    const requestUrl = new URL(request.url);
+    const incomingHost = request.headers.get("host") ?? requestUrl.host;
+    const incomingUrl = new URL(`${requestUrl.protocol}//${incomingHost}`);
+    if (
+      incomingUrl.host !== incomingHost ||
+      incomingUrl.username ||
+      incomingUrl.password ||
+      (origin && origin !== incomingUrl.origin)
+    )
       return new Response("Origin not allowed", { status: 403 });
     if (c.custodyEnabled && !c.expectedGenesis)
       return new Response("Test network has no pinned genesis hash", {
@@ -72,7 +86,9 @@ export async function POST(request: Request) {
         signal: AbortSignal.timeout(10000),
         redirect: "error",
       });
-      const genesis = JSON.parse(await boundedText(check.body, 4096)) as { result?: string };
+      const genesis = JSON.parse(await boundedText(check.body, 4096)) as {
+        result?: string;
+      };
       if (
         !check.ok ||
         genesis.result !== c.expectedGenesis ||
@@ -106,7 +122,8 @@ export async function POST(request: Request) {
     try {
       result = await boundedText(r.body, 3000000);
     } catch (e) {
-      if (e instanceof BodyLimitError) return new Response("RPC response too large", { status: 502 });
+      if (e instanceof BodyLimitError)
+        return new Response("RPC response too large", { status: 502 });
       throw e;
     }
     return new Response(result, {

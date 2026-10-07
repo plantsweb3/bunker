@@ -1,13 +1,14 @@
 //! Experimental devnet custody. Fixed SOL/classic SPL withdrawals only.
 //! Cryptographic verification is vendored unchanged from Winterwallet; see docs/CRYPTOGRAPHY.md.
 use solana_account_info::{next_account_info, AccountInfo};
-use solana_program_entrypoint::ProgramResult;
-use solana_sha256_hasher::hashv;
+use solana_clock::Clock;
 use solana_cpi::{invoke, invoke_signed};
+use solana_program_entrypoint::ProgramResult;
 use solana_program_error::ProgramError;
 use solana_program_pack::Pack;
 use solana_pubkey::Pubkey;
 use solana_rent::Rent;
+use solana_sha256_hasher::hashv;
 use solana_system_interface::{instruction as system_instruction, program as system_program};
 use solana_sysvar::Sysvar;
 use winterwallet_core::{WinternitzRoot, WinternitzSignature};
@@ -16,9 +17,12 @@ solana_program_entrypoint::entrypoint!(process_instruction);
 pub const VAULT_LEN: usize = 81;
 pub const PROOF_LEN: usize = 1162;
 pub const SIGNATURE_LEN: usize = 1088;
-pub const DOMAIN: &[u8] = b"BUNKER_DEVNET_V1";
-const VM: &[u8; 8] = b"BUNKER01";
-const PM: &[u8; 8] = b"BKPROOF1";
+pub const DOMAIN: &[u8] = b"BUNKER_WITHDRAW_TEST";
+const VM: &[u8; 8] = b"BUNKER02";
+pub const INTENT_LEN: usize = 154;
+pub const VERSION: u8 = 2;
+const SPENT: &[u8; 8] = b"BKSPENT2";
+const PM: &[u8; 8] = b"BKPROOF2";
 fn fail() -> ProgramError {
     ProgramError::InvalidInstructionData
 }
@@ -40,6 +44,15 @@ fn require(v: bool) -> ProgramResult {
 fn owned(a: &AccountInfo, id: &Pubkey, len: usize, magic: &[u8; 8]) -> ProgramResult {
     require(a.owner == id && a.data_len() == len)?;
     require(&a.try_borrow_data()?[..8] == magic)
+}
+fn unspent(id: &Pubkey, account: &AccountInfo, root: &[u8]) -> Result<u8, ProgramError> {
+    let (expected, bump) = Pubkey::find_program_address(&[b"spent-v2", root], id);
+    require(
+        account.key == &expected
+            && account.owner == &system_program::id()
+            && account.data_is_empty(),
+    )?;
+    Ok(bump)
 }
 fn create<'a>(
     payer: &AccountInfo<'a>,
@@ -88,11 +101,13 @@ pub fn process_instruction(id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) 
     }
 }
 fn initialize(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    require(data.len() == 64 && data[32..] != [0u8; 32])?;
+    require(accounts.len() == 4 && data.len() == 64 && data[32..] != [0u8; 32])?;
     let it = &mut accounts.iter();
     let payer = next_account_info(it)?;
     let vault = next_account_info(it)?;
     let system = next_account_info(it)?;
+    let unused = next_account_info(it)?;
+    unspent(id, unused, &data[32..64])?;
     let (expected, bump) = Pubkey::find_program_address(&[b"bunker", &data[..32]], id);
     require(vault.key == &expected)?;
     create(
@@ -112,7 +127,7 @@ fn initialize(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResu
     Ok(())
 }
 fn stage(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    require(data.len() > 34 && data.len() <= 634)?;
+    require(accounts.len() == 3 && data.len() > 34 && data.len() <= 634)?;
     let digest = &data[..32];
     let offset = u16::from_le_bytes(data[32..34].try_into().unwrap()) as usize;
     let chunk = &data[34..];
@@ -155,19 +170,61 @@ fn stage(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     d[72..74].copy_from_slice(&((used + chunk.len()) as u16).to_le_bytes());
     Ok(())
 }
+/// Fixed-width v2 decoding shared with the fixture verification tests.
+#[derive(Debug)]
+pub struct Withdrawal {
+    pub vault_id: [u8; 32],
+    pub nonce: u64,
+    pub kind: u8,
+    pub mint: Pubkey,
+    pub destination: Pubkey,
+    pub amount: u64,
+    pub expiry: u64,
+    pub next: [u8; 32],
+}
+pub fn decode_intent(data: &[u8]) -> Result<Withdrawal, ProgramError> {
+    require(data.len() == INTENT_LEN && data[0] == VERSION)?;
+    let w = Withdrawal {
+        vault_id: data[1..33].try_into().unwrap(),
+        nonce: u64le(&data[33..41])?,
+        kind: data[41],
+        mint: key(&data[42..74])?,
+        destination: key(&data[74..106])?,
+        amount: u64le(&data[106..114])?,
+        expiry: u64le(&data[114..122])?,
+        next: data[122..154].try_into().unwrap(),
+    };
+    require(
+        w.amount > 0 && w.next != [0; 32] && w.kind <= 1 && w.expiry > 0 && w.nonce < u64::MAX,
+    )?;
+    require(w.kind != 0 || w.mint == Pubkey::default())?;
+    Ok(w)
+}
+pub fn check_expiry(expiry: u64, slot: u64) -> ProgramResult {
+    require(slot <= expiry)
+}
 fn withdraw(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    require(data.len() == 113)?;
-    let nonce = u64le(&data[..8])?;
-    let kind = data[8];
-    let mint = key(&data[9..41])?;
-    let dest = key(&data[41..73])?;
-    let amount = u64le(&data[73..81])?;
-    let next: [u8; 32] = data[81..113].try_into().unwrap();
-    require(amount > 0 && next != [0; 32] && kind <= 1)?;
+    let w = decode_intent(data)?;
+    let (signed_vault_id, nonce, kind, mint, dest, amount, expiry, next) = (
+        &w.vault_id[..],
+        w.nonce,
+        w.kind,
+        w.mint,
+        w.destination,
+        w.amount,
+        w.expiry,
+        w.next,
+    );
+    check_expiry(expiry, Clock::get()?.slot)?;
+    require(accounts.len() == if kind == 0 { 7 } else { 10 })?;
     let it = &mut accounts.iter();
     let vault = next_account_info(it)?;
     let proof = next_account_info(it)?;
     let destination = next_account_info(it)?;
+    let payer = next_account_info(it)?;
+    let spent = next_account_info(it)?;
+    let next_spent = next_account_info(it)?;
+    let system = next_account_info(it)?;
     owned(vault, id, VAULT_LEN, VM)?;
     owned(proof, id, PROOF_LEN, PM)?;
     require(
@@ -179,7 +236,7 @@ fn withdraw(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
     )?;
     let (vault_id, root, bump) = {
         let d = vault.try_borrow_data()?;
-        require(u64le(&d[72..80])? == nonce && d[40..72] != next)?;
+        require(u64le(&d[72..80])? == nonce && d[40..72] != next && &d[8..40] == signed_vault_id)?;
         (
             <[u8; 32]>::try_from(&d[8..40]).unwrap(),
             <[u8; 32]>::try_from(&d[40..72]).unwrap(),
@@ -196,7 +253,21 @@ fn withdraw(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
         let message: &[&[u8]] = &[DOMAIN, id.as_ref(), vault.key.as_ref(), data];
         require(d[40..72] == hashv(message).to_bytes())?;
     }
+    let spent_bump = unspent(id, spent, &root)?;
+    unspent(id, next_spent, &next)?;
+    require(destination.key != spent.key && destination.key != next_spent.key)?;
     verify_proof(id, vault, proof, data, &root)?;
+    // Permanent per-program tombstone: an old root can never be reinstalled,
+    // even in another vault. CPI/transfer/rotation failure rolls this back too.
+    create(
+        payer,
+        spent,
+        system,
+        id,
+        SPENT.len(),
+        &[b"spent-v2", &root, &[spent_bump]],
+    )?;
+    spent.try_borrow_mut_data()?.copy_from_slice(SPENT);
     // All validation, transfer, and rotation are atomic under Solana transaction semantics.
     if kind == 0 {
         require(mint == Pubkey::default())?;
@@ -284,7 +355,7 @@ fn verify_proof(
     Ok(())
 }
 fn close_proof(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    require(data.is_empty())?;
+    require(accounts.len() == 2 && data.is_empty())?;
     let it = &mut accounts.iter();
     let proof = next_account_info(it)?;
     let payer = next_account_info(it)?;

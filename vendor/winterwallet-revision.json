@@ -1,0 +1,14 @@
+{
+  "repository": "https://github.com/blueshift-gg/winterwallet",
+  "revision": "672fc6789b1532ee680f24842d235e0be8737b61",
+  "scope": "Unchanged upstream algorithm source; workspace manifest is adapted. Hashes detect local drift, not security or authorship.",
+  "sha256": {
+    "crates/winterwallet-core/src/error.rs": "79a98069a3323fd45607bc743c1563bdd53791324e75538f7a4c1098585963fc",
+    "crates/winterwallet-core/src/keypair.rs": "732002141cee00dc50814cd5984fcc8f6cc37a7e04e6d21b0826c37858491db7",
+    "crates/winterwallet-core/src/lib.rs": "1d8a2588d34926e1c789358d497f1fed31604f3e508750d9c6cf39998ae07bf0",
+    "crates/winterwallet-core/src/privkey.rs": "ee4059fa1b6666adfb5cad3ecf1556bc892526515372e4d0933849ab5841ffc9",
+    "crates/winterwallet-core/src/pubkey.rs": "2245caa231bb01538972f8dc68569275bcfc1272d9ef0de7617de74f12bd433a",
+    "crates/winterwallet-core/src/signature.rs": "d554df06b5248a4308e4471111a1b39b54b070b880f5a3592f5d5c5206b157f3",
+    "crates/winterwallet-core/src/wordlist.txt": "187db04a869dd9bc7be80d21a86497d692c0db6abd3aa8cb6be5d618ff757fae"
+  }
+}

@@ -28,8 +28,9 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run audit:dependencies
-      - run: cargo test -p winterwallet-core --locked
-      - run: cargo check -p bunker --locked
+      - run: cargo test --workspace --locked
+      - run: cargo run -p bunker --locked --example protocol_vectors > /tmp/bunker-v2.json
+      - run: diff fixtures/bunker-v2.json /tmp/bunker-v2.json
       - run: npm run source:bundle
       - run: npm run build
   browser-release:

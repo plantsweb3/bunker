@@ -18,7 +18,6 @@ import {
   Copy,
   FileCheck2,
 } from "lucide-react";
-import { sha256 } from "@noble/hashes/sha256";
 import {
   Dialog,
   DialogContent,
@@ -48,26 +47,23 @@ import {
   explorer,
   assertNetwork,
 } from "@/sdk/client";
-import { hex, unhex, equal, parseAmount, formatAmount } from "@/sdk/bytes";
-import {
-  generateKey,
-  rootFromSecret,
-  signOnce,
-  verify,
-} from "@/sdk/winternitz";
+import { hex, unhex, parseAmount, formatAmount } from "@/sdk/bytes";
+import { generateKey } from "@/sdk/winternitz";
 import {
   RecoveryKit,
   encryptKit,
   decryptKit,
   downloadKit,
-  reserveIntent,
+  adoptRecovery,
+  authorizeWithdrawal,
+  recoveryCheckpoint,
+  validateRecoveryKit,
 } from "@/sdk/recovery";
 import {
   vaultAddress,
   initializeIx,
   encodeIntent,
   decodeIntent,
-  message,
   stageIxs,
   withdrawIx,
   computeIx,
@@ -104,6 +100,7 @@ function App() {
   const [assetKey, setAssetKey] = useState("SOL");
   const [amount, setAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [expirySlots, setExpirySlots] = useState("1500");
   const [phase, setPhase] = useState<"entry" | "backup">("entry");
   const [recoveryFileName, setRecoveryFileName] = useState("");
   const inFlight = useRef(false);
@@ -130,23 +127,25 @@ function App() {
       );
       setOnchain(true);
       setVaultAssets(await assets(connection, new PublicKey(kit.vault), true));
-      if (kit.pending) {
-        const pending = decodeIntent(unhex(kit.pending.payload));
-        if (
-          state.nonce === BigInt(kit.nonce) + 1n &&
-          equal(state.root, pending.nextRoot)
-        ) {
-          setKit({
-            ...kit,
-            nonce: state.nonce.toString(),
-            root: hex(state.root),
-            secret: kit.pending.nextSecret,
-            pending: undefined,
-          });
-          setNotice(
-            "Withdrawal confirmed and authority rotated. Your saved pending recovery file also restores this new key.",
-          );
-        }
+      const checkpoint = recoveryCheckpoint(kit);
+      if (!checkpoint)
+        throw new Error(
+          "Journal missing; explicitly import your recovery file",
+        );
+      const current = await adoptRecovery(
+        kit,
+        checkpoint,
+        {
+          ...state,
+          slot: BigInt(await connection.getSlot()),
+        },
+        "reconcile",
+      );
+      if (current.currentIndex !== kit.currentIndex) {
+        setKit(current);
+        setNotice(
+          "Withdrawal confirmed and authority rotated. Your saved pending recovery file also restores this new key.",
+        );
       }
     }
   }, [config, connection, wallet.address, kit]);
@@ -228,7 +227,9 @@ function App() {
       keys: generateKey(),
     };
     const next: RecoveryKit = {
-      version: 1,
+      version: 2,
+      currentIndex: "0",
+      nextUnusedIndex: "1",
       network: c.network as "devnet" | "localnet",
       genesis: c.expectedGenesis,
       program: program.toBase58(),
@@ -240,6 +241,12 @@ function App() {
     };
     keys.secret.fill(0);
     const encrypted = await encryptKit(next, password);
+    await adoptRecovery(
+      next,
+      encrypted,
+      { nonce: 0n, root: unhex(next.root), slot: 0n },
+      "create",
+    );
     setKit(next);
     setOnchain(false);
     setEncrypted(encrypted);
@@ -253,10 +260,7 @@ function App() {
     );
     if (
       !kit ||
-      restored.vault !== kit.vault ||
-      restored.root !== kit.root ||
-      restored.nonce !== kit.nonce ||
-      JSON.stringify(restored.pending) !== JSON.stringify(kit.pending)
+      JSON.stringify(restored) !== JSON.stringify(validateRecoveryKit(kit))
     )
       throw new Error(
         "Choose the recovery file just downloaded for this operation",
@@ -274,67 +278,29 @@ function App() {
       throw new Error(
         "Recovery file belongs to a different network or program",
       );
-    const p = new PublicKey(restored.program),
-      v = vaultAddress(p, unhex(restored.vaultId, 32));
-    if (v.toBase58() !== restored.vault)
-      throw new Error("Recovery file vault address is invalid");
-    if (
-      restored.secret &&
-      !equal(rootFromSecret(unhex(restored.secret)), unhex(restored.root))
-    )
-      throw new Error("Recovery key does not match its commitment");
-    if (restored.pending) {
-      const intent = decodeIntent(unhex(restored.pending.payload));
-      if (
-        intent.nonce !== BigInt(restored.nonce) ||
-        hex(intent.nextRoot) !== restored.pending.nextRoot ||
-        !equal(
-          rootFromSecret(unhex(restored.pending.nextSecret)),
-          intent.nextRoot,
-        ) ||
-        !verify(
-          unhex(restored.pending.signature),
-          message(p, v, unhex(restored.pending.payload)),
-          unhex(restored.root),
-        )
-      )
-        throw new Error("Pending recovery file is inconsistent");
-    }
-    return restored;
+    return validateRecoveryKit(restored);
   }
   async function restore() {
     requireLive();
     if (!file) throw new Error("Choose your encrypted recovery file");
     if (file.size > 35000) throw new Error("Recovery file is too large");
-    const restored = await validateKit(
-      await decryptKit(await file.text(), password),
-    );
+    const raw = await file.text();
+    const restored = await validateKit(await decryptKit(raw, password));
+    await assertNetwork(connection, config!, true);
     const state = await fetchVault(
       connection,
       new PublicKey(restored.program),
       new PublicKey(restored.vault),
     );
-    let current = restored;
-    if (
-      restored.pending &&
-      state.nonce === BigInt(restored.nonce) + 1n &&
-      hex(state.root) === restored.pending.nextRoot
-    ) {
-      current = {
-        ...restored,
-        nonce: state.nonce.toString(),
-        root: restored.pending.nextRoot,
-        secret: restored.pending.nextSecret,
-        pending: undefined,
-      };
-    } else if (
-      state.nonce !== BigInt(restored.nonce) ||
-      hex(state.root) !== restored.root
-    ) {
-      throw new Error(
-        "This recovery file is stale. Restore the newest pending or current recovery file.",
-      );
-    }
+    const current = await adoptRecovery(
+      restored,
+      raw,
+      {
+        ...state,
+        slot: BigInt(await connection.getSlot()),
+      },
+      "import",
+    );
     setKit(current);
     setOnchain(true);
     setVaultAssets(
@@ -422,8 +388,12 @@ function App() {
       recipientKey,
       selectedAsset,
     );
+    if (!/^[1-9][0-9]{0,5}$/.test(expirySlots))
+      throw new Error("Choose an authorization lifetime of 1–999999 slots");
     const next = generateKey();
     const payload = encodeIntent({
+      vaultId: unhex(kit.vaultId),
+      expirySlot: BigInt(await connection.getSlot()) + BigInt(expirySlots),
       nonce: state.nonce,
       kind: selectedAsset.mint ? 1 : 0,
       mint: selectedAsset.mint
@@ -433,35 +403,36 @@ function App() {
       amount: qty,
       nextRoot: next.root,
     });
-    const msg = message(program, new PublicKey(kit.vault), payload);
-    const root = hex(next.root),
-      secret = hex(next.secret);
-    next.secret.fill(0);
-    if (password.length < 12)
-      throw new Error("Use a recovery password of at least 12 characters");
-    await assertNetwork(connection, c, true);
-    await reserveIntent(kit.vault, kit.nonce, hex(sha256(msg)), async () => {
-      const signature = signOnce(unhex(kit.secret!), msg);
-      const pending: RecoveryKit = {
-        ...kit,
-        secret: undefined,
-        pending: {
-          payload: hex(payload),
-          signature: hex(signature),
-          nextSecret: secret,
-          nextRoot: root,
+    try {
+      const result = await authorizeWithdrawal(
+        kit,
+        payload,
+        next.secret,
+        {
           sourceToken: selectedAsset.account ?? undefined,
           recipient,
         },
-      };
-      const encrypted = await encryptKit(pending, password);
-      setKit(pending);
-      setEncrypted(encrypted);
+        password,
+        async () => {
+          await assertNetwork(connection, c, true);
+          return {
+            ...(await fetchVault(
+              connection,
+              program,
+              new PublicKey(kit.vault),
+            )),
+            slot: BigInt(await connection.getSlot()),
+          };
+        },
+      );
+      setKit(result.kit);
+      setEncrypted(result.encrypted);
       setPhase("backup");
       setVerifiedBackup(false);
-      localStorage.setItem(`bunker-pending-v1:${kit.vault}`, encrypted);
-      downloadKit(encrypted, kit.vault, kit.nonce, true);
-    });
+      downloadKit(result.encrypted, kit.vault, kit.nonce, true);
+    } finally {
+      next.secret.fill(0);
+    }
   }
   async function resumeWithdrawal() {
     const { program, payer } = requireLive();
@@ -475,17 +446,24 @@ function App() {
       intent = decodeIntent(payload),
       v = new PublicKey(kit.vault);
     const state = await fetchVault(connection, program, v);
-    if (
-      state.nonce === intent.nonce + 1n &&
-      equal(state.root, intent.nextRoot)
-    ) {
+    const checkpoint = recoveryCheckpoint(kit);
+    if (!checkpoint)
+      throw new Error("Journal missing; explicitly import the recovery blob");
+    const slot = BigInt(await connection.getSlot());
+    const current = await adoptRecovery(
+      kit,
+      checkpoint,
+      { ...state, slot },
+      "reconcile",
+    );
+    if (!current.pending) {
+      setKit(current);
       setModal(null);
-      await refresh();
       return;
     }
-    if (state.nonce !== intent.nonce || hex(state.root) !== kit.root)
+    if (slot > intent.expirySlot)
       throw new Error(
-        "On-chain state changed. Restore the latest recovery file.",
+        "Authorization expired. This key remains consumed. There is no safe replacement or cancellation; assets may remain locked.",
       );
     const source =
       intent.kind === 1 ? new PublicKey(kit.pending.sourceToken!) : undefined;
@@ -515,17 +493,27 @@ function App() {
       payload,
       unhex(kit.pending.signature),
     );
-    for (let i = 0; i < stages.length; i++)
-      await transmit(`Publish authorization ${i + 1}/2`, [stages[i]]);
-    await transmit("Withdraw and rotate authority", [
-      computeIx(),
-      ...destination.setup,
-      withdrawIx(program, payer, v, payload, source),
-      closeProofIx(program, payer, v, payload),
-    ]);
-    setModal(null);
-    setPassword("");
-    await refresh();
+    try {
+      for (let i = 0; i < stages.length; i++)
+        await transmit(`Publish authorization ${i + 1}/2`, [stages[i]]);
+      await transmit("Withdraw and rotate authority", [
+        computeIx(),
+        ...destination.setup,
+        withdrawIx(program, payer, v, payload, unhex(kit.root), source),
+        closeProofIx(program, payer, v, payload),
+      ]);
+      setModal(null);
+      setPassword("");
+      await refresh();
+    } catch (e) {
+      // Reconcile a possibly confirmed submission; never restore the spent key.
+      try {
+        await refresh();
+      } catch {
+        /* Preserve the submission error and consumed journal. */
+      }
+      throw e;
+    }
   }
   async function openPending() {
     open("withdraw");
@@ -867,9 +855,11 @@ function App() {
                 onClick={() =>
                   task("Reading checkpoint", async () => {
                     const v = new PublicKey(recipient);
-                    const raw = localStorage.getItem(
-                      `bunker-pending-v1:${v.toBase58()}`,
-                    );
+                    const raw = recoveryCheckpoint({
+                      vault: v.toBase58(),
+                      program: config!.programId!,
+                      genesis: config!.expectedGenesis,
+                    });
                     if (!raw)
                       throw new Error(
                         "No encrypted checkpoint on this browser",
@@ -903,7 +893,12 @@ function App() {
               {kit?.pending && (
                 <div className="notice">
                   Only resume this exact withdrawal. Do not reuse an older
-                  recovery file to authorize a different transfer.
+                  recovery file to authorize a different transfer. Expiry slot:{" "}
+                  {decodeIntent(
+                    unhex(kit.pending.payload),
+                  ).expirySlot.toString()}
+                  . After expiry, the key stays consumed and assets may remain
+                  locked.
                 </div>
               )}
               {encrypted && (
@@ -961,7 +956,7 @@ function App() {
               </button>
               <p className="modal-copy">
                 {kit?.pending
-                  ? "Expect 3 wallet approvals: 2 signature uploads, then the atomic withdrawal and key rotation. Failed or timed-out submissions can be resumed with this file."
+                  ? "Expect 3 wallet approvals: 2 signature uploads, then the atomic withdrawal and key rotation. Failed or timed-out submissions can resume this exact signature only before expiry. An expired authorization has no cancellation or replacement path."
                   : "One wallet approval creates the vault. No assets are deposited automatically."}
               </p>
             </>
@@ -1045,6 +1040,18 @@ function App() {
                       onChange={(e) => setRecipient(e.target.value)}
                     />
                   </label>
+                  <label className="field">
+                    <span>Authorization lifetime (slots)</span>
+                    <input
+                      inputMode="numeric"
+                      value={expirySlots}
+                      onChange={(e) => setExpirySlots(e.target.value)}
+                    />
+                    <small>
+                      Slots are not wall-clock time. Expiry can permanently lock
+                      assets; there is no cancellation path.
+                    </small>
+                  </label>
                   <Password value={password} onChange={setPassword} />
                   <label className="check-label">
                     <Checkbox
@@ -1054,7 +1061,8 @@ function App() {
                     <span>
                       I checked the full recipient and amount. This one-time
                       authorization cannot be replaced with a different
-                      withdrawal after publication.
+                      withdrawal after signing begins, even if submission fails
+                      or expires.
                     </span>
                   </label>
                 </>

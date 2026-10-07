@@ -31,29 +31,38 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
   await c.requestAirdrop(payer.publicKey, 10_000_000_000);
   for (let i = 0; i < 30 && (await c.getBalance(payer.publicKey)) === 0; i++)
     await new Promise((r) => setTimeout(r, 200));
-  await page.route("**/api/config", (r) =>
-    r.fulfill({
-      json: {
-        network: "localnet",
-        custodyEnabled: true,
-        programId: program,
-        expectedGenesis: genesis,
-        releaseStatus: "Isolated local testing",
-      },
-    }),
-  );
-  await page.route("**/api/rpc", async (route) => {
-    const response = await fetch(rpc, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: route.request().postData(),
+  if (process.env.BUNKER_E2E_REAL_RPC === "true") {
+    const actual = await (await page.request.get("/api/config")).json();
+    expect(actual.network).toBe("localnet");
+    expect(actual.custodyEnabled).toBe(true);
+    expect(actual.programId).toBe(program);
+    expect(actual.expectedGenesis).toBe(genesis);
+    // No API interception: browser -> real Next.js RPC proxy -> isolated validator.
+  } else {
+    await page.route("**/api/config", (r) =>
+      r.fulfill({
+        json: {
+          network: "localnet",
+          custodyEnabled: true,
+          programId: program,
+          expectedGenesis: genesis,
+          releaseStatus: "Isolated local testing",
+        },
+      }),
+    );
+    await page.route("**/api/rpc", async (route) => {
+      const response = await fetch(rpc, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: route.request().postData(),
+      });
+      await route.fulfill({
+        status: response.status,
+        contentType: "application/json",
+        body: await response.text(),
+      });
     });
-    await route.fulfill({
-      status: response.status,
-      contentType: "application/json",
-      body: await response.text(),
-    });
-  });
+  }
   await page.exposeFunction("localTestSign", async (bytes: number[]) => {
     const tx = Transaction.from(Uint8Array.from(bytes));
     if (!tx.feePayer?.equals(payer.publicKey))
@@ -220,5 +229,37 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
     page.getByText("Bunker restored.", { exact: false }),
   ).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".vault-balance")).toContainText("0.15");
+  // Prove the reconciled pending backup can authorize using the next key after reload.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.01");
+  await page
+    .getByLabel("Recipient wallet address")
+    .fill(recipient.publicKey.toBase58());
+  await page.getByLabel("Recovery password", { exact: true }).fill(password);
+  await page.getByRole("checkbox").check();
+  const nextDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Save withdrawal recovery file" })
+    .click();
+  const nextFile = info.outputPath("second-pending-test-recovery.json");
+  await (await nextDownload).saveAs(nextFile);
+  await page.getByLabel("Verify saved recovery file").setInputFiles(nextFile);
+  await page
+    .getByRole("button", { name: "Publish & complete withdrawal" })
+    .click();
+  await expect(
+    page.getByText("Withdrawal confirmed and authority rotated.", {
+      exact: false,
+    }),
+  ).toBeVisible({ timeout: 30000 });
+  expect(await c.getBalance(recipient.publicKey)).toBe(110_000_000);
+  expect(
+    parseVault((await c.getAccountInfo(new PublicKey(vaultText)))!.data).nonce,
+  ).toBe(2n);
+  await expect(page.locator(".vault-balance")).toContainText("0.14");
+  await page.screenshot({
+    path: info.outputPath("protocol-v2-recovered.png"),
+    fullPage: true,
+  });
   expect(errors).toEqual([]);
 });
