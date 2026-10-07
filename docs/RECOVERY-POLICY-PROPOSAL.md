@@ -2,6 +2,8 @@
 
 **Status: design proposal, not implemented or approved.** 7 October 2026. Baseline: protocol 2, commit `88bf8a8`. This document proposes a later, incompatible protocol version. No runtime behavior, expiry default, primitive, deployment or release gate is changed by it. Real-fund custody remains disabled. No independent audit is complete.
 
+A draft byte-level specification of sections 1 to 3 is in [PROTOCOL-3-DRAFT.md](PROTOCOL-3-DRAFT.md). It is also unimplemented and unapproved.
+
 ## Decision requested
 
 Review a recovery-first design before implementation: an offline recovery authority, one stable archival secret, authority consumption at announcement, delayed execution with alerts, and optional delayed destination approval. Keep the program without an administrative override, protocol fee recipient or arbitrary calls. Keep Winterwallet revision `672fc6789b1532ee680f24842d235e0be8737b61` unchanged; review its use and the surrounding protocol independently. It is not WOTS+, LMS or XMSS, and this proposal makes no end-to-end post-quantum claim.

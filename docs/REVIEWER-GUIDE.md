@@ -9,6 +9,10 @@ This repository is a pre-release research and engineering artifact. Start with t
 5. Run the unit, Rust and isolated-chain tests in `docs/TESTING.md`. The on-chain test identity has no mainnet significance. Tests use new disposable keypairs, never a repository-funded wallet.
 6. Inspect `package-lock.json`, `Cargo.lock`, CI permissions/action revisions, CSP, API request bounds, dependency findings and deployment configuration. Check the exact Git commit used by the live deployment. Hosting metadata is not an audit attestation.
 
+## Proposed next version
+
+`docs/RECOVERY-POLICY-PROPOSAL.md` describes a recovery authority, a stable archival secret and delayed withdrawals. `docs/PROTOCOL-3-DRAFT.md` makes it concrete: account and message layouts, key derivation, instructions, a transition table and a list of open questions. Neither is implemented. Design feedback is most useful before code is written; the open questions at the end of the draft are the places to start.
+
 ## Trace without the UI
 
 - Start from a vector's `payload` hex. Prepend the 20-byte domain and raw program/vault public keys; compare the 238-byte `message` and digest. Independently verify the signature against `root` using the unchanged Rust core.
