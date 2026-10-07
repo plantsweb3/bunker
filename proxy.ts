@@ -22,4 +22,10 @@ export function proxy(request: NextRequest) {
   return response;
 }
 
-export const config = { matcher: ["/", "/vault", "/demo", "/security", "/docs", "/verify"] };
+// Every document response, including not-found, gets the policy. Listing pages
+// one by one left new routes without it; exclude only non-document paths.
+export const config = {
+  matcher: [
+    "/((?!api/|_next/|brand/|assets/|source/|favicon\\.ico|opengraph-image|sitemap\\.xml|robots\\.txt).*)",
+  ],
+};
