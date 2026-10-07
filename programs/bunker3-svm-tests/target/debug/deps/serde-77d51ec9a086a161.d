@@ -1,0 +1,14 @@
+/Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/deps/serde-77d51ec9a086a161.d: /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/build/serde-ab9b7214368d48d9/out/private.rs
+
+/Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/deps/libserde-77d51ec9a086a161.rlib: /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/build/serde-ab9b7214368d48d9/out/private.rs
+
+/Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/deps/libserde-77d51ec9a086a161.rmeta: /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs /Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs /Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/build/serde-ab9b7214368d48d9/out/private.rs
+
+/Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/lib.rs:
+/Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/integer128.rs:
+/Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/mod.rs:
+/Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/de.rs:
+/Users/ulyssesmunoz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.229/src/private/ser.rs:
+/Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/build/serde-ab9b7214368d48d9/out/private.rs:
+
+# env-dep:OUT_DIR=/Users/ulyssesmunoz/bunker/programs/bunker3-svm-tests/target/debug/build/serde-ab9b7214368d48d9/out

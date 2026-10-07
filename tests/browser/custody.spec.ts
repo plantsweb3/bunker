@@ -275,5 +275,13 @@ test("create, verify backup, deposit, withdraw, rotate, and restore after reload
     path: info.outputPath("protocol-v2-recovered.png"),
     fullPage: true,
   });
+  // Sealing discards the key from the tab and returns to the closed state.
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Seal Bunker" }).click();
+  await expect(page.getByText("Bunker sealed.", { exact: false })).toBeVisible();
+  await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Withdraw", exact: true }),
+  ).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -117,7 +117,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main>
+      <main className="descent">
         <section className="hero">
           <Image
             fill
@@ -166,7 +166,7 @@ export default function Home() {
             </div>
           </div>
           <div className="architectural-label">
-            <span>01 / THE BUNKER</span>
+            <span>00 / EXTERIOR</span>
             <span>PRE-RELEASE · REAL FUNDS NOT ACCEPTED</span>
           </div>
           <div className="hero-status">
@@ -193,9 +193,11 @@ export default function Home() {
             <MoveUpRight size={16} />
           </Link>
         </section>
-        <section className="check-teaser section">
+        <section className="check-teaser section" data-level="01">
           <div>
-            <div className="eyebrow">TEN SECONDS, NOTHING TO CONNECT</div>
+            <div className="eyebrow">
+              <b>01 / SURFACE</b>TEN SECONDS, NOTHING TO CONNECT
+            </div>
             <h2>
               What could one signature
               <br />
@@ -225,7 +227,9 @@ export default function Home() {
           </form>
         </section>
         <section className="intro section" id="how">
-          <div className="eyebrow">A SEPARATE LINE OF DEFENSE</div>
+          <div className="eyebrow">
+            <b>01 / SURFACE</b>A SEPARATE LINE OF DEFENSE
+          </div>
           <div className="split-title">
             <h2>
               Keep your wallet.
@@ -267,9 +271,11 @@ export default function Home() {
             })}
           </div>
         </section>
-        <section className="demo-teaser section">
+        <section className="demo-teaser section" data-level="02">
           <div>
-            <div className="eyebrow">SEE IT IN ONE MINUTE</div>
+            <div className="eyebrow">
+              <b>02 / THRESHOLD</b>SEE IT IN ONE MINUTE
+            </div>
             <h2>
               Sign the fake airdrop.
               <br />
@@ -318,8 +324,52 @@ export default function Home() {
             </div>
           </div>
         </section>
-        <section className="section role">
-          <div className="eyebrow">YOUR PART</div>
+        <section className="section valve">
+          <div>
+            <div className="eyebrow">
+              <b>02 / THRESHOLD</b>BUNKER MODE
+            </div>
+            <h2>
+              Trade from a wallet.
+              <br />
+              Keep it in a Bunker.
+            </h2>
+            <p>
+              A trading wallet has to sign fast, so its key lives somewhere
+              exposed. Sweep what you’re keeping into a Bunker: anything can
+              go in from any wallet or terminal, and nothing comes out with
+              that wallet’s key.
+            </p>
+            <Link className="button ghost" href="/integrate">
+              Bunker beside a trading terminal
+              <MoveUpRight size={15} />
+            </Link>
+          </div>
+          <div className="valve-diagram" aria-hidden="true">
+            <div className="valve-node hot">
+              <span className="mono">TRADING WALLET</span>
+              <strong>Fast key. Exposed.</strong>
+            </div>
+            <div className="valve-pipe">
+              <span className="pipe in">
+                <i />
+                IN · ANY WALLET
+              </span>
+              <span className="pipe out">
+                <X size={12} />
+                OUT · NOT WITH THIS KEY
+              </span>
+            </div>
+            <div className="valve-node cold">
+              <span className="mono">YOUR BUNKER</span>
+              <strong>Sealed. Separate key.</strong>
+            </div>
+          </div>
+        </section>
+        <section className="section role" data-level="03">
+          <div className="eyebrow">
+            <b>03 / INSIDE</b>YOUR PART
+          </div>
           <div className="split-title">
             <h2>
               Bunker holds the line.
@@ -360,7 +410,9 @@ export default function Home() {
           </ol>
         </section>
         <section className="section limits" id="limits">
-          <div className="eyebrow">HONEST ABOUT THE EDGES</div>
+          <div className="eyebrow">
+            <b>03 / INSIDE</b>HONEST ABOUT THE EDGES
+          </div>
           <h2>
             What it’s built to stop.
             <br />
@@ -396,8 +448,10 @@ export default function Home() {
             <Link href="/security">Read the full threat model.</Link>
           </p>
         </section>
-        <section className="truth section" id="road">
-          <div className="eyebrow">ROAD TO MAINNET</div>
+        <section className="truth section" id="road" data-level="04">
+          <div className="eyebrow">
+            <b>04 / FOUNDATIONS</b>ROAD TO MAINNET
+          </div>
           <h2>
             Security is a process.
             <br />
@@ -441,7 +495,9 @@ export default function Home() {
           </div>
         </section>
         <section className="section faq">
-          <div className="eyebrow">QUESTIONS</div>
+          <div className="eyebrow">
+            <b>04 / FOUNDATIONS</b>QUESTIONS
+          </div>
           <h2>Before you ask.</h2>
           <div className="faq-list">
             {faq.map(([q, a]) => (
@@ -465,6 +521,10 @@ export default function Home() {
           </div>
         </section>
       </main>
+      <nav className="mobile-dock" aria-label="Quick actions">
+        <Link href="/check">Check a wallet</Link>
+        <Link href="/demo">Run the demo</Link>
+      </nav>
       <Footer />
     </>
   );

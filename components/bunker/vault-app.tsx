@@ -616,6 +616,45 @@ function App() {
     ? decodeIntent(unhex(kit.pending.payload))
     : null;
   const canCreate = !!config?.custodyEnabled && !!wallet.address && !busy;
+  // "Sealed" means no Bunker key is held in this tab. Sealing discards it; the
+  // vault itself is untouched and opens again only with the recovery kit.
+  function seal() {
+    setKit(null);
+    setOnchain(false);
+    setVaultAssets([]);
+    setPassword("");
+    setRepeat("");
+    setEncrypted("");
+    setError("");
+    setNotice(
+      "Bunker sealed. Its key is no longer in this browser tab. Open it again with your newest recovery kit.",
+    );
+  }
+  const door = !config
+    ? { state: "wait", label: "Connecting", line: "Reading the network." }
+    : !config.custodyEnabled
+      ? {
+          state: "locked",
+          label: "Locked until review",
+          line: "A preview of the inside. Real funds stay out until the review is done.",
+        }
+      : kit?.pending
+        ? {
+            state: "moving",
+            label: "Withdrawal in progress",
+            line: "One withdrawal is on its way out. Finish it before doing anything else.",
+          }
+        : kit && onchain
+          ? {
+              state: "open",
+              label: "Unsealed",
+              line: "The Bunker key is in this tab. Seal it when you are done.",
+            }
+          : {
+              state: "sealed",
+              label: "Sealed",
+              line: "Nothing leaves while it is sealed. Open it with your recovery kit.",
+            };
   return (
     <main className="vault-page">
       <div className="app-top">
@@ -636,20 +675,51 @@ function App() {
           <WalletButton />
         </div>
       </div>
-      <div className="vault-heading">
+      <div className={`vault-heading door-${door.state}`}>
         <div>
-          <div className="eyebrow">INDEPENDENT BY DESIGN</div>
+          <div className="eyebrow">MY BUNKER</div>
           <h1>Your Bunker.</h1>
-          <p>Separate the wallet you use from the assets you hold.</p>
+          <p>{door.line}</p>
         </div>
-        <button
-          className="text-button"
-          disabled={!!busy || !config}
-          onClick={() => task("Refreshing", refresh)}
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
+        <div className="door-plate" aria-live="polite">
+          <span className="door-light" aria-hidden="true" />
+          <div>
+            <span className="mono">DOOR</span>
+            <strong>{door.label}</strong>
+          </div>
+          <dl>
+            <div>
+              <dt>Lock</dt>
+              <dd>
+                {kit ? `${kit.root.slice(0, 8)}…${kit.root.slice(-6)}` : "—"}
+              </dd>
+            </div>
+            <div>
+              <dt>Lock changes</dt>
+              <dd>{kit?.nonce ?? "—"}</dd>
+            </div>
+          </dl>
+          <div className="door-actions">
+            <button
+              className="text-button"
+              disabled={!!busy || !config}
+              onClick={() => task("Refreshing", refresh)}
+            >
+              <RefreshCw size={14} />
+              Refresh
+            </button>
+            {kit && (
+              <button
+                className="text-button"
+                disabled={!!busy}
+                onClick={seal}
+              >
+                <LockKeyhole size={14} />
+                Seal Bunker
+              </button>
+            )}
+          </div>
+        </div>
       </div>
       {!config ? (
         <div className="notice">Loading release and network configuration…</div>
@@ -753,9 +823,15 @@ function App() {
               <div className="empty-vault-icon">
                 <Shield size={38} strokeWidth={1} />
               </div>
-              <h2>A separate home for your assets.</h2>
+              <h2>
+                {config?.custodyEnabled
+                  ? "The door is sealed."
+                  : "A separate home for your assets."}
+              </h2>
               <p>
-                Create a Bunker or restore one with its encrypted recovery file.
+                {config?.custodyEnabled
+                  ? "Build a new Bunker, or open yours with its encrypted recovery kit."
+                  : "Create a Bunker or restore one with its encrypted recovery file."}
               </p>
               <div className="actions">
                 <button
@@ -815,6 +891,28 @@ function App() {
           </Link>
         </aside>
       </div>
+      {kit && onchain && (
+        <section className="panel valve-panel">
+          <div>
+            <span className="eyebrow">ONE-WAY IN</span>
+            <h2>Send to your Bunker from anywhere.</h2>
+            <p>
+              This address accepts SOL from any wallet, exchange or trading
+              terminal. Whatever arrives can only leave with the Bunker key,
+              never with the key of the wallet that sent it.
+            </p>
+          </div>
+          <div className="valve-address">
+            <span className="mono">BUNKER ADDRESS</span>
+            <code>{kit.vault}</code>
+            <span className="micro">
+              SOL can be sent directly. For tokens, use Deposit above so the
+              right token account is created.{" "}
+              <Link href="/integrate">Using a trading terminal</Link>
+            </span>
+          </div>
+        </section>
+      )}
       <Tabs defaultValue="wallet" className="asset-tabs">
         <TabsList variant="line">
           <TabsTrigger value="wallet">Connected wallet</TabsTrigger>

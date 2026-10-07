@@ -5,6 +5,13 @@ export default function Page() {
   return (
     <>
       <Header />
+      {/* Plays once per load, never intercepts input, and is hidden under reduced motion. */}
+      <div className="bunker-door" aria-hidden="true">
+        <span />
+        <i />
+        <span />
+        <b>ENTERING BUNKER</b>
+      </div>
       <VaultApp />
       <Footer />
     </>
