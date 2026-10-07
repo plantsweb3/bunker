@@ -91,14 +91,27 @@ async function derive(password: string, salt: Uint8Array) {
     ["encrypt", "decrypt"],
   );
 }
+type PreparedEncryption = { salt: Uint8Array; key: CryptoKey };
+/** The slow, fallible part of encryption (600,000 PBKDF2 rounds). Separated so
+ * signing can finish it before the one-time key is consumed. */
+async function prepareEncryption(
+  password: string,
+): Promise<PreparedEncryption> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  return { salt, key: await derive(password, salt) };
+}
 export async function encryptKit(
   kit: RecoveryKit,
   password: string,
 ): Promise<string> {
+  return encryptPrepared(kit, await prepareEncryption(password));
+}
+async function encryptPrepared(
+  kit: RecoveryKit,
+  { salt, key }: PreparedEncryption,
+): Promise<string> {
   const canonical = validateRecoveryKit(kit);
-  const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const key = await derive(password, salt);
   const plaintext = new TextEncoder().encode(JSON.stringify(canonical));
   try {
     const ciphertext = await crypto.subtle.encrypt(
@@ -370,6 +383,10 @@ export async function authorizeWithdrawal(
       new PublicKey(k.vault),
       payload,
     );
+    // Derive the checkpoint key now. Doing this after consumption left the key
+    // spent with no saved signature if the tab closed or derivation failed
+    // during the slowest step of the whole flow.
+    const prepared = await prepareEncryption(password);
     const consumed: Journal = {
       version: 2,
       status: "consumed",
@@ -396,7 +413,7 @@ export async function authorizeWithdrawal(
         ...details,
       },
     });
-    const encrypted = await encryptKit(pending, password);
+    const encrypted = await encryptPrepared(pending, prepared);
     writeJournal(k, { ...consumed, checkpoint: encrypted });
     return { kit: pending, encrypted };
   });

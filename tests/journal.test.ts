@@ -99,6 +99,27 @@ describe("Canonical recovery and one-time journal", () => {
       adoptRecovery(f.kit, f.encrypted, f.chain, "import"),
     ).rejects.toThrow();
   });
+  it("derives the checkpoint key before consuming, so a derivation failure leaves the key unused", async () => {
+    const f = await setup();
+    const original = crypto.subtle.deriveKey.bind(crypto.subtle);
+    let derivations = 0;
+    const spy = vi
+      .spyOn(crypto.subtle, "deriveKey")
+      .mockImplementation((...args: Parameters<typeof original>) => {
+        // 1: decrypting the stored checkpoint. 2: the key for the new checkpoint.
+        if (++derivations === 2)
+          return Promise.reject(new Error("derivation interrupted"));
+        return original(...args);
+      });
+    await expect(f.sign()).rejects.toThrow("derivation interrupted");
+    expect(JSON.parse(f.storage.get(journalKey(f.kit))!).status).toBe("ready");
+    spy.mockRestore();
+    const signed = await f.sign();
+    expect(signed.kit.pending).toBeDefined();
+    expect(JSON.parse(f.storage.get(journalKey(f.kit))!).status).toBe(
+      "consumed",
+    );
+  });
   it("refuses expiry, wrong password, chain mismatch, and substituted next commitment before consuming", async () => {
     const f = await setup();
     await expect(
