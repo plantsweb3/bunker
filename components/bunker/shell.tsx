@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Shield, FlaskConical } from "lucide-react";
+import { Shield, FlaskConical, Menu } from "lucide-react";
 export function Mark({ small = false }: { small?: boolean }) {
   return (
     <span className={`brand ${small ? "small" : ""}`}>
@@ -14,7 +14,7 @@ export function Header() {
       <div className="network-bar">
         <FlaskConical size={13} />
         <strong>PRE-RELEASE</strong>
-        <span>Hash-based custody. Independent review pending.</span>
+        <span>Real funds not accepted yet. Independent review pending.</span>
         <Link href="/security">Know the limits</Link>
       </div>
       <header className="site-header">
@@ -22,13 +22,26 @@ export function Header() {
           <Mark />
         </Link>
         <nav aria-label="Main navigation">
-          <Link href="/demo">Experience Bunker</Link>
+          <Link href="/demo">Demo</Link>
+          <Link href="/docs">How it works</Link>
           <Link href="/security">Security</Link>
-          <Link href="/docs">Documentation</Link>
         </nav>
-        <Link className="button compact light" href="/vault">
-          Launch app
-        </Link>
+        <div className="header-actions">
+          <Link className="button compact light" href="/vault">
+            Launch app
+          </Link>
+          <details className="mobile-nav">
+            <summary aria-label="Menu">
+              <Menu size={20} />
+            </summary>
+            <nav aria-label="Mobile navigation">
+              <Link href="/demo">Demo</Link>
+              <Link href="/docs">How it works</Link>
+              <Link href="/security">Security</Link>
+              <Link href="/verify">Verify</Link>
+            </nav>
+          </details>
+        </div>
       </header>
     </>
   );
@@ -40,7 +53,7 @@ export function Footer() {
         <Link href="/" aria-label="Bunker home">
           <Mark small />
         </Link>
-        <p>A quieter place for your Solana.</p>
+        <p>Prepare. Don’t panic.</p>
       </div>
       <div className="footer-links">
         <Link href="/security">Security & limitations</Link>

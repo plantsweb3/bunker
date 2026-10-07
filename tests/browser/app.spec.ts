@@ -7,7 +7,7 @@ test("brand, navigation, release gate, and wallet empty state", async ({
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "Your assets. A stronger place to stay.",
+      name: "One bad signature shouldn’t cost you everything.",
     }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("bunker-preview.png") });
@@ -32,18 +32,18 @@ test("demo has a complete, resettable journey", async ({ page }) => {
   await page.goto("/demo");
   await page.getByRole("button", { name: "Move assets into Bunker" }).click();
   await page
-    .getByRole("button", { name: "Simulate wallet compromise" })
+    .getByRole("button", { name: "Approve the fake airdrop" })
     .click();
   await page
-    .getByRole("button", { name: "Attempt unauthorized withdrawal" })
+    .getByRole("button", { name: "Let the drainer try the vault" })
     .click();
   await expect(
     page.getByText("WITHDRAWAL REJECTED", { exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Authorize $10,000 withdrawal" })
+    .getByRole("button", { name: "Withdraw $500 with your Bunker key" })
     .click();
-  await expect(page.getByText("$240,000", { exact: true })).toBeVisible();
+  await expect(page.getByText("$3,500", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Reset simulation" }).click();
   await expect(
     page.getByRole("button", { name: "Move assets into Bunker" }),

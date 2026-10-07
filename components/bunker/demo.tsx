@@ -15,9 +15,9 @@ import {
 import { transition, DemoStage, DemoAction } from "@/sdk/demo";
 const steps = [
   "Move assets",
-  "Compromise wallet",
-  "Test the boundary",
-  "Authorize a withdrawal",
+  "Sign the fake airdrop",
+  "The drainer tries the vault",
+  "Withdraw with your key",
 ];
 export default function Demo() {
   const [stage, setStage] = useState<DemoStage>("wallet");
@@ -108,11 +108,11 @@ export default function Demo() {
         <div>
           <div className="eyebrow">EXPERIENCE THE BOUNDARY</div>
           <h1>
-            A wallet compromise.
+            A drained wallet.
             <br />
             <span className="ice">A different outcome.</span>
           </h1>
-          <p>Explore why a vault needs independent authorization.</p>
+          <p>Four clicks: what a drainer takes, and what it can’t reach.</p>
         </div>
         <span className="pill">
           <FlaskConical size={14} />
@@ -136,7 +136,7 @@ export default function Demo() {
             </div>
             <span className="balance-label">Simulated portfolio</span>
             <strong className="sim-balance">
-              {stage === "withdrawn" ? "$10,000" : moved ? "$0" : "$250,000"}
+              {attacked ? "$0" : moved ? "$200" : "$4,200"}
             </strong>
             <div className="sim-assets">
               <span className="asset-logo">≋</span>
@@ -146,7 +146,7 @@ export default function Demo() {
               {attacked ? (
                 <>
                   <X size={15} />
-                  Wallet signing key compromised
+                  Drained · signing key compromised
                 </>
               ) : (
                 <>
@@ -168,7 +168,7 @@ export default function Demo() {
             </div>
             <span className="balance-label">Simulated vault balance</span>
             <strong className="sim-balance">
-              {stage === "withdrawn" ? "$240,000" : moved ? "$250,000" : "$0"}
+              {stage === "withdrawn" ? "$3,500" : moved ? "$4,000" : "$0"}
             </strong>
             <div className="sim-assets">
               <Fingerprint size={19} />
@@ -193,32 +193,32 @@ export default function Demo() {
               : stage === "bunkered"
                 ? "DEPOSIT COMPLETE"
                 : stage === "compromised"
-                  ? "THREAT DETECTED"
+                  ? "WALLET DRAINED"
                   : stage === "rejected"
                     ? "WITHDRAWAL REJECTED"
                     : "WITHDRAWAL COMPLETE"}
           </span>
           <h2>
             {stage === "wallet"
-              ? "Give your assets a separate boundary."
+              ? "Put what you can’t lose behind a second key."
               : stage === "bunkered"
-                ? "Now put the everyday wallet to the test."
+                ? "Now make the mistake everyone makes once."
                 : stage === "compromised"
-                  ? "The attacker has one key. Is it enough?"
+                  ? "The drainer took the wallet. Next it tries the vault."
                   : stage === "rejected"
-                    ? "The vault requires independent approval."
-                    : "Authorization determines who can spend."}
+                    ? "Rejected. A wallet signature is not the Bunker key."
+                    : "You got out. The drainer never got in."}
           </h2>
           <p>
             {stage === "wallet"
-              ? "Move the example portfolio into a vault controlled by an independent authorization policy."
+              ? "Move $4,000 of the example balance into a vault. Leave $200 in the wallet for everyday use."
               : stage === "bunkered"
-                ? "We will simulate theft of the connected wallet key. This is an educational model, not a cryptographic proof."
+                ? "A page promises a free airdrop and asks your wallet to approve a transaction. You approve it. This is an educational model, not a cryptographic proof."
                 : stage === "compromised"
-                  ? "Attempt a withdrawal using only the compromised everyday wallet."
+                  ? "The $200 left in the wallet is gone. The drainer now signs a withdrawal from your Bunker using the wallet it controls."
                   : stage === "rejected"
-                    ? "The simulated withdrawal is blocked because the independent authorization is missing. Now supply that authorization."
-                    : "The authorized transfer completes and the simulated one-time authority rotates. The test implementation performs that change atomically on-chain."}
+                    ? "The vault only releases assets to the separate key in your recovery kit, which the drainer never saw. Now use that key yourself."
+                    : "$500 went to a new, clean wallet and the vault’s key was replaced in the same step. Your part: keep the recovery kit off the device you browse with. If the drainer had that too, this would have ended differently."}
           </p>
           <div className="sim-controls">
             {stage === "wallet" ? (
@@ -235,7 +235,7 @@ export default function Demo() {
                 className="button danger"
                 onClick={() => action("compromise")}
               >
-                Simulate wallet compromise
+                Approve the fake airdrop
               </button>
             ) : stage === "compromised" ? (
               <button
@@ -243,7 +243,7 @@ export default function Demo() {
                 className="button danger"
                 onClick={() => action("attack")}
               >
-                Attempt unauthorized withdrawal
+                Let the drainer try the vault
               </button>
             ) : stage === "rejected" ? (
               <button
@@ -251,11 +251,11 @@ export default function Demo() {
                 className="button light"
                 onClick={() => action("withdraw")}
               >
-                Authorize $10,000 withdrawal
+                Withdraw $500 with your Bunker key
               </button>
             ) : (
               <Link href="/vault" className="button light">
-                Explore the live app
+                Preview the app
               </Link>
             )}
             <button className="text-button" onClick={() => action("reset")}>
