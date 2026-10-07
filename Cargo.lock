@@ -80,6 +80,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bunker3"
+version = "0.1.0"
+dependencies = [
+ "solana-account-info",
+ "solana-clock",
+ "solana-cpi",
+ "solana-program-entrypoint",
+ "solana-program-error",
+ "solana-program-pack",
+ "solana-pubkey",
+ "solana-rent",
+ "solana-sha256-hasher 3.1.0",
+ "solana-system-interface",
+ "solana-sysvar",
+ "spl-token",
+ "winterwallet-core",
+]
+
+[[package]]
 name = "bv"
 version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
