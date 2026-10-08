@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../sdk/bytes";
 import { genesisVault, recoveryPacket } from "../sdk/v3/authority";
@@ -91,5 +92,36 @@ describe("Offline recovery tool page", () => {
   it("loads nothing from anywhere", () => {
     expect(template).not.toMatch(/<(link|img|iframe|script)[^>]+(src|href)=/i);
     expect(template).not.toMatch(/https?:\/\//);
+  });
+  it("is built only from code that needs no Solana client library", () => {
+    // Follow every import reachable from the tool's entry point.
+    const seen = new Set<string>();
+    const packages = new Set<string>();
+    const walk = (file: string) => {
+      if (seen.has(file)) return;
+      seen.add(file);
+      const source = readFileSync(file, "utf8");
+      for (const m of source.matchAll(/^\s*(?:import|export)\s[^;]*?from\s+"([^"]+)"/gms)) {
+        // A type-only import leaves nothing in the bundle.
+        if (/^\s*import\s+type\s/.test(m[0])) continue;
+        const target = m[1];
+        if (target.startsWith(".")) walk(resolve(dirname(file), target) + ".ts");
+        else packages.add(target.split("/").slice(0, target.startsWith("@") ? 2 : 1).join("/"));
+      }
+    };
+    walk(resolve("tools/recovery/main.ts"));
+    expect([...packages].sort()).toEqual(["@noble/curves", "@noble/hashes", "zod"]);
+    // The files that handle the master, and nothing that builds transactions.
+    const files = [...seen].map((f) => f.slice(resolve(".").length + 1)).sort();
+    expect(files).toEqual([
+      "sdk/bytes.ts",
+      "sdk/v3/core.ts",
+      "sdk/v3/derive.ts",
+      "sdk/v3/kit.ts",
+      "sdk/v3/master.ts",
+      "sdk/v3/requests.ts",
+      "sdk/winternitz.ts",
+      "tools/recovery/main.ts",
+    ]);
   });
 });

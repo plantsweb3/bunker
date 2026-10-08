@@ -5,11 +5,10 @@
  *    or exposing it is recoverable with the archival kit. */
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { z } from "zod";
-import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../bytes";
-import { genesisVault } from "./authority";
+import { address, base58, MAX_DELAY_SECS, MIN_DELAY_SECS, vaultAddressBytes } from "./core";
+import { genesisVault } from "./master";
 import type { Descriptor } from "./derive";
-import { MAX_DELAY_SECS, MIN_DELAY_SECS, vaultAddress } from "./protocol";
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const base = {
   version: z.literal(3),
@@ -46,13 +45,12 @@ type Identity = Pick<ArchivalKit, "genesis" | "program" | "vaultId" | "vault">;
 /** The public identity any Bunker file names. The chain tag is the cluster's
  * genesis hash; the vault address must be the address of its own identity. */
 export function identityOf(k: Identity) {
-  const program = new PublicKey(k.program);
   const d = {
-    chainTag: new PublicKey(k.genesis).toBytes(),
-    programId: program.toBytes(),
+    chainTag: address(k.genesis),
+    programId: address(k.program),
     vaultId: unhex(k.vaultId, 32),
   };
-  if (!vaultAddress(program, d.vaultId).equals(new PublicKey(k.vault)))
+  if (base58(vaultAddressBytes(d.programId, d.vaultId)) !== k.vault)
     throw new Error("File does not match its vault address");
   return d;
 }

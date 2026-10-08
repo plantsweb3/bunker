@@ -2,9 +2,9 @@
  * archival master. It makes no network request: the page's Content Security
  * Policy forbids every connection, and everything it produces is a file the
  * user carries to the website. */
-import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../../sdk/bytes";
-import { genesisVault, recoveryPacket } from "../../sdk/v3/authority";
+import { address, base58, vaultAddressBytes } from "../../sdk/v3/core";
+import { genesisVault, recoveryPacket } from "../../sdk/v3/master";
 import { epochSeed, recoveryKey } from "../../sdk/v3/derive";
 import { rootFromSecret, verify } from "../../sdk/winternitz";
 import {
@@ -17,7 +17,6 @@ import {
   passwordProblem,
   validateArchival,
 } from "../../sdk/v3/kit";
-import { vaultAddress } from "../../sdk/v3/protocol";
 import {
   CreationRequest,
   NetworkCard,
@@ -131,15 +130,15 @@ $("create").addEventListener(
     if (!checked("kit-ack")) throw new Error("Acknowledge what the recovery kit is");
     if (checked("wait") && !checked("wait-ack"))
       throw new Error("Acknowledge the waiting period, or turn it off");
-    const program = new PublicKey(card.program);
+    const program = address(card.program);
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const master = crypto.getRandomValues(new Uint8Array(32));
     const delaySecs = checked("wait") ? Number(value("delay")) : 0;
     // The address is a hash of the keys and the waiting period, so nobody
     // else can create this Bunker with different ones.
     const { d } = genesisVault(master, {
-      chainTag: new PublicKey(card.genesis).toBytes(),
-      programId: program.toBytes(),
+      chainTag: address(card.genesis),
+      programId: program,
       salt,
       delaySecs,
     });
@@ -151,7 +150,7 @@ $("create").addEventListener(
       program: card.program,
       salt: hex(salt),
       vaultId: hex(d.vaultId),
-      vault: vaultAddress(program, d.vaultId).toBase58(),
+      vault: base58(vaultAddressBytes(program, d.vaultId)),
       delaySecs,
       master: hex(master),
     });

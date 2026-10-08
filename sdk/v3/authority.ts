@@ -1,70 +1,13 @@
-/** Protocol 3 authorities built from derived keys (docs/PROTOCOL.md
- * §3). DRAFT: not reviewed, not used by the released app.
- *
- * Two deliberately different surfaces:
- *  - `recoveryPacket` takes the archival master and has NO free inputs beyond
- *    the vault descriptor and epoch. It is the only thing the master signs.
- *  - `signAnnouncement` takes an epoch seed, never the master. */
+/** Signing with an operational key (docs/PROTOCOL.md §3.1). Takes an epoch
+ * seed, never the master. Everything computed from the master lives in
+ * `master.ts` and is re-exported here for callers that want one import. */
 import { PublicKey } from "@solana/web3.js";
-import { rootFromSecret, signOnce } from "../winternitz";
-import { Descriptor, epochSeed, KeyContext, operationalKey, recoveryKey } from "./derive";
-import {
-  Announce,
-  announceMessage,
-  encodeAnnounce,
-  encodeRecover,
-  recoverMessage,
-  vaultIdOf,
-} from "./protocol";
-const program = (d: KeyContext) => new PublicKey(d.programId);
-/** The roots a new vault is created with, and the first epoch's seed. */
-export function genesisAuthorities(master: Uint8Array, d: KeyContext) {
-  const seed = epochSeed(master, d, 0n);
-  return {
-    opRoot: rootFromSecret(operationalKey(seed, d, 0n, 0n)),
-    recRoot: rootFromSecret(recoveryKey(master, d, 0n)),
-    seed,
-  };
-}
-/** Everything needed to create a vault from a master: its genesis roots and
- * the descriptor whose `vaultId` commits to them and to the waiting period. */
-export function genesisVault(master: Uint8Array, k: KeyContext) {
-  const genesis = genesisAuthorities(master, k);
-  const d: Descriptor = {
-    chainTag: k.chainTag,
-    programId: k.programId,
-    salt: k.salt,
-    delaySecs: k.delaySecs,
-    vaultId: vaultIdOf({ ...k, opRoot: genesis.opRoot, recRoot: genesis.recRoot }),
-  };
-  return { ...genesis, d, delaySecs: k.delaySecs };
-}
-export const operationalRoot = (
-  seed: Uint8Array,
-  d: KeyContext,
-  epoch: bigint,
-  opIndex: bigint,
-) => rootFromSecret(operationalKey(seed, d, epoch, opIndex));
-/** The single recovery packet for `epoch`. Calling it again yields identical
- * bytes; there is no other message this key may sign. Also returns the next
- * epoch's seed for a clean operational signer. */
-export function recoveryPacket(master: Uint8Array, d: Descriptor, epoch: bigint) {
-  const nextSeed = epochSeed(master, d, epoch + 1n);
-  const payload = encodeRecover({
-    vaultId: d.vaultId,
-    chainTag: d.chainTag,
-    epoch,
-    nextRecRoot: rootFromSecret(recoveryKey(master, d, epoch + 1n)),
-    nextOpRoot: rootFromSecret(operationalKey(nextSeed, d, epoch + 1n, 0n)),
-  });
-  const message = recoverMessage(program(d), payload);
-  return {
-    payload,
-    message,
-    signature: signOnce(recoveryKey(master, d, epoch), message),
-    nextSeed,
-  };
-}
+import { signOnce } from "../winternitz";
+import { Descriptor, operationalKey } from "./derive";
+import { operationalRoot } from "./master";
+import { Announce, announceMessage, encodeAnnounce } from "./protocol";
+export { genesisAuthorities, genesisVault, operationalRoot, recoveryPacket } from "./master";
+const program = (d: Descriptor) => new PublicKey(d.programId);
 /** Signs one announcement with `K[epoch][opIndex]`. The caller MUST have
  * durably recorded this `(epoch, opIndex)` as consumed before calling: a
  * second, different message under the same key breaks the scheme. The next

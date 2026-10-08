@@ -6,19 +6,19 @@
  *  creation request  tool -> site   the two public commitments of a new vault
  *  recovery packet   tool -> site   the one signed recovery message for an epoch */
 import { z } from "zod";
-import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../bytes";
 import { verify } from "../winternitz";
 import { identityOf } from "./kit";
 import {
+  address as addressBytes,
   decodeRecover,
   MAX_DELAY_SECS,
   RECOVER_SIZE,
-  recoverMessage,
-  SIGNATURE_SIZE,
-  VaultState,
+  recoverMessageBytes,
   vaultIdOf,
-} from "./protocol";
+} from "./core";
+import type { VaultState } from "./protocol";
+const SIGNATURE_SIZE = 1088;
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const address = z.string().min(32).max(44);
 const network = z.enum(["devnet", "localnet"]);
@@ -72,13 +72,13 @@ function parse<T>(schema: z.ZodType<T>, raw: string, what: string): T {
 }
 export function parseNetworkCard(raw: string): NetworkCard {
   const card = parse(networkCardSchema, raw, "a Bunker network card");
-  if (new PublicKey(card.genesis).toBytes().length !== 32) throw new Error("Invalid genesis");
-  new PublicKey(card.program);
+  addressBytes(card.genesis);
+  addressBytes(card.program);
   return card;
 }
 export const genesisOf = (r: CreationRequest) => ({
   salt: unhex(r.salt, 32),
-  chainTag: new PublicKey(r.genesis).toBytes(),
+  chainTag: addressBytes(r.genesis),
   opRoot: unhex(r.opRoot, 32),
   recRoot: unhex(r.recRoot, 32),
   delaySecs: r.delaySecs,
@@ -113,7 +113,7 @@ export function parseRecoveryFile(raw: string): RecoveryFile & {
   return {
     ...f,
     payloadBytes,
-    message: recoverMessage(new PublicKey(f.program), payloadBytes),
+    message: recoverMessageBytes(addressBytes(f.program), payloadBytes),
     signatureBytes: unhex(f.signature),
   };
 }
