@@ -1,22 +1,22 @@
 [package]
-name = "winterwallet-core"
+name = "bunker-lmots"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 authors.workspace = true
-description = "no_std Winternitz one-time signature primitives with BIP-39-style hierarchical key derivation, designed for efficient Solana on-chain verification."
+description = "Verification of LM-OTS one-time signatures (RFC 8554, LMOTS_SHA256_N32_W8) for on-chain use."
 
 [lints]
 workspace = true
 
 [lib]
 
+[features]
+# Key generation and signing, for tests. The program verifies only.
+signer = []
+
 [dependencies]
 solana-sha256-hasher = { workspace = true }
 
 [target.'cfg(not(any(target_arch = "bpf", target_os = "solana")))'.dependencies]
 solana-sha256-hasher = { workspace = true, features = ["sha2"] }
-hmac = { workspace = true }
-sha2 = { workspace = true }
-pbkdf2 = { workspace = true }
-zeroize = { workspace = true }

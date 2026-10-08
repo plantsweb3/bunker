@@ -7,11 +7,11 @@
 import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { concat, u64 } from "../bytes";
-import { SECRET_BYTES } from "../winternitz";
+import { ONE_TIME_BYTES } from "./onetime";
 import { trustedBytes } from "./core";
 export const MASTER_BYTES = 32;
 export const SEED_BYTES = 32;
-const LABEL = new TextEncoder().encode("BUNKER-KDF-3");
+const LABEL = new TextEncoder().encode("BUNKER-KDF-4");
 const ROLE_RECOVERY = 0x01;
 const ROLE_EPOCH_SEED = 0x02;
 const ROLE_OPERATIONAL = 0x03;
@@ -37,7 +37,7 @@ const index = (n: bigint) => {
   if (n < 0n || n > 0xffffffffffffffffn) throw new Error("Index out of range");
   return u64(n);
 };
-/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt || delay_secs ||
+/** `"BUNKER-KDF-4" || 0x00 || chain_tag || program_id || salt || delay_secs ||
  * trusted`, 241 bytes. Every input of the vault identity except the roots
  * themselves. */
 export function context(d: KeyContext): Uint8Array {
@@ -67,7 +67,7 @@ export function recoveryKey(master: Uint8Array, d: KeyContext, epoch: bigint) {
     master,
     MASTER_BYTES,
     concat(context(d), new Uint8Array([ROLE_RECOVERY]), index(epoch)),
-    SECRET_BYTES,
+    ONE_TIME_BYTES,
   );
 }
 /** `S[e]`: the only secret an operational signer holds. */
@@ -95,6 +95,6 @@ export function operationalKey(
       index(epoch),
       index(opIndex),
     ),
-    SECRET_BYTES,
+    ONE_TIME_BYTES,
   );
 }

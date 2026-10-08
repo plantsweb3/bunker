@@ -30,7 +30,7 @@ const packet = (epoch: bigint) => {
   return JSON.stringify({ ...identity, kind: "recover", epoch: epoch.toString(), payload: hex(p.payload), signature: hex(p.signature) });
 };
 const chain = (over: Partial<VaultState> = {}): VaultState => ({
-  vaultId, chainTag: d.chainTag, opRoot: g.opRoot, opIndex: 0n, epoch: 0n, recRoot: g.recRoot, delaySecs: 0, pending: null, bump: 255, trusted: [], ...over,
+  vaultId, chainTag: d.chainTag, opRoot: g.opRoot, opIndex: 0n, epoch: 0n, recRoot: g.recRoot, delaySecs: 0, pending: null, bump: 255, trusted: [], salt: d.salt, ...over,
 });
 describe("Public files between the offline tool and the site", () => {
   it("accepts a network card and rejects other files", () => {
@@ -118,12 +118,13 @@ describe("Offline recovery tool page", () => {
     const files = [...seen].map((f) => f.slice(resolve(".").length + 1)).sort();
     expect(files).toEqual([
       "sdk/bytes.ts",
+      "sdk/lmots.ts",
       "sdk/v3/core.ts",
       "sdk/v3/derive.ts",
       "sdk/v3/kit.ts",
       "sdk/v3/master.ts",
+      "sdk/v3/onetime.ts",
       "sdk/v3/requests.ts",
-      "sdk/winternitz.ts",
       "tools/recovery/main.ts",
     ]);
   });

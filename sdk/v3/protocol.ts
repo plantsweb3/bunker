@@ -11,6 +11,7 @@ import {
 import { sha256 } from "@noble/hashes/sha256";
 import { TOKEN_PROGRAM_ID } from "../classic-token";
 import { concat, readU64, u64 } from "../bytes";
+import { SIGNATURE_BYTES } from "../lmots";
 import {
   decodeRecover,
   encodeRecover,
@@ -38,10 +39,10 @@ export {
   vaultIdOf,
 };
 export type { Genesis, Recover };
-export const VAULT_SIZE = 415;
+export const VAULT_SIZE = 447;
 export const ANNOUNCE_SIZE = 196;
-export const PROOF_SIZE = 1162;
-export const SIGNATURE_SIZE = 1088;
+export const SIGNATURE_SIZE = SIGNATURE_BYTES;
+export const PROOF_SIZE = 74 + SIGNATURE_SIZE;
 /** How long an announced withdrawal stays executable once it opens: the
  * vault's waiting period, and never less than a day. */
 export const executeWindowSecs = (delaySecs: number) => BigInt(Math.max(delaySecs, 86_400));
@@ -195,6 +196,8 @@ export type VaultState = {
   bump: number;
   /** Wallets a withdrawal may go to without waiting. */
   trusted: PublicKey[];
+  /** The salt the vault was created with. Names its signers (onetime.ts). */
+  salt: Uint8Array;
 };
 export function parseVault(d: Uint8Array): VaultState {
   if (
@@ -231,6 +234,7 @@ export function parseVault(d: Uint8Array): VaultState {
       .map((i) => d.slice(287 + 32 * i, 319 + 32 * i))
       .filter((w) => !isZero(w))
       .map((w) => new PublicKey(w)),
+    salt: d.slice(415, 447),
   };
 }
 /** Where a vault's withdrawal stands at `now` (Unix seconds). */
@@ -363,7 +367,9 @@ export const closeProofIx = (
     [meta(proofAddress(program, payer, sha256(message)), true), meta(payer, true, true)],
     6,
   );
-/** Signature verification needs most of a transaction's compute budget. */
+/** Verifying a signature costs at most about 575,000 compute units (the
+ * program caps the hash-chain steps); the rest is headroom for address
+ * derivation. */
 export const computeIx = () =>
-  ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 });
+  ComputeBudgetProgram.setComputeUnitLimit({ units: 800_000 });
 export { ZERO as ZERO_ROOT };

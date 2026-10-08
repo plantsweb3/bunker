@@ -8,7 +8,7 @@ Suggested in two phases.
 
 - [PROTOCOL.md](PROTOCOL.md) in full, and its seventeen questions put to reviewers.
 - [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md): the findings of the project's own review and how each was resolved.
-- The vendored Winterwallet SHA-256 Winternitz scheme (N=32, checksum, Merkle commitment), distinguished from standardized constructions.
+- The LM-OTS implementations (`crates/bunker-lmots`, `sdk/lmots.ts`) against RFC 8554 section 4, and the three choices this use makes: one-time keys chained outside an LMS tree (with `q = 0`, as the RFC requires there), an identifier derived from the vault, and a derived randomizer selected to bound verification cost (CRYPTOGRAPHY.md).
 - Whether one fixed, re-emitted recovery signature per epoch is acceptable for that scheme.
 - The HKDF derivation and its context binding.
 - Whether a zero waiting period should be permitted, and as the default.

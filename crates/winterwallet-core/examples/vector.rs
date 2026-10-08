@@ -1,3 +1,0 @@
-use winterwallet_core::WinternitzKeypair;
-fn hex(b:&[u8])->String{b.iter().map(|x|format!("{x:02x}")).collect()}
-fn main(){let mut kp=WinternitzKeypair::from_mnemonic("abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",0).unwrap();let sk=kp.derive::<32>();let message=b"BUNKER interoperability fixture v1";let root=sk.to_pubkey().merklize();let secret=hex(sk.as_bytes());let sig=kp.sign_and_increment::<32>(&[message]);println!("{{\"message\":\"{}\",\"secret\":\"{}\",\"root\":\"{}\",\"signature\":\"{}\"}}",hex(message),secret,hex(root.as_bytes()),hex(sig.as_bytes()));}

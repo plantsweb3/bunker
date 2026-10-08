@@ -2,11 +2,11 @@
  * seed, never the master. Everything computed from the master lives in
  * `master.ts` and is re-exported here for callers that want one import. */
 import { PublicKey } from "@solana/web3.js";
-import { signOnce } from "../winternitz";
 import { Descriptor, operationalKey } from "./derive";
 import { operationalRoot } from "./master";
+import { signerOf, signOnce, SIGNS_ANNOUNCEMENTS } from "./onetime";
 import { Announce, announceMessage, encodeAnnounce } from "./protocol";
-export { genesisAuthorities, genesisVault, operationalRoot, recoveryPacket } from "./master";
+export { genesisAuthorities, genesisVault, operationalRoot, recoveryPacket, recoveryRoot } from "./master";
 const program = (d: Descriptor) => new PublicKey(d.programId);
 /** Signs one announcement with `K[epoch][opIndex]`. The caller MUST have
  * durably recorded this `(epoch, opIndex)` as consumed before calling: a
@@ -27,6 +27,10 @@ export function signAnnouncement(
   return {
     payload,
     message,
-    signature: signOnce(operationalKey(seed, d, a.epoch, a.opIndex), message),
+    signature: signOnce(
+      operationalKey(seed, d, a.epoch, a.opIndex),
+      signerOf(d, SIGNS_ANNOUNCEMENTS, a.epoch, a.opIndex),
+      message,
+    ),
   };
 }

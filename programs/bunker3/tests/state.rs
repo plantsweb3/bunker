@@ -20,6 +20,7 @@ fn vault() -> Vault {
         pending: None,
         bump: 254,
         trusted: [[0; 32]; TRUSTED_SLOTS],
+        salt: [5; 32],
     }
 }
 fn announce_bytes(v: &Vault, next: [u8; 32]) -> Vec<u8> {
@@ -59,7 +60,7 @@ fn layout_sizes_match_the_specification() {
     assert_eq!(recover_bytes(&vault(), root(21), root(12)).len(), RECOVER_LEN);
     assert_eq!(ANNOUNCE_DOMAIN.len(), RECOVER_DOMAIN.len());
     assert_ne!(ANNOUNCE_DOMAIN, RECOVER_DOMAIN);
-    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (415, 196, 138, 260));
+    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (447, 196, 138, 260));
 }
 
 #[test]
@@ -578,4 +579,26 @@ fn refusals_say_why() {
     data.extend(DAY.to_le_bytes());
     data.extend([0u8; 128]);
     assert_eq!(code(new_vault(root(1), &data, 250)), 160);
+}
+
+#[test]
+fn the_salt_is_kept_from_creation_and_never_changes() {
+    let mut data = Vec::new();
+    data.extend(root(42)); // salt
+    data.extend(root(2));
+    data.extend(root(10));
+    data.extend(root(20));
+    data.extend(DAY.to_le_bytes());
+    data.extend([0u8; 128]);
+    let mut v = new_vault(root(1), &data, 250).unwrap();
+    assert_eq!(v.salt, root(42));
+    let mut d = [0u8; VAULT_LEN];
+    v.pack(&mut d).unwrap();
+    assert_eq!(&d[415..447], &root(42));
+    assert_eq!(Vault::unpack(&d).unwrap().salt, root(42));
+    let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
+    apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
+    let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
+    apply_recover(&mut v, &r).unwrap();
+    assert_eq!(v.salt, root(42));
 }

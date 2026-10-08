@@ -4,7 +4,8 @@
 import { PublicKey } from "@solana/web3.js";
 import { sha256 } from "@noble/hashes/sha256";
 import { hex } from "../sdk/bytes";
-import { context, epochSeed } from "../sdk/v3/derive";
+import { context, epochSeed, operationalKey } from "../sdk/v3/derive";
+import { randomizerAt } from "../sdk/v3/onetime";
 import {
   genesisVault,
   operationalRoot,
@@ -52,10 +53,21 @@ export function vectors() {
   const recover = recoveryPacket(master, d, 0n);
   const seed1 = epochSeed(master, d, 1n);
   const announce1 = signAnnouncement(seed1, d, { ...withdrawal, epoch: 1n, opIndex: 0n });
+  // An announcement whose first candidate randomizer is over the program's
+  // step limit, so the signature carries a later one. Never submitted.
+  const first = hex(randomizerAt(operationalKey(genesis.seed, d, 0n, 1n).subarray(1088), 0));
+  let later = signAnnouncement(genesis.seed, d, { ...withdrawal, epoch: 0n, opIndex: 1n });
+  for (let extra = 1n; hex(later.signature.slice(4, 36)) === first; extra++)
+    later = signAnnouncement(genesis.seed, d, {
+      ...withdrawal,
+      announceBy: withdrawal.announceBy + extra,
+      epoch: 0n,
+      opIndex: 1n,
+    });
   return {
     warning: "PUBLIC TEST KEYS. Never fund or use outside isolated tests.",
     protocolVersion: 3,
-    upstreamRevision: "672fc6789b1532ee680f24842d235e0be8737b61",
+    signatureScheme: "RFC 8554 LMOTS_SHA256_N32_W8",
     master: hex(master),
     chainTag: hex(d.chainTag),
     program: program.toBase58(),
@@ -84,6 +96,7 @@ export function vectors() {
     announce: signed(announce),
     recover: signed(recover),
     announceAfterRecovery: signed(announce1),
+    announceLaterRandomizer: signed(later),
   };
 }
 if (process.argv[1]?.endsWith("v3-vectors.ts"))

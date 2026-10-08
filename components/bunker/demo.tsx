@@ -15,7 +15,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { transition, DemoStage, DemoAction } from "@/sdk/demo";
-import { generateKey, signOnce, verify } from "@/sdk/winternitz";
+import { publicKey, SECRET_BYTES, sign, SIGNATURE_BYTES, Signer, verify } from "@/sdk/lmots";
 import { hex } from "@/sdk/bytes";
 const steps = [
   "Move assets",
@@ -26,6 +26,7 @@ const steps = [
 type Line = { tag: string; text: string; tone?: "ok" | "bad" };
 type Keys = {
   secret: Uint8Array;
+  signer: Signer;
   root: Uint8Array;
   spent?: Uint8Array;
   signature?: Uint8Array;
@@ -43,6 +44,13 @@ const demoMessage = (root: Uint8Array, next: Uint8Array) =>
   encode(
     `BUNKER_DEMO_ONLY|withdraw|500|to:new-wallet|lock:${hex(root)}|next:${hex(next)}`,
   );
+const random = (n: number) => crypto.getRandomValues(new Uint8Array(n));
+/** A fresh one-time key under a signer of its own. */
+function generateKey(): Keys {
+  const secret = random(SECRET_BYTES);
+  const signer = { identifier: random(16), q: 0 };
+  return { secret, signer, root: publicKey(signer, secret) };
+}
 /** Runs the real one-time signature code for each step. Nothing leaves the tab. */
 function run(action: DemoAction, keys: { current: Keys | null }): Line[] {
   if (action === "reset") {
@@ -54,7 +62,7 @@ function run(action: DemoAction, keys: { current: Keys | null }): Line[] {
     const [k, ms] = timed(generateKey);
     keys.current = k;
     return [
-      { tag: "keygen", text: "1,088 random bytes → 34 hash chains × 255" },
+      { tag: "keygen", text: "1,088 random bytes → 34 hash chains × 255 steps" },
       {
         tag: "lock",
         text: `${short(k.root)} · 8,670 SHA-256 in ${ms}`,
@@ -75,14 +83,15 @@ function run(action: DemoAction, keys: { current: Keys | null }): Line[] {
       },
     ];
   if (action === "attack") {
-    const forged = crypto.getRandomValues(new Uint8Array(1088));
+    const forged = random(SIGNATURE_BYTES);
+    forged.set([0, 0, 0, 4]);
     const message = encode(
       `BUNKER_DEMO_ONLY|withdraw|4000|to:attacker|lock:${hex(k.root)}`,
     );
-    const [valid, ms] = timed(() => verify(forged, message, k.root));
+    const [valid, ms] = timed(() => verify(k.signer, forged, message, k.root));
     return [
       { tag: "drainer", text: "withdraw $4,000 → attacker, signed by wallet" },
-      { tag: "verify", text: `1,088-byte authorization vs lock ${short(k.root)}` },
+      { tag: "verify", text: `1,124-byte authorization vs lock ${short(k.root)}` },
       {
         tag: "verify",
         text: `→ ${valid} in ${ms}. The drainer has no Bunker key to sign with.`,
@@ -92,9 +101,10 @@ function run(action: DemoAction, keys: { current: Keys | null }): Line[] {
   }
   const next = generateKey();
   const message = demoMessage(k.root, next.root);
-  const signature = signOnce(k.secret, message);
-  const [valid, ms] = timed(() => verify(signature, message, k.root));
-  const replay = verify(signature, message, next.root);
+  const signature = sign(k.signer, k.secret, random(32), message);
+  k.secret.fill(0);
+  const [valid, ms] = timed(() => verify(k.signer, signature, message, k.root));
+  const replay = verify(next.signer, signature, message, next.root);
   keys.current = { ...next, spent: k.root, signature, message };
   return [
     { tag: "sign", text: `one-time key signs: $500 → new wallet, next lock ${short(next.root)}` },
@@ -416,7 +426,7 @@ export default function Demo() {
           <div className="sim-log" aria-label="Verification log">
             <div className="sim-log-head">
               <span className="mono">VERIFICATION LOG</span>
-              <span className="mono">sdk/winternitz.ts · runs locally</span>
+              <span className="mono">sdk/lmots.ts · runs locally</span>
             </div>
             <div className="sim-log-body">
               {log.length ? (

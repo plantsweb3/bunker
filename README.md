@@ -16,7 +16,7 @@ Assets go into a program-owned vault from any wallet. They come out only with a 
 |---|---|
 | What can go wrong, and what is not defended? | [Threat model](docs/THREAT-MODEL.md) |
 | What exactly does the program permit? | [Protocol specification](docs/PROTOCOL.md), [program](programs/bunker3/src) |
-| What is signed, and where do the primitives come from? | [Cryptography](docs/CRYPTOGRAPHY.md), [vendored core](crates/winterwallet-core) |
+| What is signed, and where do the primitives come from? | [Cryptography](docs/CRYPTOGRAPHY.md), [signature verifier](crates/bunker-lmots) |
 | How are keys derived and stored? | [Client](sdk/v3), [offline recovery tool](tools/recovery) |
 | How is it put together? | [Architecture](docs/ARCHITECTURE.md) |
 | What has actually been tested, and what has not? | [Testing](docs/TESTING.md) |
@@ -85,4 +85,4 @@ npm run audit:dependencies
 
 ## License and attribution
 
-Bunker-authored code is MIT. Vendored Winterwallet retains Dean Little's MIT license at revision `672fc6789b1532ee680f24842d235e0be8737b61`; its algorithm source is unchanged. That construction is unaudited and is not WOTS+, LMS or XMSS. Third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md); image provenance is in [docs/IMAGE-PROVENANCE.txt](docs/IMAGE-PROVENANCE.txt). Brand assets do not grant endorsement or trademark rights.
+Bunker-authored code is MIT. The one-time signature is LM-OTS as specified in RFC 8554, implemented here from the RFC text and checked against its published test vectors; it is used on its own rather than inside the LMS system that document mainly describes, and it is unaudited. Third-party notices are in [THIRD_PARTY.md](THIRD_PARTY.md); image provenance is in [docs/IMAGE-PROVENANCE.txt](docs/IMAGE-PROVENANCE.txt). Brand assets do not grant endorsement or trademark rights.

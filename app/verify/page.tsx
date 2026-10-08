@@ -41,7 +41,7 @@ export default function Page() {
             [
               "01",
               "Cryptographic review",
-              "Review the upstream primitive, full parameter set, canonical message, and Bunker’s browser port.",
+              "Review the LM-OTS verifier and signer against RFC 8554, how Bunker uses them, the canonical message, and the key derivation.",
             ],
             [
               "02",

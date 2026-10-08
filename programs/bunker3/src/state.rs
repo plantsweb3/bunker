@@ -3,7 +3,7 @@
 //! Layouts are specified in docs/PROTOCOL.md.
 use solana_program_error::ProgramError;
 
-pub const VAULT_LEN: usize = 415;
+pub const VAULT_LEN: usize = 447;
 pub const ANNOUNCE_LEN: usize = 196;
 pub const RECOVER_LEN: usize = 138;
 pub const INIT_LEN: usize = 260;
@@ -140,6 +140,9 @@ pub struct Vault {
     /// vault is created and part of its identity. Unused slots are zero and
     /// come last.
     pub trusted: [[u8; 32]; TRUSTED_SLOTS],
+    /// The random value the vault was created with. Public. Part of the
+    /// identifier under which every signature for this vault is made.
+    pub salt: [u8; 32],
 }
 /// Unused slots zero and last; no wallet listed twice.
 fn trusted_is_canonical(t: &[[u8; 32]; TRUSTED_SLOTS]) -> bool {
@@ -190,12 +193,13 @@ impl Vault {
             pending,
             bump: d[286],
             trusted: {
-                let t = read_trusted(&d[287..VAULT_LEN]);
+                let t = read_trusted(&d[287..415]);
                 if !trusted_is_canonical(&t) {
                     return Err(ProgramError::InvalidAccountData);
                 }
                 t
             },
+            salt: arr(&d[415..447]),
         })
     }
     pub fn pack(&self, d: &mut [u8]) -> Result<(), ProgramError> {
@@ -224,14 +228,14 @@ impl Vault {
         for (i, wallet) in self.trusted.iter().enumerate() {
             d[287 + 32 * i..319 + 32 * i].copy_from_slice(wallet);
         }
+        d[415..447].copy_from_slice(&self.salt);
         Ok(())
     }
 }
 
 /// `data` is `salt || chain_tag || op_root || rec_root || delay_secs ||
 /// trusted (4 x 32)`.
-/// `vault_id` is the caller's hash of `VAULT_ID_DOMAIN || data`; the salt is
-/// not stored.
+/// `vault_id` is the caller's hash of `VAULT_ID_DOMAIN || data`.
 pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, ProgramError> {
     require(data.len() == INIT_LEN)?;
     let v = Vault {
@@ -245,6 +249,7 @@ pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, Pro
         pending: None,
         bump,
         trusted: read_trusted(&data[132..INIT_LEN]),
+        salt: arr(&data[..32]),
     };
     need(
         trusted_is_canonical(&v.trusted)

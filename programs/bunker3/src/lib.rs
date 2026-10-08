@@ -1,7 +1,7 @@
 //! Protocol 3 draft implementation: recovery authority and delayed withdrawals.
 //! NOT deployed, NOT audited, NOT enabled anywhere. Specification and open
-//! questions: docs/PROTOCOL.md. Signature verification is the unchanged
-//! vendored Winterwallet core.
+//! questions: docs/PROTOCOL.md. Signatures are LM-OTS (RFC 8554), verified by
+//! `crates/bunker-lmots`.
 pub mod state;
 use solana_account_info::{next_account_info, AccountInfo};
 use solana_clock::Clock;
@@ -15,12 +15,42 @@ use solana_sha256_hasher::hashv;
 use solana_system_interface::{instruction as system_instruction, program as system_program};
 use solana_sysvar::Sysvar;
 use state::*;
-use winterwallet_core::{WinternitzRoot, WinternitzSignature};
+use bunker_lmots::{candidate_key, IDENTIFIER_LEN};
 #[cfg(not(feature = "no-entrypoint"))]
 solana_program_entrypoint::entrypoint!(process_instruction);
 
-pub const PROOF_LEN: usize = 1162;
-pub const SIGNATURE_LEN: usize = 1088;
+pub const SIGNATURE_LEN: usize = bunker_lmots::SIGNATURE_LEN;
+pub const PROOF_LEN: usize = 74 + SIGNATURE_LEN;
+/// The most chain steps a signature may take to verify: 255 * 16. The count
+/// for a message digest whose checksum has high byte `h` is always
+/// 255 * (h + 2), so this admits `h <= 14`. A signer meets it by its choice of
+/// randomizer, a little over one try in four. It bounds what `announce` and
+/// `recover` can cost, whatever the message.
+pub const VERIFY_STEP_LIMIT: u32 = 4080;
+const IDENTIFIER_DOMAIN: &[u8; 16] = b"BUNKER3_LMOTS_ID";
+
+/// The LM-OTS identifier `I` of the key at one position: a role, an epoch and
+/// an operation index (zero for recovery) under one program, chain and vault
+/// salt. Every hash a signature involves starts with it, so a signature made
+/// for one position verifies at no other. `q` is always zero, as RFC 8554
+/// section 4 requires of LM-OTS used outside an LMS tree.
+///
+/// The salt is public once a vault exists, so someone can create another vault
+/// whose keys share these identifiers. That gives them nothing against this
+/// vault: their keys are their own, and every signed message names its vault.
+fn identifier(id: &Pubkey, v: &Vault, role: u8, epoch: u64, index: u64) -> [u8; IDENTIFIER_LEN] {
+    let h = hashv(&[
+        IDENTIFIER_DOMAIN,
+        id.as_ref(),
+        &v.chain_tag,
+        &v.salt,
+        &[role],
+        &epoch.to_le_bytes(),
+        &index.to_le_bytes(),
+    ])
+    .to_bytes();
+    h[..IDENTIFIER_LEN].try_into().unwrap()
+}
 const PROOF_MAGIC: &[u8; 8] = b"BKPROOF3";
 const SPENT_MAGIC: &[u8; 8] = b"BKSPENT3";
 const VAULT_SEED: &[u8] = b"bunker3";
@@ -149,9 +179,10 @@ fn store_vault(vault: &AccountInfo, v: &Vault) -> ProgramResult {
 fn verify_proof(
     id: &Pubkey,
     proof: &AccountInfo,
-    message: &[&[u8]],
+    message: [&[u8]; 4],
     digest: &[u8; 32],
     root: &[u8; 32],
+    identifier: &[u8; IDENTIFIER_LEN],
 ) -> ProgramResult {
     owned(proof, id, PROOF_LEN, PROOF_MAGIC)?;
     let d = proof.try_borrow_data()?;
@@ -160,11 +191,12 @@ fn verify_proof(
             && d[40..72] == *digest,
         Refusal::ProofNotReady,
     )?;
-    let signature: &WinternitzSignature<32> = (&d[74..]).try_into().map_err(|_| invalid())?;
-    if !signature.verify(message, &WinternitzRoot::new(*root)) {
-        return Err(ProgramError::MissingRequiredSignature);
+    // The candidate key is computed from the signature; the signature is good
+    // only if that is the key the vault holds.
+    match candidate_key(identifier, 0, message, &d[74..], VERIFY_STEP_LIMIT) {
+        Some(candidate) if candidate == *root => Ok(()),
+        _ => Err(ProgramError::MissingRequiredSignature),
     }
-    Ok(())
 }
 
 pub fn process_instruction(id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) -> ProgramResult {
@@ -278,12 +310,14 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
         need(a.destination != reserved.to_bytes(), Refusal::DestinationNotAllowed)?;
     }
     unspent(id, vault.key, next_spent, &a.next_op_root)?;
-    let message: &[&[u8]] = &[ANNOUNCE_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
-    let digest = hashv(message).to_bytes();
+    let message: [&[u8]; 4] = [ANNOUNCE_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
+    let digest = hashv(&message).to_bytes();
+    // The key is named by the vault's epoch and the index being used up.
+    let signer = identifier(id, &v, ROLE_OPERATIONAL, v.epoch, v.op_index);
     // Cheap state checks first; `displaced` is the root the signature must match.
     let trusted = to_trusted(&v, &a);
     let displaced = apply_announce(&mut v, &a, digest, Clock::get()?.unix_timestamp, trusted)?;
-    verify_proof(id, proof, message, &digest, &displaced)?;
+    verify_proof(id, proof, message, &digest, &displaced, &signer)?;
     mark_spent(payer, spent, system, id, vault.key, &displaced)?;
     store_vault(vault, &v)
 }
@@ -398,10 +432,12 @@ fn recover(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     let mut v = load_vault(id, vault)?;
     unspent(id, vault.key, next_rec_spent, &r.next_rec_root)?;
     unspent(id, vault.key, next_op_spent, &r.next_op_root)?;
-    let message: &[&[u8]] = &[RECOVER_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
-    let digest = hashv(message).to_bytes();
+    let message: [&[u8]; 4] = [RECOVER_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
+    let digest = hashv(&message).to_bytes();
+    // The recovery key of the epoch being left. There is one per epoch.
+    let signer = identifier(id, &v, ROLE_RECOVERY, v.epoch, 0);
     let old_rec = apply_recover(&mut v, &r)?;
-    verify_proof(id, proof, message, &digest, &old_rec)?;
+    verify_proof(id, proof, message, &digest, &old_rec, &signer)?;
     // Only a root that has signed is ever marked. The displaced operational
     // root has not signed here and is left alone (see `apply_recover`).
     mark_spent(payer, rec_spent, system, id, vault.key, &old_rec)?;

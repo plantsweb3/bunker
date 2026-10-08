@@ -7,8 +7,8 @@ Status: pre-release. Nothing is deployed on mainnet, no independent audit is com
 | Part | Where | Role |
 |---|---|---|
 | On-chain program | `programs/bunker3` | Holds assets and releases them only under the rules in [PROTOCOL.md](PROTOCOL.md) |
-| Signature verifier | `crates/winterwallet-core` | Vendored unchanged; see [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) |
-| Client | `sdk/v3`, `sdk/winternitz.ts` | Derivation, encodings, instructions, key files, signing journal, passkey storage |
+| Signature verifier | `crates/bunker-lmots` | LM-OTS (RFC 8554 §4) candidate-key computation with a bound on its cost; see [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) |
+| Client | `sdk/v3`, `sdk/lmots.ts` | Derivation, encodings, instructions, key files, signing journal, passkey storage |
 | Offline recovery tool | `tools/recovery` | The only code that handles the archival master |
 | Web app | `app`, `components/bunker` | Next.js App Router on Vercel |
 
@@ -37,7 +37,7 @@ CI builds the tool on every run, checks that a second build is byte-identical an
 
 `tools/cli` is a command-line client over the same `sdk` code the site uses: read a Bunker, withdraw, resume, release, clear, submit a recovery packet. Its signing journal is a file beside the day key, written through a temporary file and a rename, with a lock file so two runs cannot sign at once. It takes the network and program from the day key file and refuses an RPC on any other network, and it refuses mainnet as the site does. It exists so that a Bunker does not depend on this website staying up.
 
-`sdk/v3/master.ts` holds everything computed from the archival master, and `sdk/v3/core.ts` the addresses, vault identity and recovery-packet bytes with no Solana library. The offline tool is built from those and five other files and nothing else.
+`sdk/v3/master.ts` holds everything computed from the archival master, and `sdk/v3/core.ts` the addresses, vault identity and recovery-packet bytes with no Solana library. The offline tool is built from those and six other files and nothing else.
 
 ## The web app
 
