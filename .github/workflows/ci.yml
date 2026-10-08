@@ -59,6 +59,9 @@ jobs:
     timeout-minutes: 30
     env:
       SOLANA_VERSION: 4.3.0
+      SOLANA_SHA256: c97289a8abb1d0efb497d8b5cb285baabd9b7f8ea6647f5d145c5dc8ff3611e8
+      PLATFORM_TOOLS_VERSION: v1.57
+      PLATFORM_TOOLS_SHA256: b0f7af104adf726fff2a6a09ea2eb2f2d2965c92295f4d7388c08d140e0c2b00
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
@@ -66,14 +69,42 @@ jobs:
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
         with:
           toolchain: 1.99.0
-      - name: Install the Solana build tools
+      # Both archives are fetched by exact version and checked against a
+      # recorded SHA-256 before anything in them runs. The Solana archive's
+      # hash was taken from two sources (release.anza.xyz and the GitHub
+      # release) and they agreed.
+      - name: Install the Solana build tools, verified
         run: |
-          curl --proto '=https' --tlsv1.2 -sSfL "https://release.anza.xyz/v${SOLANA_VERSION}/install" -o /tmp/solana-install.sh
-          sh /tmp/solana-install.sh
-          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+          curl --proto '=https' --tlsv1.2 -sSfL -o /tmp/solana.tar.bz2 \
+            "https://github.com/anza-xyz/agave/releases/download/v${SOLANA_VERSION}/solana-release-x86_64-unknown-linux-gnu.tar.bz2"
+          echo "${SOLANA_SHA256}  /tmp/solana.tar.bz2" | sha256sum -c -
+          mkdir -p "$HOME/solana" && tar -xjf /tmp/solana.tar.bz2 -C "$HOME/solana"
+          echo "$HOME/solana/solana-release/bin" >> "$GITHUB_PATH"
+      - name: Install the SBF platform tools, verified
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL -o /tmp/platform-tools.tar.bz2 \
+            "https://github.com/anza-xyz/platform-tools/releases/download/${PLATFORM_TOOLS_VERSION}/platform-tools-linux-x86_64.tar.bz2"
+          echo "${PLATFORM_TOOLS_SHA256}  /tmp/platform-tools.tar.bz2" | sha256sum -c -
+          mkdir -p "$HOME/.cache/solana/${PLATFORM_TOOLS_VERSION}/platform-tools"
+          tar -xjf /tmp/platform-tools.tar.bz2 -C "$HOME/.cache/solana/${PLATFORM_TOOLS_VERSION}/platform-tools"
       - run: cargo-build-sbf --version
-      - run: cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy
-      - run: sha256sum target/deploy/bunker3.so
+      - name: Build the program
+        run: |
+          cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy 2>&1 | tee /tmp/build.log
+          # The verified tools above must be the ones used: nothing fetched here.
+          ! grep -qi "downloading platform-tools\|Downloading https" /tmp/build.log
+      - run: sha256sum target/deploy/bunker3.so | tee target/deploy/bunker3.so.sha256
+      # The program as built by this pinned, verified toolchain, kept so its
+      # hash does not rest on anyone's own machine.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: bunker3-program
+          path: |
+            target/deploy/bunker3.so
+            target/deploy/bunker3.so.sha256
+          if-no-files-found: error
+          retention-days: 90
       - run: cargo test --locked
         working-directory: programs/bunker3-svm-tests
   browser-release:

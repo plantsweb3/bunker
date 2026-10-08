@@ -40,7 +40,7 @@ Severity is the project's own judgement. "Test" names the regression test that r
 | K-7 | Low | The key being retired was named from page state that could be stale. Deposits were offered with a replaced day key loaded. An unreadable journal threw during rendering. A token's pending amount was labelled "lamports". An error pattern matched transaction signatures containing "503". | Each corrected. | — |
 | K-10 | Low | Bunker Mode re-read the wallet when it ran and moved every token it then found, including ones that were not on the list the user had been shown. | It moves only what was listed. | `custody3.spec.ts` (bunker mode) |
 | K-11 | Open | If a signature is uploaded and the announcement then never lands, the upload account's deposit (under 0.01 SOL) stays there until its payer closes it. The interface offers no button for that. | Not changed in this draft. | — |
-| K-8 | Open | The offline tool bundles the full Solana web3 library for address derivation, about a third of a megabyte of code that a reviewer must trust or read. | Not changed in this draft. Replacing it with a small audited helper is worth doing before a reviewed release. | — |
+| K-8 | Medium | The offline tool bundled the full Solana web3 library for address derivation, about a third of a megabyte of code from twenty-two packages that a reviewer had to trust or read. | Replaced by a small address module (`sdk/v3/core.ts`). The tool is 123 KB, built from eight of this project's files and three packages, and a test pins that list. | `requests-v3.test.ts`, `core-v3.test.ts` |
 | K-9 | Open | A recovery packet for a future key generation can be produced by typing a larger number. Publishing one early lets anyone advance the vault to the next generation once it reaches that number. It installs only the owner's own next keys. This was first rated harmless; round three showed that, with the program as it then was, an early packet also told a thief which roots to plant (P-11). With P-11 fixed the original rating holds. | The website now shows the current generation for any Bunker address so the number need not be guessed. Not otherwise restricted. | — |
 
 ## Website and alert service
@@ -102,7 +102,7 @@ The second round found no way to obtain two signatures under one key while the j
 | U-7 | Low | Ordinary amounts were refused (".5", "1,5", a trailing space), which on some phone keyboards made fractions impossible to type. | Accepted, except a comma followed by exactly three digits, which could mean two different amounts and is refused with an explanation. | `core.test.ts` |
 | U-8 | Low | A deposit chose the first wallet account holding a mint, not the one selected; re-uploading a used Bunker's creation request raised a false alarm; a pending token withdrawal showed a token-account address the user had never seen with no explanation; Bunker Mode announced success when nothing moved; storage or tab-coordination being unavailable was discovered only after a withdrawal was reviewed. | Each corrected. | `custody3.spec.ts` (deposits) |
 | U-9 | Open | The offline tool cannot run on an iPhone, and wallet in-app browsers often block its downloads. Building or recovering a Bunker needs a computer or Android. | Not solved. A release requirement to state plainly or fix. | — |
-| U-10 | Open | "Finish announcing" and recovery do not check that the connected wallet can pay before starting; switching wallets part-way strands a small deposit; a release that fails because the recipient's token account was closed is not explained; program errors appear as raw codes. | Not changed in this draft. | — |
+| U-10 | Low | "Finish announcing" and recovery did not check that the connected wallet could pay before starting; a release that failed because the recipient's token account had been closed was not explained. | Both flows check the fee wallet before the first approval. Release recreates the recipient's token account when this browser knows whose it was, and explains what to do when it does not. Still open: switching wallets part-way strands a small deposit, and program errors appear as a generic message. | `preflight.test.ts` |
 
 ### Cryptography
 
@@ -122,8 +122,17 @@ The second round found no way to obtain two signatures under one key while the j
 | W-14 | Medium | The alert watcher read its stored state one vault at a time and advanced its turn before doing the work, so a slow pass could skip the same vaults every time; any Bunker could collect unlimited watchers; a refusal at the global limit claimed the per-chat limit. | Batched reads within a time budget, taking each batch only when there is time for it; a watcher limit per Bunker; distinct messages. The global limit can still be exhausted by someone determined. | `alerts.test.ts` |
 | W-15 | Low | The rate limit could be reset by filling its table, and trusted a header the client can set on hosts other than the present one. Alerts were advertised when a secret was too short for the service to run. | Overflow shares one allowance; the platform's own address header is preferred; the advertisement uses the same conditions as the service. | `rpc.test.ts`, `alerts.test.ts` |
 | W-16 | Low | The source bundle's patterns missed `keypair.json`, nested `.npmrc`, and key files under other names; the bundler for the offline tool was not a declared dependency; the VM crate's lockfile was not watched for updates. | Corrected. | `source-bundle.test.ts` |
-| W-17 | Open | CI installs the Solana build tools by running a downloaded script with no checksum. It affects only the job that builds and tests the program, which has no secrets. | Not changed. Pin and verify the release archive. | — |
+| W-17 | Low | CI installed the Solana build tools by running a downloaded script with no checksum. | The release archive and the SBF platform tools are fetched by exact version and checked against recorded SHA-256 hashes before use; the build fails if it downloads anything else. The built program and its hash are kept for commits on `main`. | CI |
 | W-18 | Open | The wallet check does not see Token-2022 issuer powers and fails on wallets with thousands of token accounts. | Its wording no longer claims completeness. | — |
+
+## After the third round
+
+| ID | Item | Resolution | Test |
+|---|---|---|---|
+| A-1 | A Bunker could only be used through the website. | A command-line client (`tools/cli`) reads, withdraws, resumes, releases, clears and submits recovery packets with the same signing code and a file-based journal. Draft; refuses mainnet as the site does. | `tests/cli-chain.ts` |
+| A-2 | Nothing compared the offline tool the site serves with the one this repository builds. | A daily workflow does. | CI |
+| A-3 | A passkey copy of a day key that recovery had replaced stayed the main way in and failed every time; a passkey that could not protect a day key was left behind in the passkey manager. | The stale copy is removed when it is found; an unusable credential is reported to the passkey manager where the browser allows. | — |
+| A-4 | A token amount was shown only in the token's own units, using a decimal count read from the network. | The review also shows the exact number of smallest units that is signed. | — |
 
 ## What was tried and held
 

@@ -1,0 +1,33 @@
+name: Check the served recovery tool
+# Builds the offline recovery tool from main and compares it, byte for byte,
+# with the file the website is serving. A difference means the site is serving
+# something this repository did not produce (or a deploy is still in flight;
+# a second failure in a row is the signal).
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run tool:build
+      - name: Compare with the live site
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL -o /tmp/served.html https://bunkermode.io/source/bunker-recovery-tool.html
+          built=$(sha256sum public/source/bunker-recovery-tool.html | cut -d' ' -f1)
+          served=$(sha256sum /tmp/served.html | cut -d' ' -f1)
+          echo "built from $(git rev-parse --short HEAD): $built"
+          echo "served by bunkermode.io:  $served"
+          test "$built" = "$served"

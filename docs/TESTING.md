@@ -13,9 +13,10 @@ Automated tests do not establish cryptographic security and are not an audit.
 | `cd programs/bunker3-svm-tests && cargo test --locked` | The compiled program in an in-process Solana VM (LiteSVM) with the Clock sysvar set, so waiting periods and deadlines are tested to the second (`tests/program.rs`); isolation between vaults and between a vault and whoever creates it (`tests/isolation.rs`); plus the client's vectors against an independent Rust derivation (`tests/client_vectors.rs`) |
 | `npm run test:chain` | Repeated create, withdraw, replay and recovery cycles on the local validator through the client. `CYCLES=40` sets the count. Prints a summary. |
 | `npm run test:alerts` | The alert watcher against the compiled program on the local validator, with Telegram replaced by a list: no alert for history before subscribing, one per event, none on a repeat pass, an announcement still reported after the vault's address is flooded with transactions, no alert when a stranger's recovery merely touches the watched vault, none after `/stop` |
+| `npm run test:cli` | The command-line client on the local validator: withdraw with and without a waiting period, a stale review refused, cancel by recovery, the old day key refused, a wrong network refused, and the real program run with typed answers (the review printed, the password not echoed, anything but "sign" signing nothing) |
 | `npm run test:e2e` | Browser, desktop and mobile. Always: routes, the content security policy on every page, release gate, demo, wallet check, mobile overflow. With the local validator running: the full custody flows below. |
 
-The VM suite is a standalone crate with its own lockfile so the VM's dependencies stay out of the program's. It needs `bunker3.so` built first. GitHub CI builds and tests the workspace, builds the program and runs the VM suite, and runs the browser suite against a production build; it does not run the chain cycles or the custody browser cases, which need a validator.
+The VM suite is a standalone crate with its own lockfile so the VM's dependencies stay out of the program's. It needs `bunker3.so` built first. GitHub CI builds and tests the workspace, builds the program with a toolchain it has checked by hash and runs the VM suite, keeps the built program and its hash for commits on `main`, and runs the browser suite against a production build; it does not run the chain cycles or the custody browser cases, which need a validator.
 
 ## Local validator
 
@@ -60,3 +61,5 @@ The suites passed while two critical flaws were present, because no test put two
 ## Other
 
 CI runs the browser job in the official Playwright container pinned by digest; match its version to `package-lock.json` when upgrading. A read-only smoke test of the live site: `BUNKER_E2E_BASE_URL=https://bunkermode.io npm run test:e2e -- tests/browser/app.spec.ts`.
+
+A separate scheduled workflow (`.github/workflows/live-tool.yml`) builds the offline recovery tool from `main` once a day and compares it byte for byte with the file the website serves.
