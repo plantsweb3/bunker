@@ -58,7 +58,9 @@ next-env.d.ts
 
 # Explicit exported recovery filenames must never enter source or Git.
 bunker-devnet-*.json
-bunker-test-v2-*.json
+bunker-test-*.json
+id.json
+*.key
 
 # standalone in-process VM tests
 /programs/bunker3-svm-tests/target/

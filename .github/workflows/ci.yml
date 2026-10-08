@@ -22,7 +22,8 @@ jobs:
           cache: npm
       - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
         with:
-          toolchain: stable
+          # Pinned so a new compiler release cannot change what is tested.
+          toolchain: 1.99.0
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
@@ -39,8 +40,10 @@ jobs:
           cmp /tmp/tool-first.html public/source/bunker-recovery-tool.html
           cat public/source/recovery-tool-manifest.json
       # An independent build of the tool, so its hash does not rest only on
-      # the copy the website serves.
+      # the copy the website serves. Only for commits on main: a pull request
+      # from a fork must not be able to publish an artifact under this name.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           name: bunker-recovery-tool
           path: |
@@ -49,6 +52,30 @@ jobs:
           if-no-files-found: error
           retention-days: 90
       - run: npm run build
+  # The compiled program, exercised in an in-process VM: every instruction,
+  # the vault-isolation attacks, and the client's own bytes.
+  program-vm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SOLANA_VERSION: 4.3.0
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: 1.99.0
+      - name: Install the Solana build tools
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfL "https://release.anza.xyz/v${SOLANA_VERSION}/install" -o /tmp/solana-install.sh
+          sh /tmp/solana-install.sh
+          echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+      - run: cargo-build-sbf --version
+      - run: cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy
+      - run: sha256sum target/deploy/bunker3.so
+      - run: cargo test --locked
+        working-directory: programs/bunker3-svm-tests
   browser-release:
     runs-on: ubuntu-latest
     timeout-minutes: 12

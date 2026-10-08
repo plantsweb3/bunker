@@ -74,7 +74,8 @@ function readSnapshot(raw: string | null): Snapshot | null {
   if (!raw) return null;
   try {
     const s = JSON.parse(raw) as Snapshot;
-    BigInt(s.epoch), BigInt(s.opIndex), BigInt(s.lamports);
+    // Throws on anything that is not a whole number.
+    for (const n of [s.epoch, s.opIndex, s.lamports]) BigInt(n);
     return s.v === 1 ? s : null;
   } catch {
     return null;
