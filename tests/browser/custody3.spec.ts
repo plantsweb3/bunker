@@ -4,12 +4,14 @@ import { resolve } from "node:path";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { parseVault } from "../../sdk/v3/protocol";
 import { connect, installLocalWallet } from "./local-wallet";
+import { getAssociatedTokenAddress } from "../../sdk/classic-token";
+import { createMint, getAccount, getOrCreateAssociatedTokenAccount, mintTo } from "../token-fixture";
 // Protocol 3 draft against an isolated LOCAL validator. No user wallet is used.
 // The 24-hour wait cannot elapse here; release after the wait is covered by the
 // in-process VM suite in programs/bunker3-svm-tests.
 const PROGRAM = "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn";
 type Ctx = Awaited<ReturnType<typeof setup>>;
-async function setup(page: Page, info: TestInfo) {
+async function setup(page: Page, info: TestInfo, origin = "") {
   test.setTimeout(120000);
   const rpc = "http://127.0.0.1:19099";
   const c = new Connection(rpc, "confirmed");
@@ -106,7 +108,7 @@ async function setup(page: Page, info: TestInfo) {
   };
   /** Builds a Bunker: kit and keys offline, creation request submitted on the site. */
   const build = async (wait: boolean) => {
-    await page.goto("/recovery");
+    await page.goto(`${origin}/recovery`);
     await connect(page);
     const card = await save(
       () => page.getByRole("button", { name: "Download network card" }).click(),
@@ -157,7 +159,7 @@ async function setup(page: Page, info: TestInfo) {
     return { packet: made("recovery-packet"), nextDay: made("day-key") };
   };
   const unseal = async (dayKey: string) => {
-    await page.goto("/vault");
+    await page.goto(`${origin}/vault`);
     await connect(page);
     await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Open with day key" }).click();
@@ -172,7 +174,7 @@ async function setup(page: Page, info: TestInfo) {
     await page.getByRole("button", { name: "Review deposit in wallet" }).click();
     await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
   };
-  return { c, recipient, errors, vaultState, build, unseal, deposit, makePacket, toolRequests };
+  return { c, recipient, errors, payer, vaultState, build, unseal, deposit, makePacket, toolRequests };
 }
 test("with a waiting period: announce, count down, cancel by recovery, continue with new keys", async ({
   page,
@@ -251,6 +253,118 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   await expect(page.getByText("Bunker sealed.", { exact: false })).toBeVisible();
   await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
   expect(toolRequests, "the offline tool made no network request").toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("tokens: deposit and withdraw a classic SPL token", async ({ page }, info) => {
+  const { c, recipient, errors, payer, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  const mint = await createMint(c, payer, payer.publicKey, null, 6);
+  const walletToken = await getOrCreateAssociatedTokenAccount(c, payer, mint, payer.publicKey);
+  await mintTo(c, payer, mint, walletToken.address, payer, 500_000_000);
+  const { day0, vault } = await build(false);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  await deposit("0.5"); // SOL for the vault's own needs is not required; this exercises both assets.
+  // Deposit 300 tokens.
+  await page.getByRole("button", { name: "Deposit", exact: true }).click();
+  await expect(page.getByLabel("Asset").locator("option")).toHaveCount(2);
+  await page.getByLabel("Asset").selectOption(mint.toBase58());
+  await page.getByLabel("Amount", { exact: true }).fill("300");
+  await page.getByRole("button", { name: "Review deposit in wallet" }).click();
+  await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
+  await expect(page.locator(".token-rows")).toContainText("300");
+  const vaultToken = await getAssociatedTokenAddress(mint, new PublicKey(vault), true);
+  expect((await getAccount(c, vaultToken)).amount).toBe(300_000_000n);
+  // Withdraw 120 to a recipient who has no token account yet.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Asset").selectOption(mint.toBase58());
+  await page.getByLabel("Amount", { exact: true }).fill("120");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText(mint.toBase58(), { exact: true })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  const recipientToken = await getAssociatedTokenAddress(mint, recipient.publicKey);
+  expect((await getAccount(c, recipientToken)).amount).toBe(120_000_000n);
+  expect((await getAccount(c, vaultToken)).amount).toBe(180_000_000n);
+  await expect(page.locator(".token-rows")).toContainText("180");
+  expect((await vaultState(vault)).opIndex).toBe(1n);
+  // More than the Bunker holds is refused before anything is signed.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Asset").selectOption(mint.toBase58());
+  await page.getByLabel("Amount", { exact: true }).fill("181");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText("Enter an amount up to 180", { exact: false })).toBeVisible();
+  expect((await vaultState(vault)).opIndex).toBe(1n);
+  expect(errors).toEqual([]);
+});
+
+test("passkey: save a day key to the device and unseal with it", async ({ page }, info) => {
+  // WebAuthn needs a registrable host name; an IP address cannot be an RP ID.
+  const { c, recipient, errors, vaultState, build, unseal, deposit }: Ctx = await setup(page, info, "http://localhost:5173");
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      hasPrf: true,
+      automaticPresenceSimulation: true,
+    },
+  });
+  const { day0, vault } = await build(false);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  await deposit("1");
+  await page.getByRole("button", { name: "Unseal with a passkey next time" }).click();
+  await expect(page.getByText("Saved. Next time", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("Unseals with passkey", { exact: true })).toBeVisible();
+  // What is stored is ciphertext: neither the seed nor the word appears.
+  const stored = await page.evaluate(() =>
+    Object.entries(localStorage).filter(([k]) => k.startsWith("bunker3-passkey:")),
+  );
+  expect(stored).toHaveLength(1);
+  expect(stored[0][1]).not.toContain("seed");
+  const seed = JSON.parse(readFileSync(day0, "utf8")).ciphertext as string;
+  expect(stored[0][1]).not.toContain(seed.slice(0, 32));
+  // Seal, come back, and open with the passkey alone: no file, no password.
+  await page.getByRole("button", { name: "Seal Bunker" }).click();
+  await page.goto("http://localhost:5173/vault");
+  await connect(page);
+  await page.getByRole("button", { name: "Unseal with passkey" }).click();
+  await expect(page.getByText("Unsealed with your passkey.", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(".vault-balance")).toContainText("1");
+  // And it can sign: a withdrawal goes through.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.25");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(recipient.publicKey)).toBe(250_000_000);
+  expect((await vaultState(vault)).opIndex).toBe(1n);
+  // Tampered storage does not unlock.
+  await page.getByRole("button", { name: "Seal Bunker" }).click();
+  await page.evaluate(() => {
+    const key = Object.keys(localStorage).find((k) => k.startsWith("bunker3-passkey:"))!;
+    const r = JSON.parse(localStorage.getItem(key)!);
+    r.ciphertext = (r.ciphertext[0] === "0" ? "1" : "0") + r.ciphertext.slice(1);
+    localStorage.setItem(key, JSON.stringify(r));
+  });
+  await page.goto("http://localhost:5173/vault");
+  await connect(page);
+  await page.getByRole("button", { name: "Unseal with passkey" }).click();
+  await expect(page.getByText("did not unlock the saved day key", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
+  // Removing it returns to the file path.
+  await page.getByRole("button", { name: "Remove" }).click();
+  await expect(page.getByRole("button", { name: "Unseal with passkey" })).toHaveCount(0);
   expect(errors).toEqual([]);
 });
 

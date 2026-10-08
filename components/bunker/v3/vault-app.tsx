@@ -5,9 +5,23 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatAmount, parseAmount, unhex } from "@/sdk/bytes";
-import { chainTime, fetchVault, formatDuration } from "@/sdk/v3/chain";
+import { Asset, assets, depositIxs, withdrawalDestination } from "@/sdk/client";
+import {
+  createAssociatedTokenAccountIdempotentInstruction,
+  getAssociatedTokenAddress,
+} from "@/sdk/classic-token";
+import { mintLabel } from "@/sdk/known-mints";
+import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
 import { authorizeAnnouncement, journalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "@/sdk/v3/kit";
+import {
+  forgetPasskey,
+  openPasskey,
+  passkeyAvailable,
+  PasskeyRecord,
+  savePasskey,
+  storedPasskey,
+} from "@/sdk/v3/passkey";
 import {
   announceIx,
   closeProofIx,
@@ -24,7 +38,14 @@ import { WalletButton, WalletProvider } from "../wallet";
 import { FileField, Messages, NetworkPill, PasswordField, readKeyFile, useBunker } from "./shared";
 /** How long a signed announcement has to land. Missing it is recoverable. */
 const ANNOUNCE_WINDOW_SECS = 3600n;
-type Loaded = { state: VaultState; spendable: bigint; now: bigint; at: number };
+type Loaded = {
+  state: VaultState;
+  spendable: bigint;
+  tokens: Asset[];
+  now: bigint;
+  at: number;
+};
+const tokenName = (mint: string) => mintLabel(mint) ?? `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 type Step = "idle" | "open" | "deposit" | "withdraw" | "review";
 const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
 function App() {
@@ -37,6 +58,25 @@ function App() {
   const [password, setPassword] = useState("");
   const [fresh, setFresh] = useState(false);
   const [amount, setAmount] = useState("");
+  // "SOL" or a mint address.
+  const [assetKey, setAssetKey] = useState("SOL");
+  const [walletAssets, setWalletAssets] = useState<Asset[]>([]);
+  // Passkey unlock: whether the device can do it, and what is saved here.
+  const [canPasskey, setCanPasskey] = useState(false);
+  const [passkey, setPasskey] = useState<PasskeyRecord | null>(null);
+  const scope =
+    b.config?.programId && b.enabled
+      ? { genesis: b.config.expectedGenesis, program: b.config.programId }
+      : null;
+  const scopeKey = scope ? `${scope.genesis}:${scope.program}` : "";
+  useEffect(() => {
+    if (!scopeKey) return;
+    const [genesis, program] = scopeKey.split(":");
+    void passkeyAvailable().then((available) => {
+      setCanPasskey(available);
+      setPasskey(storedPasskey({ genesis, program }));
+    });
+  }, [scopeKey]);
   const [recipient, setRecipient] = useState("");
   const [ack, setAck] = useState(false);
   useEffect(() => {
@@ -46,11 +86,12 @@ function App() {
   const load = useCallback(
     async (key: DayKey) => {
       if (!b.config?.programId) return null;
-      const [v, now] = await Promise.all([
+      const [v, tokens, now] = await Promise.all([
         fetchVault(b.connection, new PublicKey(b.config.programId), new PublicKey(key.vault)),
+        vaultTokens(b.connection, new PublicKey(key.vault)),
         chainTime(b.connection),
       ]);
-      const loaded = { state: v.state, spendable: v.spendable, now, at: Date.now() };
+      const loaded = { state: v.state, spendable: v.spendable, tokens, now, at: Date.now() };
       setVault(loaded);
       return loaded;
     },
@@ -70,17 +111,25 @@ function App() {
   const unfinished = journal.state === "signed" ? journal.announcement : null;
   // What is not already promised to a pending withdrawal.
   const available =
-    vault && pending
+    vault && pending?.kind === 0
       ? vault.spendable > pending.amount
         ? vault.spendable - pending.amount
         : 0n
       : (vault?.spendable ?? 0n);
+  const chosen = vault?.tokens.find((t) => t.mint === assetKey) ?? null;
+  /** A pending or announced amount in the units of its own asset. */
+  const describe = (kind: number, mint: PublicKey, raw: bigint) => {
+    if (kind === 0) return sol(raw);
+    const t = vault?.tokens.find((x) => x.mint === mint.toBase58());
+    return `${t ? formatAmount(raw, t.decimals) : raw.toString()} ${tokenName(mint.toBase58())}`;
+  };
   function close() {
     setStep("idle");
     setFile(null);
     setPassword("");
     setFresh(false);
     setAmount("");
+    setAssetKey("SOL");
     setRecipient("");
     setAck(false);
     b.setError("");
@@ -91,9 +140,9 @@ function App() {
     close();
     b.setNotice("Bunker sealed. The day key is no longer in this browser tab.");
   }
-  async function unseal() {
+  /** Checks a day key against the chain and puts it in the tab. */
+  async function admit(key: DayKey) {
     const { c, program } = b.live();
-    const key = await decryptDayKey(await readKeyFile(file), password);
     if (key.program !== program.toBase58() || key.genesis !== c.expectedGenesis)
       throw new Error("This day key belongs to a different network or program");
     const loaded = await load(key);
@@ -102,37 +151,85 @@ function App() {
       throw new Error(
         "This day key has been replaced. Use the newest one from the recovery tool.",
       );
+    setDay(key);
+    close();
+  }
+  async function unsealWithPasskey() {
+    if (!scope) throw new Error("Configuration unavailable");
+    // A day key saved on this device has only ever been used with this
+    // browser's journal, so no cross-device statement is needed.
+    await admit(await openPasskey(scope));
+    b.setNotice("Unsealed with your passkey. The day key is in this tab until you seal it.");
+  }
+  async function rememberWithPasskey() {
+    if (!day) throw new Error("Open your Bunker first");
+    setPasskey(await savePasskey(day));
+    b.setNotice(
+      "Saved. Next time, unseal with your passkey. This is not a backup: your recovery kit still replaces a lost key.",
+    );
+  }
+  function removePasskey() {
+    if (!scope) return;
+    forgetPasskey(scope);
+    setPasskey(null);
+    b.setNotice("Passkey unlock removed from this device.");
+  }
+  async function unseal() {
+    const key = await decryptDayKey(await readKeyFile(file), password);
     // This browser cannot know whether the key signed something elsewhere that
     // has not landed yet. The user has to say, every time it is opened.
     if (!fresh)
       throw new Error(
         "Confirm that this day key has not started a withdrawal on another device.",
       );
-    setDay(key);
-    close();
+    await admit(key);
     b.setNotice("Unsealed. The day key is in this tab until you seal it.");
   }
   async function deposit() {
     const { payer } = b.live();
     if (!day) throw new Error("Open your Bunker first");
-    const lamports = parseAmount(amount, 9);
-    if (lamports <= 0n) throw new Error("Enter an amount");
-    await b.transmit("Depositing", [
-      SystemProgram.transfer({ fromPubkey: payer, toPubkey: new PublicKey(day.vault), lamports }),
-    ]);
+    const vaultKey = new PublicKey(day.vault);
+    if (assetKey === "SOL") {
+      const lamports = parseAmount(amount, 9);
+      if (lamports <= 0n) throw new Error("Enter an amount");
+      await b.transmit("Depositing", [
+        SystemProgram.transfer({ fromPubkey: payer, toPubkey: vaultKey, lamports }),
+      ]);
+    } else {
+      const asset = walletAssets.find((a) => a.mint === assetKey);
+      if (!asset) throw new Error("That token is not in the connected wallet");
+      // Creates the Bunker's token account for this mint if it does not exist.
+      await b.transmit(
+        "Depositing",
+        await depositIxs(payer, vaultKey, asset, parseAmount(amount, asset.decimals)),
+      );
+    }
     close();
     await load(day);
     b.setNotice("Deposit confirmed.");
   }
   async function review() {
     if (!day || !vault) throw new Error("Open your Bunker first");
-    const lamports = parseAmount(amount, 9);
-    if (lamports <= 0n || lamports > vault.spendable)
-      throw new Error(`Enter an amount up to ${sol(vault.spendable)}`);
+    const { payer } = b.live();
     if (pending) throw new Error("Finish or cancel the pending withdrawal first");
     const to = new PublicKey(recipient);
     if (!PublicKey.isOnCurve(to.toBytes()) || to.toBase58() === day.vault)
       throw new Error("Use a normal wallet address outside this Bunker");
+    if (!chosen) {
+      const lamports = parseAmount(amount, 9);
+      if (lamports <= 0n || lamports > available)
+        throw new Error(`Enter an amount up to ${sol(available)}`);
+    } else {
+      const qty = parseAmount(amount, chosen.decimals);
+      if (qty <= 0n || qty > chosen.amount || chosen.frozen)
+        throw new Error(
+          chosen.frozen
+            ? "This token account is frozen by its issuer"
+            : `Enter an amount up to ${formatAmount(chosen.amount, chosen.decimals)}`,
+        );
+      // Confirms the mint is a classic SPL mint and the recipient can hold it.
+      await withdrawalDestination(b.connection, payer, to, chosen);
+    }
     setStep("review");
   }
   async function publish(signed: SignedAnnouncement) {
@@ -140,6 +237,23 @@ function App() {
     if (!day || !vault) throw new Error("Open your Bunker first");
     const instant = vault.state.delaySecs === 0;
     const a = decodeAnnounce(signed.payload);
+    const vaultKey = new PublicKey(day.vault);
+    // For a token, make sure the recipient's token account exists (now, so it
+    // is there when a waiting withdrawal is released) and name the Bunker's own.
+    let setup: ReturnType<typeof createAssociatedTokenAccountIdempotentInstruction>[] = [];
+    let source: PublicKey | undefined;
+    if (a.kind === 1) {
+      if (!signed.recipient) throw new Error("Recipient wallet for this token is unknown");
+      source = await getAssociatedTokenAddress(a.mint, vaultKey, true);
+      setup = [
+        createAssociatedTokenAccountIdempotentInstruction(
+          payer,
+          a.destination,
+          new PublicKey(signed.recipient),
+          a.mint,
+        ),
+      ];
+    }
     const stages = stageIxs(program, payer, signed.message, signed.signature);
     for (let i = 0; i < stages.length; i++)
       await b.transmit(`Approval ${i + 1} of 3 · publishing your authorization`, [stages[i]]);
@@ -150,15 +264,17 @@ function App() {
       [
         computeIx(),
         announceIx(program, payer, signed.payload, vault.state.opRoot),
+        ...setup,
         // With no waiting period the withdrawal is released in the same
         // transaction; either both happen or neither does.
         ...(instant
           ? [
-              executeIx(program, new PublicKey(day.vault), {
-                kind: a.kind,
-                mint: a.mint,
-                destination: a.destination,
-              }),
+              executeIx(
+                program,
+                vaultKey,
+                { kind: a.kind, mint: a.mint, destination: a.destination },
+                source,
+              ),
             ]
           : []),
         closeProofIx(program, payer, signed.message),
@@ -179,25 +295,49 @@ function App() {
     if (!current) throw new Error("Configuration unavailable");
     if (BigInt(day.epoch) !== current.state.epoch)
       throw new Error("This day key has been replaced. Open the newest one.");
+    const { payer } = b.live();
+    const to = new PublicKey(recipient);
+    const token = current.tokens.find((t) => t.mint === assetKey);
+    if (assetKey !== "SOL" && !token) throw new Error("That token is no longer in the Bunker");
     const signed = await authorizeAnnouncement(
       day,
       unhex(day.seed),
       descriptorOf(day),
       current.state,
-      {
-        kind: 0,
-        mint: PublicKey.default,
-        destination: new PublicKey(recipient),
-        amount: parseAmount(amount, 9),
-        announceBy: current.now + ANNOUNCE_WINDOW_SECS,
-      },
+      token
+        ? {
+            kind: 1,
+            mint: new PublicKey(token.mint!),
+            // The exact token account is what gets signed.
+            destination: (await withdrawalDestination(b.connection, payer, to, token)).destination,
+            amount: parseAmount(amount, token.decimals),
+            announceBy: current.now + ANNOUNCE_WINDOW_SECS,
+          }
+        : {
+            kind: 0,
+            mint: PublicKey.default,
+            destination: to,
+            amount: parseAmount(amount, 9),
+            announceBy: current.now + ANNOUNCE_WINDOW_SECS,
+          },
+      token ? to.toBase58() : undefined,
     );
     await publish(signed);
   }
   async function release() {
     const { program } = b.live();
     if (!day || !pending) throw new Error("Nothing to release");
-    await b.transmit("Releasing", [executeIx(program, new PublicKey(day.vault), pending)]);
+    const vaultKey = new PublicKey(day.vault);
+    await b.transmit("Releasing", [
+      executeIx(
+        program,
+        vaultKey,
+        pending,
+        pending.kind === 1
+          ? await getAssociatedTokenAddress(pending.mint, vaultKey, true)
+          : undefined,
+      ),
+    ]);
     await load(day);
     b.setNotice("Released. The withdrawal reached its destination.");
   }
@@ -358,7 +498,9 @@ function App() {
               <dl className="withdraw-review">
                 <div>
                   <dt>Amount</dt>
-                  <dd className="review-amount">{sol(pending.amount)}</dd>
+                  <dd className="review-amount">
+                    {describe(pending.kind, pending.mint, pending.amount)}
+                  </dd>
                 </div>
                 <div>
                   <dt>To</dt>
@@ -411,7 +553,7 @@ function App() {
               <p className="modal-copy">
                 {unfinishedExpired
                   ? "This key signed a withdrawal that did not reach the network in time. It cannot sign again. Install new keys in the recovery tool to continue; your assets have not moved."
-                  : `${sol(decodeAnnounce(unfinished.payload).amount)} to ${decodeAnnounce(unfinished.payload).destination.toBase58()} was signed but not announced. Finishing sends the same authorization.`}
+                  : `${describe(decodeAnnounce(unfinished.payload).kind, decodeAnnounce(unfinished.payload).mint, decodeAnnounce(unfinished.payload).amount)} to ${unfinished.recipient ?? decodeAnnounce(unfinished.payload).destination.toBase58()} was signed but not announced. Finishing sends the same authorization.`}
               </p>
               <div className="actions">
                 {!unfinishedExpired && (
@@ -448,12 +590,43 @@ function App() {
                 {formatAmount(available, 9)}
                 <span>SOL</span>
               </div>
+              {vault.tokens.length > 0 && (
+                <ul className="token-rows">
+                  {vault.tokens.map((t) => (
+                    <li key={t.account}>
+                      <span>
+                        <b>{tokenName(t.mint!)}</b>
+                        {t.frozen && <em>Frozen</em>}
+                      </span>
+                      <code title={t.mint!}>{formatAmount(t.amount, t.decimals)}</code>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <div className="vault-address">
                 <span>Bunker address</span>
                 <code>{day.vault}</code>
               </div>
               {step === "deposit" ? (
                 <div className="inline-form">
+                  <label className="field">
+                    <span>Asset</span>
+                    <select
+                      aria-label="Asset"
+                      value={assetKey}
+                      onChange={(e) => setAssetKey(e.target.value)}
+                    >
+                      <option value="SOL">SOL</option>
+                      {walletAssets
+                        .filter((a) => a.mint && a.amount > 0n && !a.frozen)
+                        .map((a) => (
+                          <option key={a.key} value={a.mint!}>
+                            {tokenName(a.mint!)} · {formatAmount(a.amount, a.decimals)} in wallet
+                          </option>
+                        ))}
+                    </select>
+                    <small>SOL and classic SPL tokens. Token-2022 is not supported.</small>
+                  </label>
                   <label className="field">
                     <span>Amount</span>
                     <input
@@ -478,6 +651,24 @@ function App() {
                 </div>
               ) : step === "withdraw" ? (
                 <div className="inline-form">
+                  <label className="field">
+                    <span>Asset</span>
+                    <select
+                      aria-label="Asset"
+                      value={assetKey}
+                      onChange={(e) => setAssetKey(e.target.value)}
+                    >
+                      <option value="SOL">SOL · {formatAmount(available, 9)} available</option>
+                      {vault.tokens
+                        .filter((t) => t.amount > 0n)
+                        .map((t) => (
+                          <option key={t.account} value={t.mint!} disabled={t.frozen}>
+                            {tokenName(t.mint!)} · {formatAmount(t.amount, t.decimals)}
+                            {t.frozen ? " (frozen)" : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
                   <label className="field">
                     <span>Amount</span>
                     <input
@@ -515,8 +706,19 @@ function App() {
                   <dl className="withdraw-review">
                     <div>
                       <dt>You are announcing</dt>
-                      <dd className="review-amount">{amount} SOL</dd>
+                      <dd className="review-amount">
+                        {amount} {chosen ? tokenName(chosen.mint!) : "SOL"}
+                      </dd>
                     </div>
+                    {chosen && (
+                      <div>
+                        <dt>Token mint</dt>
+                        <dd>
+                          <code>{chosen.mint}</code>
+                        </dd>
+                      </div>
+                    )}
+
                     <div>
                       <dt>To this address</dt>
                       <dd>
@@ -578,6 +780,11 @@ function App() {
                     onClick={() => {
                       close();
                       setStep("deposit");
+                      // Token balances of the paying wallet, for the asset list.
+                      if (b.wallet.address)
+                        void assets(b.connection, b.wallet.address)
+                          .then(setWalletAssets)
+                          .catch(() => setWalletAssets([]));
                     }}
                   >
                     <BIcon name="deposit" size={17} />
@@ -618,6 +825,23 @@ function App() {
                 <span>Independent review</span>
                 <b className="amber">Pending</b>
               </div>
+              {canPasskey &&
+                !stale &&
+                (passkey?.vault === day.vault && passkey.epoch === day.epoch ? (
+                  <div className="metric">
+                    <span>This device</span>
+                    <b>Unseals with passkey</b>
+                  </div>
+                ) : (
+                  <button
+                    className="button ghost passkey-offer"
+                    disabled={!!b.busy}
+                    onClick={() => b.task("Waiting for your passkey", rememberWithPasskey)}
+                  >
+                    <BIcon name="bunker-key" size={17} />
+                    Unseal with a passkey next time
+                  </button>
+                ))}
               <Link className="security-link" href="/recovery">
                 <BIcon name="recovery-kit" size={16} />
                 Open the recovery tool
@@ -667,7 +891,16 @@ function App() {
                     : "Deposits go in from any wallet. Withdrawals wait, and you can cancel them."}
                 </p>
                 <div className="actions">
-                  {b.enabled ? (
+                  {b.enabled && passkey ? (
+                    <button
+                      className="button light"
+                      disabled={!can}
+                      onClick={() => b.task("Waiting for your passkey", unsealWithPasskey)}
+                    >
+                      <BIcon name="bunker-key" size={17} />
+                      Unseal with passkey
+                    </button>
+                  ) : b.enabled ? (
                     <Link className="button light" href="/recovery">
                       <BIcon name="vault" size={17} />
                       Build a Bunker
@@ -690,6 +923,16 @@ function App() {
                     Open with day key
                   </button>
                 </div>
+                {b.enabled && passkey && (
+                  <p className="micro">
+                    Passkey saved on this device for{" "}
+                    {passkey.vault.slice(0, 4)}…{passkey.vault.slice(-4)}.{" "}
+                    <button className="link-button" onClick={removePasskey}>
+                      Remove
+                    </button>{" "}
+                    · <Link href="/recovery">Build another Bunker</Link>
+                  </p>
+                )}
                 <span className="micro">
                   {b.enabled
                     ? "TEST ASSETS ONLY · DRAFT PROTOCOL"

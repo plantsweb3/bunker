@@ -1,6 +1,8 @@
 /** Protocol 3 chain reads (DRAFT). Uses only RPC methods already on the
  * read allowlist. */
 import { Connection, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "../classic-token";
+import type { Asset } from "../client";
 import { parseVault, vaultAddress, VAULT_SIZE, VaultState } from "./protocol";
 /** Consensus time, the clock the program enforces delays against. */
 export async function chainTime(connection: Connection): Promise<bigint> {
@@ -29,6 +31,27 @@ export async function fetchVault(
   const lamports = BigInt(info.lamports);
   const spendable = lamports - BigInt(rent);
   return { state, lamports, spendable: spendable > 0n ? spendable : 0n };
+}
+/** Classic SPL token accounts owned by the vault. Token-2022 is not supported. */
+export async function vaultTokens(connection: Connection, vault: PublicKey): Promise<Asset[]> {
+  const accounts = await connection.getParsedTokenAccountsByOwner(vault, {
+    programId: TOKEN_PROGRAM_ID,
+  });
+  return accounts.value.flatMap((t) => {
+    const p = t.account.data.parsed?.info;
+    if (!p || p.tokenAmount.decimals > 18) return [];
+    return [
+      {
+        key: p.mint as string,
+        mint: p.mint as string,
+        account: t.pubkey.toBase58(),
+        label: `SPL · ${p.mint.slice(0, 4)}…${p.mint.slice(-4)}`,
+        amount: BigInt(p.tokenAmount.amount),
+        decimals: p.tokenAmount.decimals as number,
+        frozen: p.state === "frozen",
+      },
+    ];
+  });
 }
 /** `1d 3h`, `4h 12m`, `9m 30s`. */
 export function formatDuration(seconds: bigint): string {
