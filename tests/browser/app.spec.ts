@@ -222,6 +222,28 @@ test("wallet check reads a very large wallet and flags tokens their issuer can m
   await expect(page.getByText("Movable by", { exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
 });
+test("the landing page tells the story in pictures, one step at a time", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  const story = page.locator(".story");
+  await story.scrollIntoViewIfNeeded();
+  // With reduced motion it does not start by itself.
+  await page.waitForTimeout(600);
+  await expect(story).toHaveAttribute("data-beat", "0");
+  await expect(story.getByRole("heading", { name: "This is everything you own." })).toBeVisible();
+  const steps = story.getByRole("tab");
+  await expect(steps).toHaveCount(6);
+  await steps.nth(2).click();
+  await expect(story.getByText("That was your pocket money.")).toBeVisible();
+  await steps.nth(4).click();
+  await expect(story.getByText("You press cancel. Nothing leaves.", { exact: false })).toBeVisible();
+  await expect(story.locator(".story-cancelled")).toHaveCSS("opacity", "1");
+  await steps.nth(5).click();
+  await expect(story.getByRole("button", { name: "Play again" })).toBeVisible();
+  await story.getByRole("button", { name: "Play again" }).click();
+  await expect(story).toHaveAttribute("data-beat", "0");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
 test("unknown paths are served with the browser policy too", async ({
   page,
 }) => {

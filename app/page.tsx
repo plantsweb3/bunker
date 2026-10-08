@@ -8,6 +8,7 @@ import {
   LockKeyhole,
 } from "lucide-react";
 import { Header, Footer } from "@/components/bunker/shell";
+import Story from "@/components/bunker/story";
 import { BIcon, BunkerIconName } from "@/components/bunker/icon";
 function Plate({
   src,
@@ -305,16 +306,7 @@ export default function Home() {
               never has and a website can’t ask it for.
             </p>
           </div>
-          <figure className="explainer">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/assets/diagrams/two-keys.svg"
-              width={1280}
-              height={720}
-              loading="lazy"
-              alt="Diagram: the everyday wallet pays fees and stops at authorization; a separate Bunker key authorizes an exact withdrawal and a new lock. Labelled as a simulation."
-            />
-          </figure>
+          <Story />
           <div className="feature-grid">
             {[
               [
