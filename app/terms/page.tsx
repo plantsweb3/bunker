@@ -26,8 +26,9 @@ export default function Page() {
           library and a Solana program. It is not a bank, broker, exchange,
           custodian or wallet provider. Nobody operating this site holds your
           keys, and the program gives nobody a way to move, freeze or return
-          your assets. Whoever can upgrade the program could change that; the
-          upgrade policy will be published before real funds are accepted.
+          your assets. Whoever can upgrade a program can change that, so
+          the policy is that the program holding real funds will be deployed
+          so that nobody can upgrade it, with proof published.
         </p>
       </section>
       <section>

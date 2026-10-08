@@ -147,6 +147,17 @@ describe("Protocol 3 encodings", () => {
     expect(() => encodeAnnounce({ ...a, amount: 0n })).toThrow();
     expect(() => encodeAnnounce({ ...a, announceBy: 0n })).toThrow();
     expect(() => encodeAnnounce({ ...a, nextOpRoot: new Uint8Array(32) })).toThrow();
+    // SOL states no decimals; a token states the ones the signer was shown.
+    expect(() => encodeAnnounce({ ...a, decimals: 9 })).toThrow();
+    const token = { ...a, kind: 1 as const, mint: new PublicKey(new Uint8Array(32).fill(4)), decimals: 6 };
+    const encoded = encodeAnnounce(token);
+    expect([encoded.length, encoded[195], decodeAnnounce(encoded).decimals]).toEqual([196, 6, 6]);
+    expect(() => encodeAnnounce({ ...token, decimals: 256 })).toThrow();
+    expect(() => encodeAnnounce({ ...token, decimals: -1 })).toThrow();
+    // Its instruction names the mint as a seventh account; SOL's has six.
+    const tokenIx = announceIx(program, payer, encoded, unhex(fixture.epoch0.opRoot));
+    expect(tokenIx.keys.length).toBe(7);
+    expect(tokenIx.keys[6].pubkey.equals(token.mint) && !tokenIx.keys[6].isWritable).toBe(true);
   });
   it("round-trips a recovery packet and keeps the roles apart", () => {
     const bytes = unhex(fixture.recover.payload);
@@ -162,7 +173,7 @@ describe("Protocol 3 encodings", () => {
   });
   it("binds messages to the program and the vault address", () => {
     const m = announceMessage(program, unhex(fixture.announce.payload));
-    expect(m.length).toBe(275);
+    expect(m.length).toBe(276);
     expect(new TextDecoder().decode(m.slice(0, 16))).toBe("BUNKER3_ANNOUNCE");
     expect(hex(m.slice(16, 48))).toBe(fixture.programBytes);
     expect(new PublicKey(m.slice(48, 80)).toBase58()).toBe(fixture.vault);
@@ -238,6 +249,7 @@ describe("Protocol 3 authorities", () => {
       destination: new PublicKey(unhex(fixture.destination)),
       amount: 1n,
       announceBy: 5n,
+      decimals: 0,
     });
     expect(hex(decodeAnnounce(signed.payload).nextOpRoot)).toBe(fixture.epoch0.opRootIndex1);
   });

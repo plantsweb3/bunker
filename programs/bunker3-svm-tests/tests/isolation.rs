@@ -158,6 +158,7 @@ impl World {
         d.extend(amount.to_le_bytes());
         d.extend((self.now + 3600).to_le_bytes());
         d.extend(next);
+        d.push(0);
         let message = self.message(p, b"BUNKER3_ANNOUNCE", &d);
         let proof = self.stage(p, signer_tag, &message);
         let current: [u8; 32] = self.vault_data(p)[72..104].try_into().unwrap();
@@ -372,6 +373,7 @@ fn a_marker_from_another_vault_is_refused() {
     d.extend(SOL.to_le_bytes());
     d.extend((T0 + 3600).to_le_bytes());
     d.extend(root(2));
+    d.push(0);
     let message = w.message(&p, b"BUNKER3_ANNOUNCE", &d);
     let proof = w.stage(&p, 1, &message);
     let ix = |spent: Pubkey, next: Pubkey| Instruction {
@@ -487,6 +489,7 @@ fn no_instruction_accepts_one_account_in_two_slots() {
     a.extend(SOL.to_le_bytes());
     a.extend((T0 + 3600).to_le_bytes());
     a.extend(root(2));
+    a.push(0);
     let message = w.message(&p, b"BUNKER3_ANNOUNCE", &a);
     let proof = w.stage(&p, 1, &message);
     let announce = Instruction {

@@ -56,7 +56,7 @@ export default function Page() {
             [
               "04",
               "Deployment verification",
-              "Match reviewed source to the binary, publish hashes and program ID, and decide the upgrade-authority policy.",
+              "Match reviewed source to the binary, publish hashes and program ID, and revoke the upgrade authority, publishing the transaction.",
             ],
             [
               "05",

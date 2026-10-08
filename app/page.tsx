@@ -108,16 +108,18 @@ const faq: [string, React.ReactNode][] = [
     "What if Bunker goes away?",
     <>
       A vault is controlled by an on-chain program, not by this website, and
-      the program gives nobody an administrator role over a vault. Whether the
-      program itself can be upgraded, and by whom, is not decided yet and will
-      be published before real funds are accepted. The code that builds a withdrawal is{" "}
+      the program gives nobody an administrator role over a vault. The policy
+      for real funds is that the program is deployed so that nobody, us
+      included, can change it afterwards; that deployment has not happened
+      and will be published, with proof, when it does. The code that builds a withdrawal is{" "}
       <a href={REPO} target="_blank" rel="noreferrer">
         public
       </a>
       . The recovery tool is a file you keep and runs without this site, and
       the public source includes a command-line program that withdraws and
-      recovers with nothing but your key files and a Solana connection. It is
-      a draft for technical users today.
+      submits recovery packets with nothing but your key files and a Solana
+      connection. Today it is a draft for technical users and, like this
+      site, works on test networks only.
     </>,
   ],
   [
@@ -432,7 +434,7 @@ export default function Home() {
           src="/assets/world/03-threshold.webp"
           alt="A bare concrete corridor seen from inside, the open doorway a slot of grey daylight at the far end"
           level="03 / INSIDE"
-          line="Past this point, the only key is yours."
+          line="Past this point, the keys are yours."
         />
         <section className="section role" data-level="03">
           <div className="eyebrow">
@@ -445,8 +447,8 @@ export default function Home() {
               You hold the key.
             </h2>
             <p>
-              There is no company account behind your vault and no reset
-              button. A day key opens it; one recovery kit, made once,
+              The program gives nobody an account behind your vault and has
+              no reset button. A day key opens it; one recovery kit, made once,
               replaces that key if it is ever lost or stolen. Three habits
               keep it yours.
             </p>

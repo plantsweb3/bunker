@@ -27,7 +27,7 @@ Assets go into a program-owned vault from any wallet. They come out only with a 
 
 - **Wallet key:** pays fees and deposits. It has no authority over the vault.
 - **Day key:** announces withdrawals. Each withdrawal uses a one-time key and installs the next one.
-- **Recovery kit:** opened only in an offline tool that cannot connect to anything. It builds a vault, replaces a lost or stolen day key, and cancels a waiting withdrawal by installing new keys. It never moves assets.
+- **Recovery kit:** opened only in an offline tool whose own policy stops it making network connections. It builds a vault, replaces a lost or stolen day key, and cancels a waiting withdrawal by installing new keys. It never moves assets.
 - **Waiting period:** optional, chosen when a vault is built, off by default. With one, an announced withdrawal waits and can be cancelled. Without one, a stolen day key can withdraw immediately; see the threat model.
 
 ## Run the website

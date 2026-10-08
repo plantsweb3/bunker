@@ -82,6 +82,7 @@ for (let n = 0; n < cycles; n++) {
       destination: recipient,
       amount,
       announceBy: (await chainTime(c)) + 600n,
+      decimals: 0,
     });
   // Nothing can leave before anything is announced.
   await fails("execute with nothing pending", executeIx(PROGRAM, vault, { kind: 0, mint: PublicKey.default, destination: recipient }));

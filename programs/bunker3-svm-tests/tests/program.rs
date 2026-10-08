@@ -19,7 +19,11 @@ const PHRASE: &str =
     "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const T0: i64 = 1_800_000_000;
 const DAY: i64 = 86_400;
-const WINDOW: i64 = 604_800;
+/// The execution window of a vault with a one-day waiting period.
+const WINDOW: i64 = 86_400;
+const MAX_DELAY: u32 = 604_800;
+/// Decimal places of every test mint.
+const TOKEN_DECIMALS: u8 = 6;
 const VAULT_LEN: usize = 287;
 const SOL: u64 = 1_000_000_000;
 
@@ -176,6 +180,7 @@ impl Env {
         d.extend(w.amount.to_le_bytes());
         d.extend(w.announce_by.to_le_bytes());
         d.extend(w.next);
+        d.push(if w.kind == 1 { TOKEN_DECIMALS } else { 0 });
         d
     }
     fn recover_payload(&self, epoch: u64, next_rec: [u8; 32], next_op: [u8; 32]) -> Vec<u8> {
@@ -235,7 +240,13 @@ impl Env {
                 AccountMeta::new(self.marker(current), false),
                 AccountMeta::new_readonly(self.marker(next), false),
                 AccountMeta::new_readonly(system(), false),
-            ],
+            ]
+            .into_iter()
+            // A token announcement also names its mint.
+            .chain((payload[82] == 1).then(|| {
+                AccountMeta::new_readonly(Pubkey::new_from_array(payload[83..115].try_into().unwrap()), false)
+            }))
+            .collect(),
             data: [vec![2u8], payload.to_vec()].concat(),
         }
     }
@@ -335,7 +346,7 @@ fn initialize_rejects_bad_roots_and_delays() {
         (root(1), root(1), DAY as u32),
         ([0; 32], root(100), DAY as u32),
         (root(1), [0; 32], DAY as u32),
-        (root(1), root(100), WINDOW as u32 + 1),
+        (root(1), root(100), MAX_DELAY + 1),
     ] {
         let mut e = Env::new();
         let ix = e.init_ix(op, rec, delay);
@@ -911,3 +922,80 @@ fn a_token_withdrawal_accepts_only_the_recorded_mint_destination_and_a_clean_vau
     e.send(&[ix]).unwrap();
     assert_eq!((token_amount(&e, &source), token_amount(&e, &destination), e.pending()), (500, 400, false));
 }
+
+/// A token announcement is refused unless its mint is a classic mint with the
+/// decimal places the signer stated. Nothing is recorded and no key is retired.
+#[test]
+fn a_token_announcement_is_checked_against_its_mint() {
+    let mut e = Env::new();
+    e.init();
+    let (mint, destination) = (Pubkey::new_unique(), Pubkey::new_unique());
+    let put = |e: &mut Env, key: Pubkey, data: Vec<u8>, program: Pubkey| {
+        let lamports = e.svm.minimum_balance_for_rent_exemption(data.len());
+        e.svm
+            .set_account(key, Account { lamports, data, owner: program, executable: false, rent_epoch: 0 })
+            .unwrap();
+    };
+    let w = Withdrawal {
+        epoch: 0,
+        index: 0,
+        kind: 1,
+        mint: mint.to_bytes(),
+        destination,
+        amount: 400,
+        announce_by: T0 + 3600,
+        next: root(2),
+    };
+    // Signs `payload` with the current key and announces with `accounts` after the usual six.
+    let attempt = |e: &mut Env, payload: Vec<u8>, extra: Vec<AccountMeta>| {
+        let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+        let proof = e.stage(1, &message);
+        let mut ix = e.announce_ix(&payload, proof, &root(1), &root(2));
+        ix.accounts.truncate(6);
+        ix.accounts.extend(extra);
+        let result = e.send(&[ix]);
+        // Free the proof address for the next attempt with other bytes.
+        let close = Instruction {
+            program_id: e.program,
+            accounts: vec![AccountMeta::new(proof, false), AccountMeta::new(e.payer.pubkey(), true)],
+            data: vec![6u8],
+        };
+        e.send(&[close]).unwrap();
+        result
+    };
+    let named = |key: Pubkey| vec![AccountMeta::new_readonly(key, false)];
+    let good = e.announce_payload(&w);
+    // No mint account exists yet.
+    assert!(attempt(&mut e, good.clone(), named(mint)).is_err(), "a mint that does not exist");
+    // The right bytes under another program, as a Token-2022 mint would be.
+    put(&mut e, mint, mint_data(TOKEN_DECIMALS), Pubkey::new_unique());
+    assert!(attempt(&mut e, good.clone(), named(mint)).is_err(), "a mint owned by another program");
+    put(&mut e, mint, mint_data(TOKEN_DECIMALS), token_program());
+    // The signer believed a different number of decimal places.
+    let mut wrong = good.clone();
+    wrong[195] = TOKEN_DECIMALS + 3;
+    assert!(attempt(&mut e, wrong, named(mint)).is_err(), "decimals that are not the mint's");
+    // The mint account left out, replaced, or followed by another.
+    assert!(attempt(&mut e, good.clone(), vec![]).is_err(), "no mint account");
+    let other = Pubkey::new_unique();
+    put(&mut e, other, mint_data(TOKEN_DECIMALS), token_program());
+    assert!(attempt(&mut e, good.clone(), named(other)).is_err(), "another mint's account");
+    assert!(attempt(&mut e, good.clone(), [named(mint), named(other)].concat()).is_err(), "an extra account");
+    // A token account is not a mint.
+    let account = Pubkey::new_unique();
+    let vault = e.vault;
+    put(&mut e, account, token_data(&mint, &vault, 900, false), token_program());
+    let mut as_mint = w.clone();
+    as_mint.mint = account.to_bytes();
+    let payload = e.announce_payload(&as_mint);
+    assert!(attempt(&mut e, payload, named(account)).is_err(), "a token account named as the mint");
+    assert!(!e.pending() && !e.spent(&root(1)) && e.op_index() == 0);
+    // SOL takes no seventh account.
+    let sol = e.sol(destination, SOL, 0, 2);
+    let payload = e.announce_payload(&sol);
+    assert!(attempt(&mut e, payload, named(mint)).is_err(), "SOL with a mint account");
+    // And the correct announcement lands.
+    assert!(attempt(&mut e, good, named(mint)).is_ok());
+    assert!(e.pending() && e.spent(&root(1)));
+}
+

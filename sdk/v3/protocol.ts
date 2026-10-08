@@ -39,10 +39,12 @@ export {
 };
 export type { Genesis, Recover };
 export const VAULT_SIZE = 287;
-export const ANNOUNCE_SIZE = 195;
+export const ANNOUNCE_SIZE = 196;
 export const PROOF_SIZE = 1162;
 export const SIGNATURE_SIZE = 1088;
-export const EXECUTE_WINDOW_SECS = 604_800n;
+/** How long an announced withdrawal stays executable once it opens: the
+ * vault's waiting period, and never less than a day. */
+export const executeWindowSecs = (delaySecs: number) => BigInt(Math.max(delaySecs, 86_400));
 const ROLE_OPERATIONAL = 1;
 const text = (s: string) => new TextEncoder().encode(s);
 export const ANNOUNCE_DOMAIN = text("BUNKER3_ANNOUNCE");
@@ -96,6 +98,9 @@ export type Announce = {
   /** Unix seconds. The announcement must land at or before this. */
   announceBy: bigint;
   nextOpRoot: Uint8Array;
+  /** The decimal places the signer was shown for the token; 0 for SOL. The
+   * program refuses the announcement if the mint's differ. */
+  decimals: number;
 };
 export function encodeAnnounce(a: Announce): Uint8Array {
   if (
@@ -103,6 +108,10 @@ export function encodeAnnounce(a: Announce): Uint8Array {
     a.amount <= 0n ||
     a.announceBy <= 0n ||
     isZero(root32(a.nextOpRoot, "Next root")) ||
+    !Number.isInteger(a.decimals) ||
+    a.decimals < 0 ||
+    a.decimals > 255 ||
+    (a.kind === 0 && a.decimals !== 0) ||
     (a.kind === 0) !== a.mint.equals(PublicKey.default)
   )
     throw new Error("Invalid announcement");
@@ -118,6 +127,7 @@ export function encodeAnnounce(a: Announce): Uint8Array {
     u64(a.amount),
     i64(a.announceBy),
     a.nextOpRoot,
+    new Uint8Array([a.decimals]),
   );
 }
 export function decodeAnnounce(b: Uint8Array): Announce {
@@ -139,6 +149,7 @@ export function decodeAnnounce(b: Uint8Array): Announce {
     amount: readU64(b, 147),
     announceBy: readI64(b, 155),
     nextOpRoot: b.slice(163, 195),
+    decimals: b[195],
   };
   encodeAnnounce(a); // One validation path.
   return a;
@@ -290,6 +301,8 @@ export function announceIx(
       meta(spentAddress(program, vault, currentOpRoot), true),
       meta(spentAddress(program, vault, a.nextOpRoot)),
       meta(SystemProgram.programId),
+      // A token announcement names its mint so the program can check it now.
+      ...(a.kind === 1 ? [meta(a.mint)] : []),
     ],
     2,
     payload,

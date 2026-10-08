@@ -95,8 +95,12 @@ function dayPassword(id: string, repeatId: string, kitPassword: string) {
     throw new Error("The day key needs a different password from the recovery kit");
   return password;
 }
+/** Solana mainnet's genesis hash. This release builds no mainnet Bunkers; the
+ * constant exists so the tool can say which kind of network it is looking at
+ * without trusting the label in the file it was handed. */
+const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 const describe = (k: { network: string; genesis: string; program: string }) =>
-  `Network: ${k.network}\nGenesis: ${k.genesis}\nProgram: ${k.program}`;
+  `${k.genesis === MAINNET_GENESIS ? "MAINNET" : "TEST NETWORK. Nothing built here holds real funds."}\nNetwork: ${k.network}\nGenesis: ${k.genesis}\nProgram: ${k.program}`;
 $("card").addEventListener("change", () => {
   read(file("card"), "the network card")
     .then((raw) => {
@@ -120,6 +124,8 @@ $("create").addEventListener(
   "click",
   run("build-status", async () => {
     const card: NetworkCard = parseNetworkCard(await read(file("card"), "the network card"));
+    if (card.genesis === MAINNET_GENESIS)
+      throw new Error("This release does not build mainnet Bunkers.");
     const password = value("password");
     if (password !== value("repeat")) throw new Error("Passwords do not match");
     const weak = passwordProblem(password, "archival");

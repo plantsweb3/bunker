@@ -36,6 +36,7 @@ fn announce_bytes(v: &Vault, next: [u8; 32], amount: u64, announce_by: i64, toke
     d.extend(amount.to_le_bytes());
     d.extend(announce_by.to_le_bytes());
     d.extend(next);
+    d.push(if token { 6 } else { 0 });
     d
 }
 fn recover_bytes(v: &Vault, next_rec: [u8; 32], next_op: [u8; 32]) -> Vec<u8> {
@@ -123,7 +124,7 @@ fn random_interleavings_keep_every_invariant() {
                             assert!(!retired.contains(&v.op_root) && v.op_root != v.rec_root, "{context}");
                             let p = v.pending.as_ref().unwrap();
                             assert_eq!(p.opens_at - now, delay as i64, "{context}: wrong wait");
-                            assert_eq!((p.deadline - p.opens_at, p.epoch, p.digest), (EXECUTE_WINDOW_SECS, v.epoch, digest), "{context}");
+                            assert_eq!((p.deadline - p.opens_at, p.epoch, p.digest), (execute_window(delay), v.epoch, digest), "{context}");
                             announced += 1;
                         }
                         Err(_) => {

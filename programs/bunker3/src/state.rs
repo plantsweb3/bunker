@@ -4,7 +4,7 @@
 use solana_program_error::ProgramError;
 
 pub const VAULT_LEN: usize = 287;
-pub const ANNOUNCE_LEN: usize = 195;
+pub const ANNOUNCE_LEN: usize = 196;
 pub const RECOVER_LEN: usize = 138;
 pub const INIT_LEN: usize = 132;
 pub const VERSION: u8 = 3;
@@ -17,7 +17,14 @@ pub const VAULT_ID_DOMAIN: &[u8; 16] = b"BUNKER3_VAULT_ID";
 /// A vault may be created with no waiting period. Zero means an announced
 /// withdrawal can execute immediately, including in the same transaction.
 pub const MAX_DELAY_SECS: u32 = 604_800;
-pub const EXECUTE_WINDOW_SECS: i64 = 604_800;
+/// How long an announced withdrawal stays executable once it opens: as long
+/// as the vault's own waiting period, and never less than a day. Execution is
+/// permissionless, so a day is enough for an honest release; a record that
+/// cannot execute then blocks the vault for a day rather than a week.
+pub const MIN_EXECUTE_WINDOW_SECS: i64 = 86_400;
+pub fn execute_window(delay_secs: u32) -> i64 {
+    (delay_secs as i64).max(MIN_EXECUTE_WINDOW_SECS)
+}
 /// A signed announcement that has not landed stops being usable at most this
 /// long after it could first have landed.
 pub const MAX_ANNOUNCE_AHEAD_SECS: i64 = 86_400;
@@ -163,6 +170,10 @@ pub struct Announce {
     pub amount: u64,
     pub announce_by: i64,
     pub next_op_root: [u8; 32],
+    /// The decimal places the signer believed the token has. Zero for SOL.
+    /// Checked against the mint, so a wrong belief fails instead of signing
+    /// away a different amount than was shown.
+    pub decimals: u8,
 }
 pub fn decode_announce(d: &[u8]) -> Result<Announce, ProgramError> {
     if d.len() != ANNOUNCE_LEN || d[0] != VERSION || d[1] != ROLE_OPERATIONAL {
@@ -179,12 +190,14 @@ pub fn decode_announce(d: &[u8]) -> Result<Announce, ProgramError> {
         amount: u64le(&d[147..155]),
         announce_by: i64le(&d[155..163]),
         next_op_root: arr(&d[163..195]),
+        decimals: d[195],
     };
     require(
         a.amount > 0
             && a.kind <= 1
             && (a.kind == 1 || a.mint == ZERO)
             && (a.kind == 0 || a.mint != ZERO)
+            && (a.kind == 1 || a.decimals == 0)
             && a.announce_by > 0
             && a.next_op_root != ZERO,
     )?;
@@ -236,7 +249,7 @@ pub fn apply_announce(
         .checked_add(v.delay_secs as i64)
         .ok_or(ProgramError::ArithmeticOverflow)?;
     let deadline = opens_at
-        .checked_add(EXECUTE_WINDOW_SECS)
+        .checked_add(execute_window(v.delay_secs))
         .ok_or(ProgramError::ArithmeticOverflow)?;
     let displaced = v.op_root;
     v.op_index = v

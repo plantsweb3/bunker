@@ -214,8 +214,9 @@ function Page() {
           <h2>Get the offline recovery tool.</h2>
           <p className="modal-copy">
             One file, no installation. Save it, move it to a device you trust,
-            and open it there. Its own security policy forbids every network
-            connection. It needs a computer or an Android phone: an iPhone
+            and open it there. Its own security policy stops it making network
+            connections; check its SHA-256 below against a copy from another
+            source if you can. It needs a computer or an Android phone: an iPhone
             cannot open a saved web page this way, and the browsers built into
             wallet apps usually cannot save its files.
           </p>

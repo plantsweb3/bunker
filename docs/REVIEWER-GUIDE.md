@@ -5,7 +5,7 @@ This repository is a pre-release research and engineering artifact. Assume no ex
 ## Read in this order
 
 1. [THREAT-MODEL.md](THREAT-MODEL.md) — what each secret can do, and what is not defended.
-2. [PROTOCOL.md](PROTOCOL.md) — derivation, layouts, signed bytes, instructions, the transition table, and sixteen open questions. **The open questions are where design feedback is most useful.**
+2. [PROTOCOL.md](PROTOCOL.md) — derivation, layouts, signed bytes, instructions, the transition table, and sixteen questions put to reviewers. **The open questions are where design feedback is most useful.**
 3. [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) — the vendored primitive, what is signed, file encryption, the journal.
 4. [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md) — what the project's own adversarial review found and changed, so you do not spend time rediscovering it. It is not an audit.
 5. `programs/bunker3/src/state.rs` (about 300 lines, pure) then `src/lib.rs` (about 390 lines).

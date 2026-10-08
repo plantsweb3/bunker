@@ -46,8 +46,16 @@ The local validator loads `target/deploy/bunker3.so` at a fixed **test-only** ad
 
 Before any test deployment elsewhere, run the workspace Rust tests, regenerate and compare `fixtures/bunker-v3.json`, build the program, run the VM suite, the chain cycles and the browser custody cases, and record the binary's SHA-256. There is no devnet deployment and no tooling for one in this repository. No mainnet program deployment is part of this release. Enabling real funds requires a later reviewed release and an explicit source change; adding an environment bypass is prohibited.
 
+## Upgrade authority
+
+**Policy: the program that holds real funds is deployed immutable.** Its upgrade authority is revoked in the release that enables real funds, and the following are published with it: the program id; the SHA-256 of the deployed binary and a reproducible-build attestation for it; the transaction that revoked the authority; and who is responsible for incidents.
+
+The reasons. An upgradeable program reduces every vault to whatever keys can upgrade it, which is the kind of key this product exists to get away from; one person cannot staff a multisig that outsiders should trust; and a timelocked fix announces the flaw it fixes. The cost is accepted knowingly: a flaw found after deployment cannot be patched. The response is to stop new deposits in the interface, tell users, have them withdraw (the command-line client exists so that does not depend on this website), and publish a successor at a new program id. There is no migration instruction.
+
+Any deployment that is still upgradeable, for testing or review, uses a different program id from the real-funds deployment and is labelled as such wherever it appears.
+
 A website rollback cannot undo a transaction. Because the program has no administrator, nothing can pause it once deployed: a problem found after launch can be met by stopping new deposits in the interface and by users withdrawing, and by nothing else.
 
 ## Real-fund launch blockers
 
-Complete [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md) with independent cryptographic and Solana program reviewers. Resolve findings and the open questions in [PROTOCOL.md](PROTOCOL.md), freeze a reviewed release, reproduce its binary, publish source-to-deployment verification, and decide the upgrade-authority policy. Distribute the offline recovery tool by a channel independent of the website. Test on real phones and wallet in-app browsers. Configure a dedicated RPC provider and edge rate limiting. The current repository is review material, not evidence that these are done. No audit has been commissioned.
+Complete [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md) with independent cryptographic and Solana program reviewers. Resolve findings and the open questions in [PROTOCOL.md](PROTOCOL.md), freeze a reviewed release, reproduce its binary, publish source-to-deployment verification, and carry out the upgrade-authority policy above. Distribute the offline recovery tool by a channel independent of the website. Test on real phones and wallet in-app browsers. Configure a dedicated RPC provider and edge rate limiting. The current repository is review material, not evidence that these are done. No audit has been commissioned.

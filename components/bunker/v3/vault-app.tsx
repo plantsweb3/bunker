@@ -43,6 +43,7 @@ import {
   decodeAnnounce,
   executeIx,
   expireIx,
+  executeWindowSecs,
   MAX_ANNOUNCE_AHEAD_SECS,
   pendingPhase,
   stageIxs,
@@ -552,6 +553,8 @@ function App() {
         destination: intent.destination,
         amount: intent.amount,
         announceBy: announceBy(current.now),
+        // Signed, and checked by the program against the mint.
+        decimals: intent.kind === 1 ? intent.decimals : 0,
       },
       intent.kind === 1 ? intent.recipient : undefined,
     );
@@ -1065,8 +1068,8 @@ function App() {
                           <small>
                             {" "}
                             The amount above assumes this token has {intent.decimals} decimal
-                            places, which is read from the network. If that looks wrong for
-                            this token, stop.
+                            places. That number is signed too, and the program refuses the
+                            withdrawal if the token’s real number differs.
                           </small>
                         </dd>
                       </div>
@@ -1084,7 +1087,8 @@ function App() {
                           <dt>It can leave after</dt>
                           <dd>
                             {formatDuration(BigInt(vault.state.delaySecs))} of
-                            waiting, then within 7 days
+                            waiting, then within{" "}
+                            {formatDuration(executeWindowSecs(vault.state.delaySecs))}
                           </dd>
                         </div>
                         <div>

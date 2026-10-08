@@ -154,7 +154,7 @@ export async function authorizeAnnouncement(
   seed: Uint8Array,
   d: Descriptor,
   chain: VaultState,
-  withdrawal: Pick<Announce, "kind" | "mint" | "destination" | "amount" | "announceBy">,
+  withdrawal: Pick<Announce, "kind" | "mint" | "destination" | "amount" | "announceBy" | "decimals">,
   recipient?: string,
 ): Promise<SignedAnnouncement> {
   return locked(k, async () => {

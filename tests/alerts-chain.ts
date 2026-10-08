@@ -72,7 +72,7 @@ const start = (vault: PublicKey) =>
 const recipient = Keypair.generate().publicKey;
 const announce = async (v: Awaited<ReturnType<typeof vaultWith>>, amount: bigint, instant: boolean) => {
   const { state } = await fetchVault(c, PROGRAM, v.vault);
-  const s = signAnnouncement(v.g.seed, v.d, { epoch: 0n, opIndex: state.opIndex, kind: 0, mint: PublicKey.default, destination: recipient, amount, announceBy: (await chainTime(c)) + 600n });
+  const s = signAnnouncement(v.g.seed, v.d, { epoch: 0n, opIndex: state.opIndex, kind: 0, mint: PublicKey.default, destination: recipient, amount, announceBy: (await chainTime(c)) + 600n, decimals: 0 });
   for (const ix of stageIxs(PROGRAM, payer.publicKey, s.message, s.signature)) await send(ix);
   await send(
     computeIx(),
