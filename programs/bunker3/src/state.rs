@@ -13,7 +13,8 @@ pub const ROLE_RECOVERY: u8 = 2;
 pub const VAULT_MAGIC: &[u8; 8] = b"BUNKER03";
 pub const ANNOUNCE_DOMAIN: &[u8; 16] = b"BUNKER3_ANNOUNCE";
 pub const RECOVER_DOMAIN: &[u8; 16] = b"BUNKER3_RECOVER_";
-pub const MIN_DELAY_SECS: u32 = 86_400;
+/// A vault may be created with no waiting period. Zero means an announced
+/// withdrawal can execute immediately, including in the same transaction.
 pub const MAX_DELAY_SECS: u32 = 604_800;
 pub const EXECUTE_WINDOW_SECS: i64 = 604_800;
 const ZERO: [u8; 32] = [0; 32];
@@ -139,7 +140,7 @@ pub fn new_vault(data: &[u8], bump: u8) -> Result<Vault, ProgramError> {
         v.op_root != ZERO
             && v.rec_root != ZERO
             && v.op_root != v.rec_root
-            && (MIN_DELAY_SECS..=MAX_DELAY_SECS).contains(&v.delay_secs),
+            && v.delay_secs <= MAX_DELAY_SECS,
     )?;
     Ok(v)
 }

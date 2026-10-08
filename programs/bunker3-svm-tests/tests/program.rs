@@ -327,7 +327,6 @@ fn initialize_rejects_bad_roots_and_delays() {
         (root(1), root(1), DAY as u32),
         ([0; 32], root(100), DAY as u32),
         (root(1), [0; 32], DAY as u32),
-        (root(1), root(100), DAY as u32 - 1),
         (root(1), root(100), WINDOW as u32 + 1),
     ] {
         let mut e = Env::new();
@@ -383,6 +382,48 @@ fn nothing_leaves_before_the_wait_and_exactly_once_after() {
     assert!(e.vault_data()[157..286].iter().all(|b| *b == 0), "the record is zeroed");
     assert!(e.execute(destination).is_err(), "a withdrawal executes at most once");
     assert_eq!(e.lamports(&destination), 2 * SOL);
+}
+
+/// A vault created with no waiting period: announce and execute in ONE
+/// transaction, and the other protections are unchanged.
+#[test]
+fn a_vault_without_a_waiting_period_withdraws_in_one_transaction() {
+    let mut e = Env::new();
+    let ix = e.init_ix(root(1), root(100), 0);
+    e.send(&[ix]).unwrap();
+    let fund = system_instruction::transfer(&e.payer.pubkey(), &e.vault, 10 * SOL);
+    e.send(&[fund]).unwrap();
+    assert_eq!(u32::from_le_bytes(e.vault_data()[152..156].try_into().unwrap()), 0);
+    let destination = Pubkey::new_unique();
+    let before = e.lamports(&e.vault);
+    let w = e.sol(destination, 2 * SOL, 0, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let proof = e.stage(1, &message);
+    let announce = e.announce_ix(&payload, proof, &root(1), &w.next);
+    // Execution alone, before any announcement, does nothing.
+    assert!(e.execute(destination).is_err());
+    // A different recipient in the same transaction fails the whole thing.
+    let thief = Pubkey::new_unique();
+    let steal = e.execute_ix(thief, vec![]);
+    assert!(e.send(&[announce.clone(), steal]).is_err());
+    assert_eq!((e.lamports(&e.vault), e.pending(), e.spent(&root(1))), (before, false, false));
+    let execute = e.execute_ix(destination, vec![]);
+    e.send(&[announce.clone(), execute]).unwrap();
+    assert_eq!(e.lamports(&destination), 2 * SOL);
+    assert_eq!(e.lamports(&e.vault), before - 2 * SOL);
+    assert!(!e.pending());
+    assert_eq!((e.op_index(), e.op_root()), (1, root(2)));
+    assert!(e.spent(&root(1)));
+    // Still exactly once, still not replayable, still not without the key.
+    assert!(e.execute(destination).is_err());
+    assert!(e.send(&[announce]).is_err());
+    let again = e.sol(destination, SOL, 1, 3);
+    assert!(e.announce(55, &again).is_err());
+    assert_eq!(e.lamports(&destination), 2 * SOL);
+    // Recovery still works on such a vault.
+    e.recover(100, 0, 101, 10).unwrap();
+    assert_eq!(e.epoch(), 1);
 }
 
 #[test]

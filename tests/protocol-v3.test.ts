@@ -243,7 +243,7 @@ describe("Protocol 3 authorities", () => {
     expect([init.data[0], init.data.length, init.keys.length]).toEqual([0, 133, 5]);
     expect(init.keys[1].pubkey.equals(vault)).toBe(true);
     expect(() =>
-      initializeIx(program, payer, { vaultId: d.vaultId, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 86_399 }),
+      initializeIx(program, payer, { vaultId: d.vaultId, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 604_801 }),
     ).toThrow();
     const stage = stageIxs(program, payer, unhex(fixture.announce.message), unhex(fixture.announce.signature));
     expect(stage.map((s) => s.data.length)).toEqual([1 + 32 + 2 + 600, 1 + 32 + 2 + 488]);
