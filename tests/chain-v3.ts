@@ -54,15 +54,10 @@ const started = Date.now();
 for (let n = 0; n < cycles; n++) {
   const master = crypto.getRandomValues(new Uint8Array(32));
   const instant = n % 2 === 0;
-  const g = genesisVault(
-    master,
-    {
+  const g = genesisVault(master, {
       chainTag: new PublicKey(genesis).toBytes(),
       programId: PROGRAM.toBytes(),
-      salt: crypto.getRandomValues(new Uint8Array(32)),
-    },
-    instant ? 0 : 86_400,
-  );
+      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: instant ? 0 : 86_400 });
   const d: Descriptor = g.d;
   const vault = vaultAddress(PROGRAM, d.vaultId);
   await send(

@@ -57,27 +57,56 @@ fn random_interleavings_keep_every_invariant() {
     let (mut announced, mut executed, mut recovered, mut rejected) = (0u64, 0u64, 0u64, 0u64);
     for sequence in 0..20_000u32 {
         let delay = [0u32, 1, 3_600, 86_400, MAX_DELAY_SECS][rng.below(5) as usize];
+        // What the master derives: for each epoch, its recovery root and its
+        // first operational root. The packet for epoch e names rec[e+1] and
+        // op0[e+1]. These are public once a packet has been seen, so the
+        // operational signer is allowed to know and use all of them.
+        let rec: Vec<[u8; 32]> = (0..45).map(|_| rng.root()).collect();
+        let op0: Vec<[u8; 32]> = (0..45).map(|_| rng.root()).collect();
         let mut v = Vault {
             vault_id: rng.root(),
             chain_tag: rng.root(),
-            op_root: rng.root(),
+            op_root: op0[0],
             op_index: 0,
             epoch: 0,
-            rec_root: rng.root(),
+            rec_root: rec[0],
             delay_secs: delay,
             pending: None,
             bump: 255,
         };
         let mut now: i64 = 1_800_000_000;
-        // Every root that has ever been an authority, and every announcement that paid out.
+        // The spent markers the program keeps for this vault, and every announcement that paid out.
         let mut retired: HashSet<[u8; 32]> = HashSet::new();
         let mut paid: HashSet<[u8; 32]> = HashSet::new();
         for step in 0..40 {
             let before = v.clone();
             let context = format!("sequence {sequence} step {step}");
+            let e = v.epoch as usize;
             match rng.below(6) {
                 0 | 1 => {
-                    let mut bytes = announce_bytes(&v, rng.root(), 1 + rng.below(1_000_000), now + rng.below(7200) as i64 - 600, rng.below(4) == 0);
+                    // The operational signer can only sign under a root whose key it
+                    // holds: never one that only the master can derive.
+                    if rec.contains(&v.op_root) || op0[e + 1..].contains(&v.op_root) {
+                        continue;
+                    }
+                    // It chooses the next root freely, and chooses adversarially.
+                    let marked: Vec<[u8; 32]> = retired.iter().copied().collect();
+                    let next = match rng.below(10) {
+                        0 => v.op_root,
+                        1 => v.rec_root,
+                        2 if !marked.is_empty() => marked[rng.below(marked.len() as u64) as usize],
+                        3 => rec[e + 1],
+                        4 => op0[e + 1],
+                        5 => rec[e + 2],
+                        6 => op0[e + 2],
+                        _ => rng.root(),
+                    };
+                    // The program refuses a next root that is already marked.
+                    if retired.contains(&next) {
+                        rejected += 1;
+                        continue;
+                    }
+                    let mut bytes = announce_bytes(&v, next, 1 + rng.below(1_000_000), now + rng.below(7200) as i64 - 600, rng.below(4) == 0);
                     let corrupt = rng.below(4) == 0;
                     if corrupt {
                         let at = rng.below(bytes.len() as u64) as usize;
@@ -123,19 +152,24 @@ fn random_interleavings_keep_every_invariant() {
                     Err(_) => assert_eq!(v, before, "{context}"),
                 },
                 4 => {
-                    let mut bytes = recover_bytes(&v, rng.root(), rng.root());
-                    if rng.below(4) == 0 {
+                    // The one packet the master makes for this epoch, sometimes damaged.
+                    let mut bytes = recover_bytes(&v, rec[e + 1], op0[e + 1]);
+                    let corrupt = rng.below(4) == 0;
+                    if corrupt {
                         let at = rng.below(bytes.len() as u64) as usize;
                         bytes[at] ^= 1 << rng.below(8);
                     }
-                    match decode_recover(&bytes).and_then(|r| apply_recover(&mut v, &r)) {
-                        Ok((old_rec, old_op)) => {
+                    // The program refuses next roots that are already marked.
+                    let unmarked = decode_recover(&bytes).is_ok_and(|r| !retired.contains(&r.next_rec_root) && !retired.contains(&r.next_op_root));
+                    let result = if unmarked { decode_recover(&bytes).and_then(|r| apply_recover(&mut v, &r)) } else { Err(invalid()) };
+                    // Whatever the operational signer has done, in this epoch or any
+                    // earlier one, the undamaged packet always lands.
+                    assert!(corrupt || result.is_ok(), "{context}: the recovery packet for epoch {e} was refused");
+                    match result {
+                        Ok(old_rec) => {
                             assert_eq!(old_rec, before.rec_root, "{context}");
-                            // Random roots never coincide with the packet's, so the displaced root is always retired here.
-                            let old_op = old_op.expect("displaced operational root");
-                            assert_eq!(old_op, before.op_root, "{context}");
                             assert_eq!((v.epoch, v.op_index, v.pending.clone()), (before.epoch + 1, 0, None), "{context}");
-                            assert!(retired.insert(old_rec) && retired.insert(old_op), "{context}: an authority was used twice");
+                            assert!(retired.insert(old_rec), "{context}: a recovery root was used twice");
                             assert!(!retired.contains(&v.op_root) && !retired.contains(&v.rec_root) && v.op_root != v.rec_root, "{context}");
                             assert!(check_execute(&v, now).is_err() && check_execute(&v, now + delay as i64).is_err(), "{context}: a cancelled withdrawal can still execute");
                             recovered += 1;

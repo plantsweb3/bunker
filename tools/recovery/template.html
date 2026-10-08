@@ -37,6 +37,8 @@ button.ghost{min-height:48px;padding:13px 22px;border:1px solid #3e484b;border-r
 .status.ok{color:#bfe6d9}.status.bad{color:#f0c4b7}
 code{font-size:13px;color:#d4e9eb;overflow-wrap:anywhere}
 small{color:#839497;font-size:12px}
+.files{margin:0;padding:12px 16px 12px 34px;border:1px solid var(--line);border-radius:6px;font-size:14px}
+.files a{color:var(--ice);overflow-wrap:anywhere}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -61,9 +63,9 @@ small{color:#839497;font-size:12px}
 <code id="card-echo" style="white-space:pre-wrap"></code>
 <label class="check"><input id="card-ack" type="checkbox"><span>These match what the Bunker website shows under “Network”. A Bunker built for a different program is a different Bunker.</span></label>
 </div>
-<label>Recovery password<input id="password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
-<label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
-<small>The recovery password is only ever typed into this tool. Never type it into a website.</small>
+<label>Recovery password<input id="password" type="password" autocomplete="new-password" placeholder="At least 16 characters"></label>
+<label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="At least 16 characters"></label>
+<small>The recovery password is only ever typed into this tool. Never type it into a website. It is all that protects this file if someone copies it: use five or more unrelated words, not a phrase, a date or anything you use elsewhere. There is no reset.</small>
 <label>Day key password (a different one)<input id="day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <label>Confirm day key password<input id="day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <small>The day key password is the one you type on the Bunker website to open your Bunker.</small>
@@ -82,6 +84,7 @@ small{color:#839497;font-size:12px}
 <label>Re-open the saved recovery kit to prove it is saved<input id="verify" type="file" accept=".json,application/json"></label>
 </div>
 <div class="status" id="build-status" role="status"></div>
+<ul class="files" id="build-files" hidden></ul>
 <div id="built" hidden>
 <p>Bunker address: <code id="built-address"></code></p>
 <p>Three files were saved. <strong>Recovery kit</strong>: keep it here, away from your everyday device. <strong>Day key</strong>: what you open your Bunker with. <strong>Creation request</strong>: public, upload it on the website to build the Bunker.</p>
@@ -93,11 +96,12 @@ small{color:#839497;font-size:12px}
 <label>Recovery kit<input id="kit" type="file" accept=".json,application/json"></label>
 <label>Recovery password<input id="kit-password" type="password" autocomplete="off" placeholder="At least 12 characters"></label>
 <div class="box" id="kit-box" hidden><code id="kit-echo" style="white-space:pre-wrap"></code></div>
-<label>Current key generation (shown on your Bunker page)<input id="epoch" type="text" inputmode="numeric" placeholder="0"></label>
+<label>Current key generation (shown on your Bunker page, or look it up by Bunker address on the website’s Recovery page)<input id="epoch" type="text" inputmode="numeric" placeholder="0"></label>
 <label>Password for the new day key (not the recovery password)<input id="new-day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <label>Confirm new day key password<input id="new-day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key</button></div>
 <div class="status" id="recover-status" role="status"></div>
+<ul class="files" id="recover-files" hidden></ul>
 </section>
 </div>
 </main>

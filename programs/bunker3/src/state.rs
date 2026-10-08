@@ -75,7 +75,7 @@ impl Vault {
                 require(d[157..286].iter().all(|b| *b == 0))?;
                 None
             }
-            1 => Some(Pending {
+            1 if d[157] <= 1 => Some(Pending {
                 kind: d[157],
                 mint: arr(&d[158..190]),
                 destination: arr(&d[190..222]),
@@ -273,23 +273,20 @@ pub fn apply_expire(v: &mut Vault, now: i64) -> Result<(), ProgramError> {
 }
 
 /// Installs a new epoch. Returns the displaced recovery root, which the caller
-/// must mark spent, and the displaced operational root if it must be marked too.
-/// The caller has already verified the signature against `v.rec_root`. Never
-/// touches balances and has no time guard.
+/// must mark spent. The caller has already verified the signature against
+/// `v.rec_root`. Never touches balances and has no time guard.
 ///
-/// Nothing here depends on what the operational root currently is. An
-/// operational signer can install any 32 bytes as the live root, including a
-/// root this packet names; if that could make the packet fail, a stolen day
-/// key could block recovery. Such a root is simply installed: only the holder
-/// of the master can sign under it, and it is not marked spent.
-pub fn apply_recover(
-    v: &mut Vault,
-    r: &Recover,
-) -> Result<([u8; 32], Option<[u8; 32]>), ProgramError> {
+/// Nothing here, and nothing the caller does, depends on what the operational
+/// root is or has been. An operational signer can install any 32 bytes as the
+/// live root, including a root that this packet or a later one names. If
+/// recovery compared against that root, or retired it, a stolen day key could
+/// make this packet or a future one fail. So the displaced operational root is
+/// neither checked nor marked: a signature made under it names the epoch being
+/// left and can never be accepted again.
+pub fn apply_recover(v: &mut Vault, r: &Recover) -> Result<[u8; 32], ProgramError> {
     require(r.vault_id == v.vault_id && r.chain_tag == v.chain_tag && r.epoch == v.epoch)?;
     require(r.next_rec_root != v.rec_root && r.next_op_root != v.rec_root)?;
-    let reinstalled = v.op_root == r.next_rec_root || v.op_root == r.next_op_root;
-    let displaced = (v.rec_root, (!reinstalled).then_some(v.op_root));
+    let displaced = v.rec_root;
     v.epoch = v
         .epoch
         .checked_add(1)

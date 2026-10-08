@@ -13,11 +13,7 @@ import {
 const program = new PublicKey(new Uint8Array(32).fill(11));
 const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
-const g = genesisVault(
-  master,
-  { chainTag: new Uint8Array(32).fill(9), programId: program.toBytes(), salt },
-  0,
-);
+const g = genesisVault(master, { chainTag: new Uint8Array(32).fill(9), programId: program.toBytes(), salt, delaySecs: 0 });
 const { d } = g;
 const vaultId = d.vaultId;
 const identity = {

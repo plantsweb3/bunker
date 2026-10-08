@@ -54,8 +54,9 @@ fn rust_derivation_matches_the_client() {
     context.extend(bytes(&f["chainTag"]));
     context.extend(bytes(&f["programBytes"]));
     context.extend(bytes(&f["salt"]));
+    context.extend((f["delaySecs"].as_u64().unwrap() as u32).to_le_bytes());
     assert_eq!(context, bytes(&f["context"]));
-    assert_eq!(context.len(), 109);
+    assert_eq!(context.len(), 113);
     let seed = |epoch: u64| expand(&master, &info(&context, 2, &[epoch]), 32);
     let recovery = |epoch: u64| expand(&master, &info(&context, 1, &[epoch]), 1088);
     let operational = |epoch: u64, index: u64| expand(&seed(epoch), &info(&context, 3, &[epoch, index]), 1088);
@@ -184,7 +185,6 @@ fn the_compiled_program_accepts_the_client_bytes() {
             AccountMeta::new_readonly(proof, false),
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(marker(&rec0), false),
-            AccountMeta::new(marker(&op0b), false),
             AccountMeta::new_readonly(marker(&next_rec), false),
             AccountMeta::new_readonly(marker(&op1), false),
             AccountMeta::new_readonly(system, false),

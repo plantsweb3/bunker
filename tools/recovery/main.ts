@@ -12,7 +12,6 @@ import {
   DayKey,
   decryptArchival,
   descriptorOf,
-  download,
   encryptFile,
   fileName,
   passwordProblem,
@@ -55,6 +54,24 @@ function dayKey(kit: ArchivalKit, epoch: bigint): DayKey {
   };
 }
 const publicJson = (o: object) => JSON.stringify(o, null, 2);
+/** Starts a download AND leaves a link on the page. A browser may block the
+ * second of two automatic downloads, or lose one behind a prompt; the tool
+ * cannot tell, so every file it makes stays available until the page closes. */
+function offer(listId: string, name: string, content: string) {
+  const list = $(listId);
+  list.hidden = false;
+  const item = document.createElement("li");
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([content], { type: "application/json" }));
+  link.download = name;
+  link.textContent = name;
+  item.append(link);
+  list.append(item);
+  link.click();
+}
+// Choosing the same file again after an error must count as a choice.
+for (const input of Array.from(document.querySelectorAll<HTMLInputElement>("input[type=file]")))
+  input.addEventListener("click", () => (input.value = ""));
 function run(statusId: string, fn: () => Promise<void>) {
   return () => {
     say(statusId, "Working…");
@@ -106,6 +123,8 @@ $("create").addEventListener(
     const card: NetworkCard = parseNetworkCard(await read(file("card"), "the network card"));
     const password = value("password");
     if (password !== value("repeat")) throw new Error("Passwords do not match");
+    const weak = passwordProblem(password, "archival");
+    if (weak) throw new Error(`Recovery password: ${weak}`);
     dayPassword("day-password", "day-repeat", password);
     if (!checked("card-ack"))
       throw new Error("Confirm the network and program match the website");
@@ -118,11 +137,12 @@ $("create").addEventListener(
     const delaySecs = checked("wait") ? Number(value("delay")) : 0;
     // The address is a hash of the keys and the waiting period, so nobody
     // else can create this Bunker with different ones.
-    const { d } = genesisVault(
-      master,
-      { chainTag: new PublicKey(card.genesis).toBytes(), programId: program.toBytes(), salt },
+    const { d } = genesisVault(master, {
+      chainTag: new PublicKey(card.genesis).toBytes(),
+      programId: program.toBytes(),
+      salt,
       delaySecs,
-    );
+    });
     const kit = validateArchival({
       version: 3,
       kind: "archival",
@@ -137,9 +157,14 @@ $("create").addEventListener(
     });
     master.fill(0);
     draft = { kit, encrypted: await encryptFile(kit, password) };
-    download(fileName(kit), draft.encrypted);
+    $("build-files").replaceChildren();
+    offer("build-files", fileName(kit), draft.encrypted);
     $("verify-step").hidden = false;
-    say("build-status", `Saved ${fileName(kit)}. Re-open it below to continue.`, "ok");
+    say(
+      "build-status",
+      `Created ${fileName(kit)}. Find where your browser saved it and re-open it below to continue.`,
+      "ok",
+    );
   }),
 );
 $("verify").addEventListener(
@@ -150,7 +175,7 @@ $("verify").addEventListener(
     if (JSON.stringify(reopened) !== JSON.stringify(draft.kit))
       throw new Error("That is not the recovery kit that was just saved");
     const { kit } = draft;
-    const g = genesisVault(unhex(kit.master), descriptorOf(kit), kit.delaySecs);
+    const g = genesisVault(unhex(kit.master), descriptorOf(kit));
     const request: CreationRequest = {
       version: 3,
       kind: "create",
@@ -165,16 +190,21 @@ $("verify").addEventListener(
       recRoot: hex(g.recRoot),
     };
     const day = dayKey(kit, 0n);
-    download(
+    offer(
+      "build-files",
       fileName(day),
       await encryptFile(day, dayPassword("day-password", "day-repeat", value("password"))),
     );
-    download(`bunker-test-creation-request-${kit.vault.slice(0, 8)}.json`, publicJson(request));
+    offer(
+      "build-files",
+      `bunker-test-creation-request-${kit.vault.slice(0, 8)}.json`,
+      publicJson(request),
+    );
     $("built-address").textContent = kit.vault;
     $("built").hidden = false;
     say(
       "build-status",
-      "Verified. Your day key and a creation request were saved. Take the creation request to the website.",
+      "Verified. A day key and a creation request were created. Check that all three files listed below are saved (use the links if one is missing), then take the creation request to the website.",
       "ok",
     );
   }),
@@ -200,6 +230,11 @@ $("recover").addEventListener(
     const password = newDayPassword();
     const d = descriptorOf(kit);
     const packet = recoveryPacket(unhex(kit.master), d, epoch);
+    // The one message this key may ever sign, built twice. If the two differ,
+    // something in this device computed wrongly and neither is released.
+    const again = recoveryPacket(unhex(kit.master), d, epoch);
+    if (hex(again.payload) !== hex(packet.payload) || hex(again.signature) !== hex(packet.signature))
+      throw new Error("Internal check failed. Nothing was saved.");
     // Never hand out a packet this tool cannot itself verify.
     const root = rootFromSecret(recoveryKey(unhex(kit.master), d, epoch));
     if (!verify(packet.signature, packet.message, root))
@@ -217,14 +252,16 @@ $("recover").addEventListener(
       signature: hex(packet.signature),
     };
     const next = dayKey(kit, epoch + 1n);
-    download(fileName(next), await encryptFile(next, password));
-    download(
+    $("recover-files").replaceChildren();
+    offer("recover-files", fileName(next), await encryptFile(next, password));
+    offer(
+      "recover-files",
       `bunker-test-recovery-packet-${kit.vault.slice(0, 8)}-epoch-${epoch}.json`,
       publicJson(out),
     );
     say(
       "recover-status",
-      `Saved a recovery packet for key generation ${epoch} and the day key for generation ${epoch + 1n}. Submit the packet on the website; the new day key works once it lands.`,
+      `Created a recovery packet for key generation ${epoch} and the day key for generation ${epoch + 1n}. Check both files listed below are saved before you leave this page. Submit the packet on the website; the new day key works once it lands. If you ever lose that day key, come back here and re-issue it for generation ${epoch + 1n}.`,
       "ok",
     );
   }),
@@ -234,8 +271,9 @@ $("reissue").addEventListener(
   run("recover-status", async () => {
     const kit = await openKit();
     const day = dayKey(kit, epochOf("epoch"));
-    download(fileName(day), await encryptFile(day, newDayPassword()));
-    say("recover-status", `Saved ${fileName(day)}.`, "ok");
+    $("recover-files").replaceChildren();
+    offer("recover-files", fileName(day), await encryptFile(day, newDayPassword()));
+    say("recover-status", `Created ${fileName(day)}. Check it is saved; the link below downloads it again.`, "ok");
   }),
 );
 for (const tab of ["build", "recover"] as const)
@@ -247,7 +285,8 @@ for (const tab of ["build", "recover"] as const)
   });
 // Served from a website this page could be swapped or observed. It only runs
 // as a file the user saved and opened.
-if (location.protocol !== "file:") {
+// (`content:` is how Android opens a file from its downloads.)
+if (location.protocol !== "file:" && location.protocol !== "content:") {
   $("served").hidden = false;
   $("tool").hidden = true;
 }

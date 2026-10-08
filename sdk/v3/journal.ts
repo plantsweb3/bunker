@@ -172,7 +172,7 @@ export async function authorizeAnnouncement(
     const local = BigInt(Math.floor(Date.now() / 1000));
     if (withdrawal.announceBy > local + MAX_ANNOUNCE_AHEAD_SECS || withdrawal.announceBy <= local)
       throw new Error(
-        "The network’s clock and this device’s clock disagree. Nothing was signed. Check your device’s time and connection.",
+        "The network’s clock and this device’s clock are too far apart to set a safe deadline. Nothing was signed. Check this device’s date and time; if they are right, the network is reporting the wrong time, so try again later or on another connection.",
       );
     // Anything that would make the message invalid is found now, before the
     // key is reserved, so a bad request cannot use a key up.

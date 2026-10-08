@@ -190,7 +190,7 @@ fn stage(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let payer = next_account_info(it)?;
     let proof = next_account_info(it)?;
     let system = next_account_info(it)?;
-    require(payer.is_signer && proof.is_writable)?;
+    require(payer.is_signer && proof.is_writable && system.key == &system_program::id())?;
     let (expected, bump) =
         Pubkey::find_program_address(&[PROOF_SEED, payer.key.as_ref(), digest], id);
     require(proof.key == &expected)?;
@@ -342,13 +342,12 @@ fn expire(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 /// next epoch's authorities. Clears any pending withdrawal. Never debits the vault.
 fn recover(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let r = decode_recover(data)?;
-    require(accounts.len() == 8)?;
+    require(accounts.len() == 7)?;
     let it = &mut accounts.iter();
     let vault = next_account_info(it)?;
     let proof = next_account_info(it)?;
     let payer = next_account_info(it)?;
     let rec_spent = next_account_info(it)?;
-    let op_spent = next_account_info(it)?;
     let next_rec_spent = next_account_info(it)?;
     let next_op_spent = next_account_info(it)?;
     let system = next_account_info(it)?;
@@ -357,15 +356,11 @@ fn recover(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     unspent(id, vault.key, next_op_spent, &r.next_op_root)?;
     let message: &[&[u8]] = &[RECOVER_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
     let digest = hashv(message).to_bytes();
-    let (old_rec, old_op) = apply_recover(&mut v, &r)?;
+    let old_rec = apply_recover(&mut v, &r)?;
     verify_proof(id, proof, message, &digest, &old_rec)?;
+    // Only a root that has signed is ever marked. The displaced operational
+    // root has not signed here and is left alone (see `apply_recover`).
     mark_spent(payer, rec_spent, system, id, vault.key, &old_rec)?;
-    // An offline signature under the displaced operational root may exist even
-    // if it was never announced, so that root is retired too, unless it is one
-    // of the roots this packet installs (see `apply_recover`).
-    if let Some(old_op) = old_op {
-        mark_spent(payer, op_spent, system, id, vault.key, &old_op)?;
-    }
     store_vault(vault, &v)
 }
 

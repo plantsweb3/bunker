@@ -21,6 +21,10 @@ export type KeyContext = {
   chainTag: Uint8Array;
   programId: Uint8Array;
   salt: Uint8Array;
+  /** The vault's waiting period. Part of what the vault IS, so part of what
+   * its keys are bound to: the same master and salt with another waiting
+   * period derive unrelated keys. */
+  delaySecs: number;
 };
 /** A key context plus the identity of the vault its genesis keys create. The
  * identity is a hash over the genesis commitments (protocol.ts `vaultIdOf`),
@@ -30,11 +34,16 @@ const index = (n: bigint) => {
   if (n < 0n || n > 0xffffffffffffffffn) throw new Error("Index out of range");
   return u64(n);
 };
-/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt`, 109 bytes. */
+/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt || delay_secs`,
+ * 113 bytes. Every input of the vault identity except the roots themselves. */
 export function context(d: KeyContext): Uint8Array {
   for (const part of [d.chainTag, d.programId, d.salt])
     if (part.length !== 32) throw new Error("Descriptor fields are 32 bytes");
-  return concat(LABEL, new Uint8Array([0]), d.chainTag, d.programId, d.salt);
+  if (!Number.isInteger(d.delaySecs) || d.delaySecs < 0 || d.delaySecs > 0xffffffff)
+    throw new Error("Invalid waiting period");
+  const delay = new Uint8Array(4);
+  new DataView(delay.buffer).setUint32(0, d.delaySecs, true);
+  return concat(LABEL, new Uint8Array([0]), d.chainTag, d.programId, d.salt, delay);
 }
 function expand(ikm: Uint8Array, expected: number, info: Uint8Array, length: number) {
   if (ikm.length !== expected) throw new Error("Invalid key material length");

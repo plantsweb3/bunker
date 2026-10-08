@@ -25,11 +25,7 @@ const program = new PublicKey(new Uint8Array(32).fill(11));
 const genesis = new PublicKey(new Uint8Array(32).fill(9)).toBase58();
 const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
-const g = genesisVault(
-  master,
-  { chainTag: new PublicKey(genesis).toBytes(), programId: program.toBytes(), salt },
-  86_400,
-);
+const g = genesisVault(master, { chainTag: new PublicKey(genesis).toBytes(), programId: program.toBytes(), salt, delaySecs: 86_400 });
 const { d } = g;
 const vaultId = d.vaultId;
 const identity = {
@@ -255,6 +251,23 @@ describe("Protocol 3 key files", () => {
     // Relabelling the file does not help: the label is authenticated.
     const relabelled = JSON.stringify({ ...JSON.parse(a), kind: "day-key" });
     await expect(decryptDayKey(relabelled, password)).rejects.toThrow("Incorrect password or damaged");
+  });
+  it("derives the file key with scrypt and holds the recovery kit to a higher floor", async () => {
+    const e = JSON.parse(await encryptFile(archival, password));
+    expect([e.format, e.kdf, e.N, e.r, e.p, e.kind]).toEqual(["bunker3-encrypted-v3", "scrypt", 131072, 8, 1, "archival"]);
+    // Weakening the cost in the file does not make it open faster: the cost is fixed.
+    await expect(decryptArchival(JSON.stringify({ ...e, N: 1024 }), password)).rejects.toThrow("not a Bunker key file");
+    // Fourteen characters is enough for a day key and not for the kit.
+    await expect(encryptFile(archival, "fourteen chars")).rejects.toThrow("at least 16");
+    expect(typeof (await encryptFile(day, "fourteen chars"))).toBe("string");
+  });
+  it("opens with the same password however the keyboard composed it", async () => {
+    // "é" as one code point and as "e" plus a combining accent.
+    const composed = "caf\u00e9 au lait every day";
+    const decomposed = "cafe\u0301 au lait every day";
+    expect(composed).not.toBe(decomposed);
+    const file = await encryptFile(day, composed);
+    expect(await decryptDayKey(file, decomposed)).toEqual(day);
   });
   it("detects tampering with the envelope", async () => {
     const e = JSON.parse(await encryptFile(day, password));

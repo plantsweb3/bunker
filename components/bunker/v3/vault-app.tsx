@@ -5,7 +5,14 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatAmount, parseAmount, unhex } from "@/sdk/bytes";
-import { Asset, assets, depositIxs, explorer, withdrawalDestination } from "@/sdk/client";
+import {
+  Asset,
+  assets,
+  depositIxs,
+  explorer,
+  UnconfirmedError,
+  withdrawalDestination,
+} from "@/sdk/client";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -31,6 +38,7 @@ import {
   decodeAnnounce,
   executeIx,
   expireIx,
+  MAX_ANNOUNCE_AHEAD_SECS,
   pendingPhase,
   stageIxs,
   VaultState,
@@ -47,6 +55,16 @@ type Loaded = {
   now: bigint;
   at: number;
 };
+/** The deadline for an announcement to land. Counted from whichever clock is
+ * later, the chain's or this device's, so a chain clock that runs behind does
+ * not produce a deadline already in the past; never further ahead of the
+ * chain than the program allows. */
+function announceBy(chainNow: bigint): bigint {
+  const device = BigInt(Math.floor(Date.now() / 1000));
+  const by = (device > chainNow ? device : chainNow) + ANNOUNCE_WINDOW_SECS;
+  const limit = chainNow + MAX_ANNOUNCE_AHEAD_SECS;
+  return by < limit ? by : limit;
+}
 const tokenName = (mint: string) => mintLabel(mint) ?? `${mint.slice(0, 4)}…${mint.slice(-4)}`;
 /** Exactly what the review screen shows and what gets signed. Built once,
  * when the withdrawal is reviewed, and never recomputed from the form. */
@@ -60,6 +78,10 @@ type Intent = {
   recipient: string;
   /** The account that is signed: the wallet for SOL, its token account otherwise. */
   destination: PublicKey;
+  /** The key this was reviewed against. If the Bunker has moved on by the
+   * time it is signed, the review no longer describes what would happen. */
+  epoch: bigint;
+  opIndex: bigint;
 };
 type Step = "idle" | "open" | "deposit" | "withdraw" | "review" | "sweep";
 /** Left in the wallet by a sweep so it can still pay fees. */
@@ -210,7 +232,9 @@ function App() {
     await load(day);
     setHistory(null);
     b.setNotice(
-      "Bunker Mode on. What you selected is inside, and this wallet’s key cannot take it back out. Seal when you are done.",
+      moved > 0
+        ? "Bunker Mode on. What you selected is inside, and this wallet’s key cannot take it back out. Seal when you are done."
+        : "Nothing was moved: there was nothing selected beyond the SOL this wallet keeps for fees.",
     );
   }
   function seal() {
@@ -227,10 +251,27 @@ function App() {
       throw new Error("This day key belongs to a different network or program");
     const loaded = await load(key);
     if (!loaded) throw new Error("Configuration unavailable");
+    if (BigInt(key.epoch) > loaded.state.epoch)
+      throw new Error(
+        `This day key is for key generation ${key.epoch}, and your Bunker is still on generation ${loaded.state.epoch}. Submit the recovery packet on the Recovery page first; this key works once it lands.`,
+      );
     if (BigInt(key.epoch) !== loaded.state.epoch)
       throw new Error(
-        "This day key has been replaced. Use the newest one from the recovery tool.",
+        `This day key (generation ${key.epoch}) has been replaced. Your Bunker is on generation ${loaded.state.epoch}: use that day key, or re-issue it in the recovery tool.`,
       );
+    // Signing needs both; say so now, not after a withdrawal has been reviewed.
+    if (!navigator.locks)
+      throw new Error(
+        "This browser cannot coordinate tabs safely (no Web Locks), so withdrawals cannot be signed here. Use a current version of Safari, Chrome or Firefox outside a wallet’s built-in browser.",
+      );
+    try {
+      localStorage.setItem("bunker3-storage-check", "1");
+      localStorage.removeItem("bunker3-storage-check");
+    } catch {
+      throw new Error(
+        "This browser is not letting the page store anything (private mode or blocked site data), so it cannot keep the record that stops a key being used twice. Open your Bunker in a normal window.",
+      );
+    }
     if (key.delaySecs !== loaded.state.delaySecs)
       throw new Error(
         "The network reports a different waiting period from the one this Bunker was built with. Nothing was opened. Try again later or on another connection.",
@@ -283,20 +324,32 @@ function App() {
     const { payer } = b.live();
     if (!day) throw new Error("Open your Bunker first");
     const vaultKey = new PublicKey(day.vault);
-    if (assetKey === "SOL") {
-      const lamports = parseAmount(amount, 9);
-      if (lamports <= 0n) throw new Error("Enter an amount");
-      await b.transmit("Depositing", [
-        SystemProgram.transfer({ fromPubkey: payer, toPubkey: vaultKey, lamports }),
-      ]);
-    } else {
-      const asset = walletAssets.find((a) => a.mint === assetKey);
-      if (!asset) throw new Error("That token is not in the connected wallet");
-      // Creates the Bunker's token account for this mint if it does not exist.
-      await b.transmit(
-        "Depositing",
-        await depositIxs(payer, vaultKey, asset, parseAmount(amount, asset.decimals)),
-      );
+    try {
+      if (assetKey === "SOL") {
+        const lamports = parseAmount(amount, 9);
+        if (lamports <= 0n) throw new Error("Enter an amount");
+        await b.transmit("Depositing", [
+          SystemProgram.transfer({ fromPubkey: payer, toPubkey: vaultKey, lamports }),
+        ]);
+      } else {
+        // A wallet can hold one mint in several accounts: the one chosen is
+        // the one used, not the first with that mint.
+        const asset = walletAssets.find((a) => a.account === assetKey);
+        if (!asset) throw new Error("That token is not in the connected wallet");
+        // Creates the Bunker's token account for this mint if it does not exist.
+        await b.transmit(
+          "Depositing",
+          await depositIxs(payer, vaultKey, asset, parseAmount(amount, asset.decimals)),
+        );
+      }
+    } catch (e) {
+      // Sent but unconfirmed: clear the form so it is not simply pressed
+      // again, and show the balance as it now is.
+      if (e instanceof UnconfirmedError) {
+        close();
+        await load(day).catch(() => null);
+      }
+      throw e;
     }
     close();
     await load(day);
@@ -334,6 +387,8 @@ function App() {
         amount: lamports,
         recipient: to.toBase58(),
         destination: to,
+        epoch: vault.state.epoch,
+        opIndex: vault.state.opIndex,
       });
     } else {
       const qty = parseAmount(amount, chosen.decimals);
@@ -356,6 +411,8 @@ function App() {
         recipient: to.toBase58(),
         // The exact token account is what gets signed.
         destination: dest.destination,
+        epoch: vault.state.epoch,
+        opIndex: vault.state.opIndex,
       });
     }
     setStep("review");
@@ -369,9 +426,20 @@ function App() {
     const current = await load(day);
     if (!current) throw new Error("Configuration unavailable");
     const { state } = current;
+    const landed = (s: VaultState) => s.epoch === a.epoch && s.opIndex > a.opIndex;
+    const done = (s: VaultState) => {
+      close();
+      b.setNotice(
+        s.pending
+          ? "Withdrawal announced. Nothing has moved. It can be released when the waiting period ends."
+          : "Withdrawal sent. It reached its destination and the key was replaced.",
+      );
+    };
+    // Already on-chain (an earlier attempt landed without being confirmed).
+    if (landed(state)) return done(state);
     if (state.epoch !== a.epoch || state.opIndex !== a.opIndex || state.pending)
       throw new Error(
-        "The Bunker has moved on since this withdrawal was signed. It can no longer be announced.",
+        "Your Bunker’s keys were replaced after this withdrawal was signed, so it can no longer be announced. Nothing moved.",
       );
     const instant = state.delaySecs === 0;
     const vaultKey = new PublicKey(day.vault);
@@ -391,39 +459,48 @@ function App() {
         ),
       ];
     }
-    const stages = stageIxs(program, payer, signed.message, signed.signature);
-    for (let i = 0; i < stages.length; i++)
-      await b.transmit(`Approval ${i + 1} of 3 · publishing your authorization`, [stages[i]]);
-    await b.transmit(
-      instant
-        ? "Approval 3 of 3 · sending the withdrawal"
-        : "Approval 3 of 3 · announcing the withdrawal",
-      [
-        computeIx(),
-        announceIx(program, payer, signed.payload, state.opRoot),
-        ...setup,
-        // With no waiting period the withdrawal is released in the same
-        // transaction; either both happen or neither does.
-        ...(instant
-          ? [
-              executeIx(
-                program,
-                vaultKey,
-                { kind: a.kind, mint: a.mint, destination: a.destination },
-                source,
-              ),
-            ]
-          : []),
-        closeProofIx(program, payer, signed.message),
-      ],
-    );
-    close();
-    await load(day);
-    b.setNotice(
-      instant
-        ? "Withdrawal sent. It reached its destination and the key was replaced."
-        : "Withdrawal announced. Nothing has moved. It can be released when the waiting period ends.",
-    );
+    try {
+      const stages = stageIxs(program, payer, signed.message, signed.signature);
+      for (let i = 0; i < stages.length; i++)
+        await b.transmit(`Approval ${i + 1} of 3 · publishing your authorization`, [stages[i]]);
+      await b.transmit(
+        instant
+          ? "Approval 3 of 3 · sending the withdrawal"
+          : "Approval 3 of 3 · announcing the withdrawal",
+        [
+          computeIx(),
+          announceIx(program, payer, signed.payload, state.opRoot),
+          ...setup,
+          // With no waiting period the withdrawal is released in the same
+          // transaction; either both happen or neither does.
+          ...(instant
+            ? [
+                executeIx(
+                  program,
+                  vaultKey,
+                  { kind: a.kind, mint: a.mint, destination: a.destination },
+                  source,
+                ),
+              ]
+            : []),
+          closeProofIx(program, payer, signed.message),
+        ],
+      );
+    } catch (e) {
+      // The key has signed. Whatever went wrong, leave the review screen so
+      // the same withdrawal cannot be signed a second time from it, and look
+      // at the chain: an approval that timed out may still have landed.
+      close();
+      // An unconfirmed step may land a moment later: look more than once.
+      for (let attempt = 0; attempt < (e instanceof UnconfirmedError ? 6 : 1); attempt++) {
+        if (attempt > 0) await new Promise((r) => setTimeout(r, 1500));
+        const after = await load(day).catch(() => null);
+        if (after && landed(after.state)) return done(after.state);
+      }
+      throw e;
+    }
+    const after = await load(day);
+    done(after ? after.state : state);
   }
   async function announce() {
     if (!day) throw new Error("Open your Bunker first");
@@ -432,6 +509,17 @@ function App() {
     if (!current) throw new Error("Configuration unavailable");
     if (BigInt(day.epoch) !== current.state.epoch)
       throw new Error("This day key has been replaced. Open the newest one.");
+    // Signing happens against the key the review was made for, or not at all.
+    // If the Bunker has moved on, an earlier attempt may already have landed.
+    if (
+      intent &&
+      (intent.epoch !== current.state.epoch || intent.opIndex !== current.state.opIndex)
+    ) {
+      close();
+      throw new Error(
+        "Your Bunker changed after you reviewed this withdrawal, so it was not signed. A withdrawal may already have gone through: check the balance and activity before starting another.",
+      );
+    }
     if (!intent) throw new Error("Review the withdrawal first");
     const signed = await authorizeAnnouncement(
       day,
@@ -443,7 +531,7 @@ function App() {
         mint: intent.mint,
         destination: intent.destination,
         amount: intent.amount,
-        announceBy: current.now + ANNOUNCE_WINDOW_SECS,
+        announceBy: announceBy(current.now),
       },
       intent.kind === 1 ? intent.recipient : undefined,
     );
@@ -628,9 +716,16 @@ function App() {
                   </dd>
                 </div>
                 <div>
-                  <dt>To</dt>
+                  <dt>{pending.kind === 0 ? "To" : "To the recipient’s token account"}</dt>
                   <dd>
                     <code>{pending.destination.toBase58()}</code>
+                    {pending.kind === 1 && (
+                      <small>
+                        {" "}
+                        Tokens are held in a token account that belongs to the recipient’s wallet,
+                        so this is not the wallet address you typed.
+                      </small>
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -700,7 +795,7 @@ function App() {
             <div className="error-box app-message" role="alert">
               {journal.state === "behind"
                 ? "The network is showing an older state of your Bunker than this browser has already signed for. Withdrawals are paused here so a key is never used twice. Refresh; if it stays, install new keys in the "
-                : "This browser’s record of what it has signed cannot be read, so it will not sign. Install new keys in the "}
+                : "This browser’s record of what it has signed cannot be read, so it will not sign. If this key may have signed a withdrawal that never arrived, install new keys in the "}
               <Link href="/recovery">recovery tool</Link>. Your assets have not moved.
             </div>
           )}
@@ -753,7 +848,7 @@ function App() {
                       {walletAssets
                         .filter((a) => a.mint && a.amount > 0n && !a.frozen)
                         .map((a) => (
-                          <option key={a.key} value={a.mint!}>
+                          <option key={a.account} value={a.account!}>
                             {tokenName(a.mint!)} · {formatAmount(a.amount, a.decimals)} in wallet
                           </option>
                         ))}
@@ -1238,7 +1333,7 @@ function App() {
           </div>
           {history === null ? (
             <p className="micro">
-              Everything that has moved in or out, read back from the chain.
+              The most recent transactions in or out, read back from the chain.
             </p>
           ) : history.length === 0 ? (
             <p className="micro">Nothing yet.</p>

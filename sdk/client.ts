@@ -101,6 +101,15 @@ export function explorer(
     ? null
     : `https://explorer.solana.com/${kind}/${signature}${network === "devnet" ? "?cluster=devnet" : ""}`;
 }
+/** The transaction was broadcast and its outcome is not known. It may have
+ * landed. Callers must look at the chain before doing anything again. */
+export class UnconfirmedError extends Error {
+  constructor(public readonly signature: string) {
+    super(
+      "This step was sent to the network but could not be confirmed. It may have gone through. Check what your Bunker shows before trying anything again.",
+    );
+  }
+}
 export async function confirm(
   connection: Connection,
   signature: string,
@@ -153,7 +162,7 @@ export async function send(
   );
   if (sim.value.err)
     throw new Error(
-      `Simulation rejected: ${JSON.stringify(sim.value.err)}. No transaction was sent.`,
+      `The network would reject this step (${JSON.stringify(sim.value.err)}). This step was not sent.`,
     );
   const signed = await sign(
     tx,
@@ -165,7 +174,14 @@ export async function send(
     maxRetries: 3,
   });
   onSignature?.(signature);
-  await confirm(connection, signature, latest.lastValidBlockHeight);
+  try {
+    await confirm(connection, signature, latest.lastValidBlockHeight);
+  } catch (e) {
+    // A definite on-chain failure is reported as such. Anything else (a
+    // timeout, a dropped connection while polling) leaves the outcome unknown.
+    if (e instanceof Error && e.message.startsWith("Transaction failed")) throw e;
+    throw new UnconfirmedError(signature);
+  }
   return signature;
 }
 export async function depositIxs(

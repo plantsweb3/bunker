@@ -46,7 +46,14 @@ async function setup(page: Page, info: TestInfo, origin = "") {
       },
     }),
   );
+  // Lets a test make the network stop confirming transactions that it still
+  // accepts, starting with the nth one sent from now.
+  const net = { loseFromSend: 0, sends: 0 };
   await page.route("**/api/rpc", async (route) => {
+    const method = (JSON.parse(route.request().postData() ?? "{}") as { method?: string }).method;
+    if (method === "sendTransaction") net.sends++;
+    if (method === "getSignatureStatuses" && net.loseFromSend && net.sends >= net.loseFromSend)
+      return route.fulfill({ status: 503, body: "unavailable" });
     const response = await fetch(rpc, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -187,7 +194,7 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await page.getByRole("button", { name: "Review deposit in wallet" }).click();
     await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
   };
-  return { c, recipient, errors, payer, vaultState, build, unseal, deposit, makePacket, toolRequests };
+  return { c, recipient, errors, payer, vaultState, build, unseal, deposit, makePacket, toolRequests, net };
 }
 test("with a waiting period: announce, count down, cancel by recovery, continue with new keys", async ({
   page,
@@ -232,12 +239,17 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   await page.goto("/recovery");
   await connect(page);
   await page.getByRole("tab", { name: "Recover or cancel" }).click();
+  // Someone without a day key can still find the number the tool asks for.
+  await page.getByPlaceholder("Bunker address").fill(vault);
+  await page.getByRole("button", { name: "Look up" }).click();
+  await expect(page.getByText("A withdrawal is waiting.", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.locator(".micro", { hasText: "Key generation" }).locator("b")).toHaveText("0");
   await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(stale.packet);
   await expect(page.getByText("Made for a later generation", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole("button", { name: /install new keys/i })).toBeDisabled();
   await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(packet);
   await expect(page.getByText("Signature checked against", { exact: false })).toBeVisible({ timeout: 15000 });
-  await expect(page.getByText("will be cancelled", { exact: false })).toBeVisible();
+  await expect(page.getByText("Recovery cancels it if it lands before", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Cancel withdrawal and install new keys" }).click();
   await expect(page.getByText("Recovered.", { exact: false })).toBeVisible({ timeout: 40000 });
   state = await vaultState(vault);
@@ -281,7 +293,8 @@ test("tokens: deposit and withdraw a classic SPL token", async ({ page }, info) 
   // Deposit 300 tokens.
   await page.getByRole("button", { name: "Deposit", exact: true }).click();
   await expect(page.getByLabel("Asset").locator("option")).toHaveCount(2);
-  await page.getByLabel("Asset").selectOption(mint.toBase58());
+  // Deposits are chosen by the wallet's token account, not by mint.
+  await page.getByLabel("Asset").selectOption({ index: 1 });
   await page.getByLabel("Amount", { exact: true }).fill("300");
   await page.getByRole("button", { name: "Review deposit in wallet" }).click();
   await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
@@ -427,7 +440,7 @@ test("default, no waiting period: a withdrawal arrives on the third approval", a
   page,
 }, info) => {
   test.setTimeout(120000);
-  const { c, recipient, errors, vaultState, build, unseal, deposit, toolRequests }: Ctx = await setup(page, info);
+  const { c, recipient, errors, vaultState, build, unseal, deposit, toolRequests, net }: Ctx = await setup(page, info);
   const { day0, vault } = await build(false);
   expect((await vaultState(vault)).delaySecs).toBe(0);
   await unseal(day0);
@@ -456,6 +469,23 @@ test("default, no waiting period: a withdrawal arrives on the third approval", a
   await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
   expect(await c.getBalance(recipient.publicKey)).toBe(500_000_000);
   expect((await vaultState(vault)).opIndex).toBe(2n);
+  // The final approval lands but the network never confirms it. The page must
+  // not leave the user on a screen where pressing again pays a second time.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.2");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await page.getByRole("checkbox").check();
+  net.sends = 0;
+  net.loseFromSend = 3;
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  net.loseFromSend = 0;
+  await expect(page.getByRole("button", { name: "Sign and send" })).toHaveCount(0);
+  await expect(page.getByText("Finish announcing", { exact: false })).toHaveCount(0);
+  expect(await c.getBalance(recipient.publicKey)).toBe(700_000_000);
+  expect((await vaultState(vault)).opIndex).toBe(3n);
+  await expect(page.locator(".vault-balance")).toContainText("0.3");
   expect(toolRequests, "the offline tool made no network request").toEqual([]);
   expect(errors).toEqual([]);
 });
