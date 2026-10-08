@@ -1,0 +1,23 @@
+# Standalone on purpose: these tests load the built SBF binary into an
+# in-process Solana VM. Keeping them out of the workspace keeps the VM's
+# dependency tree out of the program's lockfile.
+[package]
+name = "bunker3-svm-tests"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+[workspace]
+[dependencies]
+[dev-dependencies]
+litesvm = "0.17.0"
+solana-account = "4"
+solana-address = "2.7"
+solana-clock = "3.2"
+solana-instruction = "3.5"
+solana-keypair = "3"
+solana-sha256-hasher = "3.1"
+solana-signer = "3"
+solana-system-interface = { version = "3", features = ["bincode"] }
+solana-transaction = "4"
+winterwallet-core = { path = "../../crates/winterwallet-core" }

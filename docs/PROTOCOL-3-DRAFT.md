@@ -2,6 +2,8 @@
 
 **Status: draft for design review. Not implemented, not approved, not audited.** 7 October 2026. It makes `docs/RECOVERY-POLICY-PROPOSAL.md` concrete enough to review and to implement against: accounts, instructions, signed bytes, derivation and a transition table. Where the proposal left a choice open, this draft picks one and lists it under [Open questions](#open-questions). Nothing here changes protocol 2, the release gate or any deployed behaviour. Real-fund custody remains disabled.
 
+A draft implementation of this document is in `programs/bunker3` (see [Implementation status](#implementation-status)). It exists so the design can be reviewed against running code; it is not deployed and the web app does not use it.
+
 Scope of this draft: the recovery authority (proposal §1), the stable archival secret (§2) and delayed withdrawals with cancel-by-recovery (§3). Pre-approved destinations (§4) and the alert service (§6) are out of scope; the vault layout reserves no space for them and a later version must be a new, reviewed layout.
 
 Unchanged from protocol 2: the vendored Winterwallet verifier at revision `672fc6789b1532ee680f24842d235e0be8737b61`, N=32, 1,088-byte signatures, two-chunk proof staging, direct deposits, no administrator, no fee recipient, no arbitrary invocation, SOL and classic SPL only.
@@ -203,6 +205,23 @@ These are trust assumptions, not program guarantees.
 - Failed `execute` (frozen destination, closed token account, insufficient rent) leaves the record intact and retryable; `recover` then clears it.
 - Counter limits at `u64::MAX` for `epoch` and `op_index`; `opens_at` and `deadline` overflow.
 - Compute-unit measurements for `announce` and `recover` (one verification each, one and two marker creations).
+
+## Implementation status
+
+`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. Not yet written: the derivation in section 1.1, the offline recovery tool, a client SDK, and any web interface.
+
+| Evidence | Where | Count |
+|---|---|---:|
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 16 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests` (standalone crate; see `docs/TESTING.md`) | 20 |
+
+The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; both displaced roots retired; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root and as a new vault's root; the rent reserve; a forged vault account; proof staging and close; and a classic SPL withdrawal including a frozen destination that later thaws.
+
+Each of the following checks was removed in turn and the suite confirmed to fail: the waiting period, signature verification, clearing the record on recovery, retiring the displaced operational root, the vault PDA check, clearing the record after execution, destination binding, and the next-root marker check.
+
+Measured on that VM with the 1,400,000-unit limit: `announce` about 594,000 compute units, `recover` about 639,000.
+
+Known gaps: no fuzzing; no validator-level test of the same binary; no independent implementation of the encodings; SPL coverage is one scenario. None of this is an audit.
 
 ## Open questions
 
