@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey } from "@solana/web3.js";
 import { formatAmount, hex } from "@/sdk/bytes";
+import { feePreflight } from "@/sdk/preflight";
 import { fetchVault, formatDuration } from "@/sdk/v3/chain";
 import { download } from "@/sdk/v3/kit";
 import {
@@ -143,6 +144,8 @@ function Page() {
       setPacket({ file, chain: state, status });
       throw new Error("This packet no longer applies to the Bunker");
     }
+    // Three approvals follow. Do not start if the wallet cannot finish them.
+    await feePreflight(b.connection, payer);
     const stages = stageIxs(program, payer, file.message, file.signatureBytes);
     for (let i = 0; i < stages.length; i++)
       await b.transmit(`Approval ${i + 1} of 3 · publishing the recovery packet`, [stages[i]]);
@@ -212,7 +215,9 @@ function Page() {
           <p className="modal-copy">
             One file, no installation. Save it, move it to a device you trust,
             and open it there. Its own security policy forbids every network
-            connection.
+            connection. It needs a computer or an Android phone: an iPhone
+            cannot open a saved web page this way, and the browsers built into
+            wallet apps usually cannot save its files.
           </p>
         </div>
         <div className="actions">

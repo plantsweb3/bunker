@@ -66,13 +66,18 @@ export function storedPasskeys(s: Scope): PasskeyRecord[] {
  * supports it, tells the passkey manager the credential is no longer valid. */
 export function forgetPasskey(s: Scope, r: PasskeyRecord) {
   localStorage.removeItem(slot({ ...s, vault: r.vault }));
+  discard(r.credentialId);
+}
+/** Tells the passkey manager a credential is no longer valid, where the
+ * browser supports that. */
+function discard(credentialId: string) {
   const signal = (
     globalThis.PublicKeyCredential as unknown as {
       signalUnknownCredential?: (o: { rpId: string; credentialId: string }) => Promise<void>;
     }
   )?.signalUnknownCredential;
   if (signal) {
-    const b64 = btoa(String.fromCharCode(...unhex(r.credentialId)))
+    const b64 = btoa(String.fromCharCode(...unhex(credentialId)))
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
       .replace(/=+$/, "");
@@ -131,10 +136,13 @@ export async function savePasskey(day: DayKey): Promise<PasskeyRecord> {
   })) as PublicKeyCredential | null;
   if (!created) throw new Error("No passkey was created");
   const ext = created.getClientExtensionResults() as Prf;
-  if (!ext.prf?.enabled && !ext.prf?.results?.first)
+  if (!ext.prf?.enabled && !ext.prf?.results?.first) {
+    // The credential just made is of no use: tell the passkey manager.
+    discard(hex(new Uint8Array(created.rawId)));
     throw new Error(
       "This device’s passkey cannot protect a day key. Keep using the key file.",
     );
+  }
   const id = new Uint8Array(created.rawId);
   // Some authenticators only evaluate the extension when signing in.
   const output = ext.prf.results?.first ? bytes(ext.prf.results.first) : await assertion(id);
