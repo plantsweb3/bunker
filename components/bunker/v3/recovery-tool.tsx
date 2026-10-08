@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey } from "@solana/web3.js";
-import { unhex } from "@/sdk/bytes";
+import { formatAmount, hex } from "@/sdk/bytes";
 import { fetchVault, formatDuration } from "@/sdk/v3/chain";
 import { download } from "@/sdk/v3/kit";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/sdk/v3/protocol";
 import {
   CreationRequest,
+  genesisOf,
   NetworkCard,
   parseCreationRequest,
   parseRecoveryFile,
@@ -78,15 +79,27 @@ function Page() {
   async function create() {
     const { program, payer } = b.live();
     if (!request) throw new Error("Choose a creation request");
-    await b.transmit("Building your Bunker", [
-      initializeIx(program, payer, {
-        vaultId: unhex(request.vaultId),
-        chainTag: new PublicKey(request.genesis).toBytes(),
-        opRoot: unhex(request.opRoot),
-        recRoot: unhex(request.recRoot),
-        delaySecs: request.delaySecs,
-      }),
-    ]);
+    const address = new PublicKey(request.vault);
+    // The address is a hash of the request, so a Bunker already standing there
+    // can only be this one, whoever created it.
+    const exists = await b.connection.getAccountInfo(address, "confirmed");
+    if (!exists || exists.data.length === 0)
+      await b.transmit("Building your Bunker", [
+        initializeIx(program, payer, genesisOf(request)),
+      ]);
+    // Read it back: never tell someone to deposit into a Bunker that is not
+    // exactly the one their recovery kit describes.
+    const { state } = await fetchVault(b.connection, program, address);
+    if (
+      hex(state.vaultId) !== request.vaultId ||
+      hex(state.opRoot) !== request.opRoot ||
+      hex(state.recRoot) !== request.recRoot ||
+      state.delaySecs !== request.delaySecs ||
+      state.epoch !== 0n
+    )
+      throw new Error(
+        "The Bunker at this address does not match your creation request. Do not deposit. Make a new recovery kit.",
+      );
     setBuilt(request.vault);
     setRequest(null);
     b.setNotice("Bunker built. Open it with the day key the tool saved.");
@@ -190,6 +203,13 @@ function Page() {
             Download network card
           </button>
         </div>
+        {b.enabled && b.config && (
+          <p className="micro">
+            Network <code>{b.config.network}</code> · genesis <code>{b.config.expectedGenesis}</code>{" "}
+            · program <code>{b.config.programId}</code>. The tool shows these when you give it the
+            network card; they must match.
+          </p>
+        )}
         {manifest && (
           <p className="micro">
             SHA-256 <code>{manifest.sha256}</code> · {manifest.bytes.toLocaleString("en-US")} bytes ·
@@ -303,7 +323,7 @@ function Page() {
                   <dt>Waiting withdrawal</dt>
                   <dd>
                     {pending
-                      ? `${pending.amount.toString()} lamports to ${pending.destination.toBase58()} — will be cancelled`
+                      ? `${pending.kind === 0 ? `${formatAmount(pending.amount, 9)} SOL` : `${pending.amount.toString()} base units of token ${pending.mint.toBase58()}`} to ${pending.destination.toBase58()}. It will be cancelled.`
                       : "None"}
                   </dd>
                 </div>

@@ -6,6 +6,7 @@
 import { z } from "zod";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../bytes";
+import { genesisVault } from "./authority";
 import type { Descriptor } from "./derive";
 import { MAX_DELAY_SECS, MIN_DELAY_SECS, vaultAddress } from "./protocol";
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -14,6 +15,8 @@ const base = {
   network: z.enum(["devnet", "localnet"]),
   genesis: z.string().min(32).max(44),
   program: z.string().min(32).max(44),
+  /** Random, chosen when the kit is made. Every key is derived under it. */
+  salt: hex32,
   vaultId: hex32,
   vault: z.string().min(32).max(44),
 };
@@ -36,8 +39,9 @@ export const dayKeySchema = z
 export type ArchivalKit = z.infer<typeof archivalSchema>;
 export type DayKey = z.infer<typeof dayKeySchema>;
 type Identity = Pick<ArchivalKit, "genesis" | "program" | "vaultId" | "vault">;
-/** The chain tag is the cluster's genesis hash; it must decode to 32 bytes. */
-export function descriptorOf(k: Identity): Descriptor {
+/** The public identity any Bunker file names. The chain tag is the cluster's
+ * genesis hash; the vault address must be the address of its own identity. */
+export function identityOf(k: Identity) {
   const program = new PublicKey(k.program);
   const d = {
     chainTag: new PublicKey(k.genesis).toBytes(),
@@ -45,12 +49,25 @@ export function descriptorOf(k: Identity): Descriptor {
     vaultId: unhex(k.vaultId, 32),
   };
   if (!vaultAddress(program, d.vaultId).equals(new PublicKey(k.vault)))
-    throw new Error("Key file does not match its vault address");
+    throw new Error("File does not match its vault address");
   return d;
 }
+/** What a key file's secrets are derived under. */
+export function descriptorOf(k: Identity & { salt: string }): Descriptor {
+  return { ...identityOf(k), salt: unhex(k.salt, 32) };
+}
+/** Also proves the kit's master really creates the vault the kit names: the
+ * identity is recomputed from the master, the salt and the waiting period. */
 export function validateArchival(input: unknown): ArchivalKit {
   const k = archivalSchema.parse(input);
-  descriptorOf(k);
+  const d = descriptorOf(k);
+  const master = unhex(k.master, 32);
+  try {
+    if (hex(genesisVault(master, d, k.delaySecs).d.vaultId) !== k.vaultId)
+      throw new Error("Recovery kit does not match its vault");
+  } finally {
+    master.fill(0);
+  }
   return k;
 }
 export function validateDayKey(input: unknown): DayKey {
@@ -82,9 +99,16 @@ const header = (salt: string, iv: string) =>
   }) as const;
 const aad = (salt: string, iv: string) =>
   new TextEncoder().encode("BUNKER3_KIT_TEST_V1:" + JSON.stringify(header(salt, iv)));
-async function key(password: string, salt: Uint8Array) {
-  if (password.length < 12)
-    throw new Error("Use a password with at least 12 characters");
+/** A floor, not a guarantee: these files are only as strong as the password. */
+export function passwordProblem(password: string): string | null {
+  if (password.length < 12) return "Use a password with at least 12 characters";
+  if (new Set(password).size < 6 || /^[0-9]+$/.test(password))
+    return "That password is too easy to guess. Use several unrelated words.";
+  return null;
+}
+async function key(password: string, salt: Uint8Array, creating = false) {
+  const problem = creating ? passwordProblem(password) : null;
+  if (problem) throw new Error(problem);
   const material = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(password),
@@ -108,7 +132,7 @@ export async function encryptFile(
     file.kind === "archival" ? validateArchival(file) : validateDayKey(file);
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const k = await key(password, salt);
+  const k = await key(password, salt, true);
   const plaintext = new TextEncoder().encode(JSON.stringify(canonical));
   try {
     const ciphertext = await crypto.subtle.encrypt(

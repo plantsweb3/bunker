@@ -14,7 +14,7 @@ import { mintLabel } from "@/sdk/known-mints";
 import { withdrawalPreflight } from "@/sdk/preflight";
 import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
 import { Activity, ACTIVITY_LABEL, fetchHistory } from "@/sdk/v3/history";
-import { authorizeAnnouncement, journalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
+import { authorizeAnnouncement, safeJournalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "@/sdk/v3/kit";
 import {
   forgetPasskey,
@@ -22,7 +22,7 @@ import {
   passkeyAvailable,
   PasskeyRecord,
   savePasskey,
-  storedPasskey,
+  storedPasskeys,
 } from "@/sdk/v3/passkey";
 import {
   announceIx,
@@ -48,6 +48,19 @@ type Loaded = {
   at: number;
 };
 const tokenName = (mint: string) => mintLabel(mint) ?? `${mint.slice(0, 4)}…${mint.slice(-4)}`;
+/** Exactly what the review screen shows and what gets signed. Built once,
+ * when the withdrawal is reviewed, and never recomputed from the form. */
+type Intent = {
+  kind: 0 | 1;
+  mint: PublicKey;
+  name: string;
+  decimals: number;
+  amount: bigint;
+  /** The wallet the user typed. */
+  recipient: string;
+  /** The account that is signed: the wallet for SOL, its token account otherwise. */
+  destination: PublicKey;
+};
 type Step = "idle" | "open" | "deposit" | "withdraw" | "review" | "sweep";
 /** Left in the wallet by a sweep so it can still pay fees. */
 const SWEEP_KEEP_LAMPORTS = 20_000_000n;
@@ -72,7 +85,8 @@ function App() {
   const [history, setHistory] = useState<Activity[] | null>(null);
   // Passkey unlock: whether the device can do it, and what is saved here.
   const [canPasskey, setCanPasskey] = useState(false);
-  const [passkey, setPasskey] = useState<PasskeyRecord | null>(null);
+  const [passkeys, setPasskeys] = useState<PasskeyRecord[]>([]);
+  const [intent, setIntent] = useState<Intent | null>(null);
   const scope =
     b.config?.programId && b.enabled
       ? { genesis: b.config.expectedGenesis, program: b.config.programId }
@@ -83,7 +97,7 @@ function App() {
     const [genesis, program] = scopeKey.split(":");
     void passkeyAvailable().then((available) => {
       setCanPasskey(available);
-      setPasskey(storedPasskey({ genesis, program }));
+      setPasskeys(storedPasskeys({ genesis, program }));
     });
   }, [scopeKey]);
   const [recipient, setRecipient] = useState("");
@@ -115,7 +129,7 @@ function App() {
   const stale = !!day && !!vault && BigInt(day.epoch) !== vault.state.epoch;
   const journal =
     day && vault && !stale && !pending
-      ? journalStatus(day, vault.state)
+      ? safeJournalStatus(day, vault.state)
       : ({ state: "unused" } as const);
   const unfinished = journal.state === "signed" ? journal.announcement : null;
   // What is not already promised to a pending withdrawal.
@@ -125,7 +139,6 @@ function App() {
         ? vault.spendable - pending.amount
         : 0n
       : (vault?.spendable ?? 0n);
-  const chosen = vault?.tokens.find((t) => t.mint === assetKey) ?? null;
   /** A pending or announced amount in the units of its own asset. */
   const describe = (kind: number, mint: PublicKey, raw: bigint) => {
     if (kind === 0) return sol(raw);
@@ -142,6 +155,7 @@ function App() {
     setSkipped([]);
     setRecipient("");
     setAck(false);
+    setIntent(null);
     b.setError("");
   }
   const loadWallet = () => {
@@ -216,25 +230,32 @@ function App() {
     setDay(key);
     close();
   }
-  async function unsealWithPasskey() {
+  async function unsealWithPasskey(r: PasskeyRecord) {
     if (!scope) throw new Error("Configuration unavailable");
-    // A day key saved on this device has only ever been used with this
-    // browser's journal, so no cross-device statement is needed.
-    await admit(await openPasskey(scope));
+    // The same day key also exists as a file, and may have been used in
+    // another browser. The statement is needed however the key is opened.
+    if (!fresh)
+      throw new Error(
+        "Confirm that this day key has not started a withdrawal on another device.",
+      );
+    await admit(await openPasskey(scope, r));
     b.setNotice("Unsealed with your passkey. The day key is in this tab until you seal it.");
   }
   async function rememberWithPasskey() {
     if (!day) throw new Error("Open your Bunker first");
-    setPasskey(await savePasskey(day));
+    await savePasskey(day);
+    if (scope) setPasskeys(storedPasskeys(scope));
     b.setNotice(
-      "Saved. Next time, unseal with your passkey. This is not a backup: your recovery kit still replaces a lost key.",
+      "Saved. Next time, unseal with your passkey in this browser. This is not a backup: your recovery kit still replaces a lost key.",
     );
   }
-  function removePasskey() {
+  function removePasskey(r: PasskeyRecord) {
     if (!scope) return;
-    forgetPasskey(scope);
-    setPasskey(null);
-    b.setNotice("Passkey unlock removed from this device.");
+    forgetPasskey(scope, r);
+    setPasskeys(storedPasskeys(scope));
+    b.setNotice(
+      `Passkey unlock removed from this browser. You can also delete “Bunker ${r.vault.slice(0, 8)}” from your device’s passkey manager.`,
+    );
   }
   async function unseal() {
     const key = await decryptDayKey(await readKeyFile(file), password);
@@ -274,9 +295,13 @@ function App() {
     if (!day || !vault) throw new Error("Open your Bunker first");
     const { payer } = b.live();
     if (pending) throw new Error("Finish or cancel the pending withdrawal first");
-    const to = new PublicKey(recipient);
+    const to = new PublicKey(recipient.trim());
     if (!PublicKey.isOnCurve(to.toBytes()) || to.toBase58() === day.vault)
       throw new Error("Use a normal wallet address outside this Bunker");
+    // One asset, read once. Everything below, the review screen and the
+    // signature all use this value and nothing from the form again.
+    const chosen = assetKey === "SOL" ? null : vault.tokens.find((t) => t.mint === assetKey);
+    if (chosen === undefined) throw new Error("That token is not in the Bunker");
     if (!chosen) {
       const lamports = parseAmount(amount, 9);
       if (lamports <= 0n || lamports > available)
@@ -290,6 +315,15 @@ function App() {
         { key: "SOL", mint: null, account: null, label: "SOL", amount: available, decimals: 9, frozen: false },
         lamports,
       );
+      setIntent({
+        kind: 0,
+        mint: PublicKey.default,
+        name: "SOL",
+        decimals: 9,
+        amount: lamports,
+        recipient: to.toBase58(),
+        destination: to,
+      });
     } else {
       const qty = parseAmount(amount, chosen.decimals);
       if (qty <= 0n || qty > chosen.amount || chosen.frozen)
@@ -302,14 +336,33 @@ function App() {
       // account is usable, and that the fee wallet can pay for the withdrawal.
       const dest = await withdrawalDestination(b.connection, payer, to, chosen);
       await withdrawalPreflight(b.connection, payer, to, dest.destination, chosen, qty);
+      setIntent({
+        kind: 1,
+        mint: new PublicKey(chosen.mint!),
+        name: tokenName(chosen.mint!),
+        decimals: chosen.decimals,
+        amount: qty,
+        recipient: to.toBase58(),
+        // The exact token account is what gets signed.
+        destination: dest.destination,
+      });
     }
     setStep("review");
   }
   async function publish(signed: SignedAnnouncement) {
     const { program, payer } = b.live();
-    if (!day || !vault) throw new Error("Open your Bunker first");
-    const instant = vault.state.delaySecs === 0;
+    if (!day) throw new Error("Open your Bunker first");
     const a = decodeAnnounce(signed.payload);
+    // Read the vault now: the key being retired is named from the chain as it
+    // is at this moment, not from what the page last rendered.
+    const current = await load(day);
+    if (!current) throw new Error("Configuration unavailable");
+    const { state } = current;
+    if (state.epoch !== a.epoch || state.opIndex !== a.opIndex || state.pending)
+      throw new Error(
+        "The Bunker has moved on since this withdrawal was signed. It can no longer be announced.",
+      );
+    const instant = state.delaySecs === 0;
     const vaultKey = new PublicKey(day.vault);
     // For a token, make sure the recipient's token account exists (now, so it
     // is there when a waiting withdrawal is released) and name the Bunker's own.
@@ -336,7 +389,7 @@ function App() {
         : "Approval 3 of 3 · announcing the withdrawal",
       [
         computeIx(),
-        announceIx(program, payer, signed.payload, vault.state.opRoot),
+        announceIx(program, payer, signed.payload, state.opRoot),
         ...setup,
         // With no waiting period the withdrawal is released in the same
         // transaction; either both happen or neither does.
@@ -368,32 +421,20 @@ function App() {
     if (!current) throw new Error("Configuration unavailable");
     if (BigInt(day.epoch) !== current.state.epoch)
       throw new Error("This day key has been replaced. Open the newest one.");
-    const { payer } = b.live();
-    const to = new PublicKey(recipient);
-    const token = current.tokens.find((t) => t.mint === assetKey);
-    if (assetKey !== "SOL" && !token) throw new Error("That token is no longer in the Bunker");
+    if (!intent) throw new Error("Review the withdrawal first");
     const signed = await authorizeAnnouncement(
       day,
       unhex(day.seed),
       descriptorOf(day),
       current.state,
-      token
-        ? {
-            kind: 1,
-            mint: new PublicKey(token.mint!),
-            // The exact token account is what gets signed.
-            destination: (await withdrawalDestination(b.connection, payer, to, token)).destination,
-            amount: parseAmount(amount, token.decimals),
-            announceBy: current.now + ANNOUNCE_WINDOW_SECS,
-          }
-        : {
-            kind: 0,
-            mint: PublicKey.default,
-            destination: to,
-            amount: parseAmount(amount, 9),
-            announceBy: current.now + ANNOUNCE_WINDOW_SECS,
-          },
-      token ? to.toBase58() : undefined,
+      {
+        kind: intent.kind,
+        mint: intent.mint,
+        destination: intent.destination,
+        amount: intent.amount,
+        announceBy: current.now + ANNOUNCE_WINDOW_SECS,
+      },
+      intent.kind === 1 ? intent.recipient : undefined,
     );
     await publish(signed);
   }
@@ -644,6 +685,14 @@ function App() {
               </div>
             </section>
           )}
+          {(journal.state === "behind" || journal.state === "unreadable") && (
+            <div className="error-box app-message" role="alert">
+              {journal.state === "behind"
+                ? "The network is showing an older state of your Bunker than this browser has already signed for. Withdrawals are paused here so a key is never used twice. Refresh; if it stays, install new keys in the "
+                : "This browser’s record of what it has signed cannot be read, so it will not sign. Install new keys in the "}
+              <Link href="/recovery">recovery tool</Link>. Your assets have not moved.
+            </div>
+          )}
           {journal.state === "orphaned" && (
             <div className="error-box app-message" role="alert">
               This key was reserved for a withdrawal that was never saved. It
@@ -786,6 +835,7 @@ function App() {
                     <select
                       aria-label="Asset"
                       value={assetKey}
+                      disabled={!!b.busy}
                       onChange={(e) => setAssetKey(e.target.value)}
                     >
                       <option value="SOL">SOL · {formatAmount(available, 9)} available</option>
@@ -805,12 +855,14 @@ function App() {
                       inputMode="decimal"
                       placeholder="0.00"
                       value={amount}
+                      disabled={!!b.busy}
                       onChange={(e) => setAmount(e.target.value)}
                     />
                   </label>
                   <label className="field">
                     <span>Recipient wallet address</span>
                     <input
+                      disabled={!!b.busy}
                       autoComplete="off"
                       spellCheck={false}
                       placeholder="Solana wallet address"
@@ -831,20 +883,20 @@ function App() {
                     </button>
                   </div>
                 </div>
-              ) : step === "review" ? (
+              ) : step === "review" && intent ? (
                 <div className="inline-form">
                   <dl className="withdraw-review">
                     <div>
                       <dt>You are announcing</dt>
                       <dd className="review-amount">
-                        {amount} {chosen ? tokenName(chosen.mint!) : "SOL"}
+                        {formatAmount(intent.amount, intent.decimals)} {intent.name}
                       </dd>
                     </div>
-                    {chosen && (
+                    {intent.kind === 1 && (
                       <div>
                         <dt>Token mint</dt>
                         <dd>
-                          <code>{chosen.mint}</code>
+                          <code>{intent.mint.toBase58()}</code>
                         </dd>
                       </div>
                     )}
@@ -852,7 +904,7 @@ function App() {
                     <div>
                       <dt>To this address</dt>
                       <dd>
-                        <code>{recipient}</code>
+                        <code>{intent.recipient}</code>
                       </dd>
                     </div>
                     {vault.state.delaySecs ? (
@@ -897,7 +949,15 @@ function App() {
                     >
                       {vault.state.delaySecs ? "Sign and announce" : "Sign and send"}
                     </button>
-                    <button className="button ghost" onClick={() => setStep("withdraw")}>
+                    <button
+                      className="button ghost"
+                      disabled={!!b.busy}
+                      onClick={() => {
+                        setIntent(null);
+                        setAck(false);
+                        setStep("withdraw");
+                      }}
+                    >
                       Back
                     </button>
                   </div>
@@ -906,7 +966,7 @@ function App() {
                 <div className="actions">
                   <button
                     className="button light"
-                    disabled={!can}
+                    disabled={!can || stale}
                     onClick={() => {
                       close();
                       setStep("deposit");
@@ -929,7 +989,7 @@ function App() {
                   </button>
                   <button
                     className="button ghost bunker-mode"
-                    disabled={!can}
+                    disabled={!can || stale}
                     onClick={() => {
                       close();
                       setStep("sweep");
@@ -966,9 +1026,9 @@ function App() {
               </div>
               {canPasskey &&
                 !stale &&
-                (passkey?.vault === day.vault && passkey.epoch === day.epoch ? (
+                (passkeys.some((p) => p.vault === day.vault && p.epoch === day.epoch) ? (
                   <div className="metric">
-                    <span>This device</span>
+                    <span>This browser</span>
                     <b>Unseals with passkey</b>
                   </div>
                 ) : (
@@ -1040,16 +1100,32 @@ function App() {
                     ? "Open your Bunker with its day key, or build a new one with the offline recovery tool."
                     : "Deposits go in from any wallet. Withdrawals wait, and you can cancel them."}
                 </p>
+                {b.enabled && passkeys.length > 0 && (
+                  <label className="check-label">
+                    <Checkbox checked={fresh} onCheckedChange={(v) => setFresh(v === true)} />
+                    <span>
+                      This day key has not started a withdrawal on another
+                      device or browser.
+                    </span>
+                  </label>
+                )}
                 <div className="actions">
-                  {b.enabled && passkey ? (
-                    <button
-                      className="button light"
-                      disabled={!can}
-                      onClick={() => b.task("Waiting for your passkey", unsealWithPasskey)}
-                    >
-                      <BIcon name="bunker-key" size={17} />
-                      Unseal with passkey
-                    </button>
+                  {b.enabled && passkeys.length > 0 ? (
+                    passkeys.map((p) => (
+                      <button
+                        key={p.vault}
+                        className="button light"
+                        disabled={!can || !fresh}
+                        onClick={() =>
+                          b.task("Waiting for your passkey", () => unsealWithPasskey(p))
+                        }
+                      >
+                        <BIcon name="bunker-key" size={17} />
+                        {passkeys.length === 1
+                          ? "Unseal with passkey"
+                          : `Unseal ${p.vault.slice(0, 4)}…${p.vault.slice(-4)} with passkey`}
+                      </button>
+                    ))
                   ) : b.enabled ? (
                     <Link className="button light" href="/recovery">
                       <BIcon name="vault" size={17} />
@@ -1073,14 +1149,19 @@ function App() {
                     Open with day key
                   </button>
                 </div>
-                {b.enabled && passkey && (
+                {b.enabled &&
+                  passkeys.map((p) => (
+                    <p className="micro" key={p.vault}>
+                      Passkey unlock saved in this browser for{" "}
+                      {p.vault.slice(0, 4)}…{p.vault.slice(-4)}.{" "}
+                      <button className="link-button" onClick={() => removePasskey(p)}>
+                        Remove
+                      </button>
+                    </p>
+                  ))}
+                {b.enabled && passkeys.length > 0 && (
                   <p className="micro">
-                    Passkey saved on this device for{" "}
-                    {passkey.vault.slice(0, 4)}…{passkey.vault.slice(-4)}.{" "}
-                    <button className="link-button" onClick={removePasskey}>
-                      Remove
-                    </button>{" "}
-                    · <Link href="/recovery">Build another Bunker</Link>
+                    <Link href="/recovery">Build another Bunker</Link>
                   </p>
                 )}
                 <span className="micro">

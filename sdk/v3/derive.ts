@@ -15,28 +15,33 @@ const ROLE_RECOVERY = 0x01;
 const ROLE_EPOCH_SEED = 0x02;
 const ROLE_OPERATIONAL = 0x03;
 const NO_SALT = new Uint8Array(0);
-/** Everything a derivation is bound to. All three are 32 bytes. */
-export type Descriptor = {
+/** Everything a derivation is bound to. All three are 32 bytes. `salt` is the
+ * random value chosen when the kit is made; it is public once the vault exists. */
+export type KeyContext = {
   chainTag: Uint8Array;
   programId: Uint8Array;
-  vaultId: Uint8Array;
+  salt: Uint8Array;
 };
+/** A key context plus the identity of the vault its genesis keys create. The
+ * identity is a hash over the genesis commitments (protocol.ts `vaultIdOf`),
+ * so it cannot itself be an input to deriving them. */
+export type Descriptor = KeyContext & { vaultId: Uint8Array };
 const index = (n: bigint) => {
   if (n < 0n || n > 0xffffffffffffffffn) throw new Error("Index out of range");
   return u64(n);
 };
-/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || vault_id`, 109 bytes. */
-export function context(d: Descriptor): Uint8Array {
-  for (const part of [d.chainTag, d.programId, d.vaultId])
+/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt`, 109 bytes. */
+export function context(d: KeyContext): Uint8Array {
+  for (const part of [d.chainTag, d.programId, d.salt])
     if (part.length !== 32) throw new Error("Descriptor fields are 32 bytes");
-  return concat(LABEL, new Uint8Array([0]), d.chainTag, d.programId, d.vaultId);
+  return concat(LABEL, new Uint8Array([0]), d.chainTag, d.programId, d.salt);
 }
 function expand(ikm: Uint8Array, expected: number, info: Uint8Array, length: number) {
   if (ikm.length !== expected) throw new Error("Invalid key material length");
   return hkdf(sha256, ikm, NO_SALT, info, length);
 }
 /** `R[e]`: signs exactly one message, the recovery packet for epoch `e`. */
-export function recoveryKey(master: Uint8Array, d: Descriptor, epoch: bigint) {
+export function recoveryKey(master: Uint8Array, d: KeyContext, epoch: bigint) {
   return expand(
     master,
     MASTER_BYTES,
@@ -45,7 +50,7 @@ export function recoveryKey(master: Uint8Array, d: Descriptor, epoch: bigint) {
   );
 }
 /** `S[e]`: the only secret an operational signer holds. */
-export function epochSeed(master: Uint8Array, d: Descriptor, epoch: bigint) {
+export function epochSeed(master: Uint8Array, d: KeyContext, epoch: bigint) {
   return expand(
     master,
     MASTER_BYTES,
@@ -56,7 +61,7 @@ export function epochSeed(master: Uint8Array, d: Descriptor, epoch: bigint) {
 /** `K[e][i]`: authorizes at most one announcement. */
 export function operationalKey(
   seed: Uint8Array,
-  d: Descriptor,
+  d: KeyContext,
   epoch: bigint,
   opIndex: bigint,
 ) {

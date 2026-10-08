@@ -4,9 +4,9 @@
 import { PublicKey } from "@solana/web3.js";
 import { sha256 } from "@noble/hashes/sha256";
 import { hex } from "../sdk/bytes";
-import { context, Descriptor, epochSeed } from "../sdk/v3/derive";
+import { context, epochSeed } from "../sdk/v3/derive";
 import {
-  genesisAuthorities,
+  genesisVault,
   operationalRoot,
   recoveryPacket,
   signAnnouncement,
@@ -15,16 +15,20 @@ import { initializeIx, vaultAddress } from "../sdk/v3/protocol";
 export function vectors() {
   const master = new Uint8Array(32).fill(0x42);
   const program = new PublicKey(new Uint8Array(32).fill(11));
-  const d: Descriptor = {
-    chainTag: new Uint8Array(32).fill(9),
-    programId: program.toBytes(),
-    vaultId: new Uint8Array(32).fill(7),
-  };
   const delaySecs = 86_400;
-  const genesis = genesisAuthorities(master, d);
+  const genesis = genesisVault(
+    master,
+    {
+      chainTag: new Uint8Array(32).fill(9),
+      programId: program.toBytes(),
+      salt: new Uint8Array(32).fill(7),
+    },
+    delaySecs,
+  );
+  const { d } = genesis;
   const payer = new PublicKey(new Uint8Array(32).fill(5));
   const init = initializeIx(program, payer, {
-    vaultId: d.vaultId,
+    salt: d.salt,
     chainTag: d.chainTag,
     opRoot: genesis.opRoot,
     recRoot: genesis.recRoot,
@@ -56,6 +60,7 @@ export function vectors() {
     chainTag: hex(d.chainTag),
     program: program.toBase58(),
     programBytes: hex(d.programId),
+    salt: hex(d.salt),
     vaultId: hex(d.vaultId),
     vault: vaultAddress(program, d.vaultId).toBase58(),
     delaySecs,

@@ -14,6 +14,7 @@ import {
 } from "../sdk/v3/derive";
 import {
   genesisAuthorities,
+  genesisVault,
   recoveryPacket,
   signAnnouncement,
 } from "../sdk/v3/authority";
@@ -32,8 +33,10 @@ import {
   pendingPhase,
   recoverIx,
   recoverMessage,
+  spentAddress,
   stageIxs,
   vaultAddress,
+  vaultIdOf,
 } from "../sdk/v3/protocol";
 import { vectors } from "../scripts/v3-vectors";
 
@@ -42,6 +45,7 @@ const program = new PublicKey(fixture.program);
 const d: Descriptor = {
   chainTag: unhex(fixture.chainTag),
   programId: program.toBytes(),
+  salt: unhex(fixture.salt),
   vaultId: unhex(fixture.vaultId),
 };
 const master = unhex(fixture.master);
@@ -67,8 +71,8 @@ describe("Protocol 3 derivation", () => {
     expect(c[12]).toBe(0);
     expect(hex(c.slice(13, 45))).toBe(fixture.chainTag);
     expect(hex(c.slice(45, 77))).toBe(fixture.programBytes);
-    expect(hex(c.slice(77))).toBe(fixture.vaultId);
-    expect(() => context({ ...d, vaultId: new Uint8Array(31) })).toThrow();
+    expect(hex(c.slice(77))).toBe(fixture.salt);
+    expect(() => context({ ...d, salt: new Uint8Array(31) })).toThrow();
   });
   it("separates roles, epochs, indices and vaults", () => {
     const seen = new Set<string>();
@@ -88,7 +92,7 @@ describe("Protocol 3 derivation", () => {
     add(operationalKey(seed1, d, 1n, 0n));
     // Same seed bytes used under the wrong epoch label derive something else.
     add(operationalKey(seed0, d, 1n, 0n));
-    const other = { ...d, vaultId: new Uint8Array(32).fill(8) };
+    const other = { ...d, salt: new Uint8Array(32).fill(8) };
     add(epochSeed(master, other, 0n));
     add(recoveryKey(master, other, 0n));
     const otherChain = { ...d, chainTag: new Uint8Array(32).fill(1) };
@@ -233,22 +237,17 @@ describe("Protocol 3 authorities", () => {
   it("builds instructions with the account order the program expects", () => {
     const g = genesisAuthorities(master, d);
     const vault = vaultAddress(program, d.vaultId);
-    const init = initializeIx(program, payer, {
-      vaultId: d.vaultId,
-      chainTag: d.chainTag,
-      opRoot: g.opRoot,
-      recRoot: g.recRoot,
-      delaySecs: 86_400,
-    });
-    expect([init.data[0], init.data.length, init.keys.length]).toEqual([0, 133, 5]);
+    const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 86_400 };
+    const init = initializeIx(program, payer, genesis);
+    expect([init.data[0], init.data.length, init.keys.length]).toEqual([0, 133, 3]);
     expect(init.keys[1].pubkey.equals(vault)).toBe(true);
-    expect(() =>
-      initializeIx(program, payer, { vaultId: d.vaultId, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 604_801 }),
-    ).toThrow();
+    expect(() => initializeIx(program, payer, { ...genesis, delaySecs: 604_801 })).toThrow();
+    expect(() => initializeIx(program, payer, { ...genesis, recRoot: g.opRoot })).toThrow();
     const stage = stageIxs(program, payer, unhex(fixture.announce.message), unhex(fixture.announce.signature));
     expect(stage.map((s) => s.data.length)).toEqual([1 + 32 + 2 + 600, 1 + 32 + 2 + 488]);
     const announce = announceIx(program, payer, unhex(fixture.announce.payload), g.opRoot);
     expect([announce.data[0], announce.keys.length]).toEqual([2, 6]);
+    expect(announce.keys[3].pubkey.equals(spentAddress(program, vault, g.opRoot))).toBe(true);
     expect(announce.keys.map((k) => k.isWritable)).toEqual([true, false, true, true, false, false]);
     const recover = recoverIx(program, payer, unhex(fixture.recover.payload), g);
     expect([recover.data[0], recover.keys.length]).toEqual([5, 8]);
@@ -257,5 +256,34 @@ describe("Protocol 3 authorities", () => {
     const execute = executeIx(program, vault, pending);
     expect([execute.data.length, execute.keys.length]).toEqual([1, 2]);
     expect(() => executeIx(program, vault, { ...pending, kind: 1 })).toThrow();
+  });
+});
+describe("Protocol 3 vault identity", () => {
+  const g = genesisAuthorities(master, d);
+  const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: fixture.delaySecs as number };
+  it("is the hash of the creation data, and the address follows from it", () => {
+    expect(hex(vaultIdOf(genesis))).toBe(fixture.vaultId);
+    expect(vaultAddress(program, vaultIdOf(genesis)).toBase58()).toBe(fixture.vault);
+    expect(hex(genesisVault(master, d, genesis.delaySecs).d.vaultId)).toBe(fixture.vaultId);
+  });
+  it("changes with every creation parameter", () => {
+    const other = new Uint8Array(32).fill(0xee);
+    const ids = new Set(
+      [
+        genesis,
+        { ...genesis, salt: other },
+        { ...genesis, chainTag: other },
+        { ...genesis, opRoot: other },
+        { ...genesis, recRoot: other },
+        { ...genesis, delaySecs: 0 },
+      ].map((x) => hex(vaultIdOf(x))),
+    );
+    expect(ids.size).toBe(6);
+  });
+  it("scopes spent markers to one vault", () => {
+    const a = vaultAddress(program, vaultIdOf(genesis));
+    const b = vaultAddress(program, vaultIdOf({ ...genesis, delaySecs: 0 }));
+    expect(spentAddress(program, a, g.opRoot).equals(spentAddress(program, b, g.opRoot))).toBe(false);
+    expect(() => spentAddress(program, a, new Uint8Array(32))).toThrow();
   });
 });

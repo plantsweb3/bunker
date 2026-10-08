@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../sdk/bytes";
-import { genesisAuthorities, recoveryPacket } from "../sdk/v3/authority";
-import { descriptorOf } from "../sdk/v3/kit";
+import { genesisVault, recoveryPacket } from "../sdk/v3/authority";
 import { vaultAddress, VaultState } from "../sdk/v3/protocol";
 import {
   parseCreationRequest,
@@ -12,8 +11,15 @@ import {
   recoveryFileStatus,
 } from "../sdk/v3/requests";
 const program = new PublicKey(new Uint8Array(32).fill(11));
-const vaultId = new Uint8Array(32).fill(7);
+const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
+const g = genesisVault(
+  master,
+  { chainTag: new Uint8Array(32).fill(9), programId: program.toBytes(), salt },
+  0,
+);
+const { d } = g;
+const vaultId = d.vaultId;
 const identity = {
   version: 3 as const,
   network: "localnet" as const,
@@ -22,8 +28,6 @@ const identity = {
   vaultId: hex(vaultId),
   vault: vaultAddress(program, vaultId).toBase58(),
 };
-const d = descriptorOf(identity);
-const g = genesisAuthorities(master, d);
 const packet = (epoch: bigint) => {
   const p = recoveryPacket(master, d, epoch);
   return JSON.stringify({ ...identity, kind: "recover", epoch: epoch.toString(), payload: hex(p.payload), signature: hex(p.signature) });
@@ -40,7 +44,7 @@ describe("Public files between the offline tool and the site", () => {
     expect(() => parseNetworkCard("x".repeat(9000))).toThrow("too large");
   });
   it("validates a creation request and carries no secret", () => {
-    const request = { ...identity, kind: "create", delaySecs: 0, opRoot: hex(g.opRoot), recRoot: hex(g.recRoot) };
+    const request = { ...identity, kind: "create", salt: hex(salt), delaySecs: 0, opRoot: hex(g.opRoot), recRoot: hex(g.recRoot) };
     expect(parseCreationRequest(JSON.stringify(request))).toEqual(request);
     expect(JSON.stringify(request)).not.toContain(hex(master));
     expect(JSON.stringify(request)).not.toContain(hex(g.seed));
@@ -48,6 +52,12 @@ describe("Public files between the offline tool and the site", () => {
     expect(bad({ recRoot: hex(g.opRoot) })).toThrow("invalid commitments");
     expect(bad({ opRoot: "0".repeat(64) })).toThrow("invalid commitments");
     expect(bad({ delaySecs: 604_801 })).toThrow();
+    // The address commits to every parameter: changing any one is detected
+    // before anything is sent.
+    expect(bad({ delaySecs: 3600 })).toThrow("does not match its vault address");
+    expect(bad({ recRoot: "ab".repeat(32) })).toThrow("does not match its vault address");
+    expect(bad({ opRoot: "ab".repeat(32) })).toThrow("does not match its vault address");
+    expect(bad({ salt: "ab".repeat(32) })).toThrow("does not match its vault address");
     expect(bad({ vault: vaultAddress(program, new Uint8Array(32).fill(8)).toBase58() })).toThrow("does not match");
     expect(bad({ master: hex(master) })).toThrow("not a Bunker creation request");
   });

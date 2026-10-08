@@ -53,7 +53,7 @@ fn rust_derivation_matches_the_client() {
     context.push(0);
     context.extend(bytes(&f["chainTag"]));
     context.extend(bytes(&f["programBytes"]));
-    context.extend(bytes(&f["vaultId"]));
+    context.extend(bytes(&f["salt"]));
     assert_eq!(context, bytes(&f["context"]));
     assert_eq!(context.len(), 109);
     let seed = |epoch: u64| expand(&master, &info(&context, 2, &[epoch]), 32);
@@ -98,7 +98,10 @@ fn the_compiled_program_accepts_the_client_bytes() {
     let f = fixture();
     let program = Pubkey::from_str(f["program"].as_str().unwrap()).unwrap();
     let vault = Pubkey::from_str(f["vault"].as_str().unwrap()).unwrap();
-    assert_eq!(Pubkey::find_program_address(&[b"bunker3", &arr(&f["vaultId"])], &program).0, vault);
+    // The identity is the hash of the creation data, as the program computes it.
+    let id = hashv(&[b"BUNKER3_VAULT_ID", &bytes(&f["initializeData"])]).to_bytes();
+    assert_eq!(id, arr(&f["vaultId"]));
+    assert_eq!(Pubkey::find_program_address(&[b"bunker3", &id], &program).0, vault);
     let mut svm = LiteSVM::new();
     svm.add_program_from_file(program, concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/bunker3.so"))
         .expect("build bunker3.so first");
@@ -109,7 +112,7 @@ fn the_compiled_program_accepts_the_client_bytes() {
     clock.unix_timestamp = announce_by - 100;
     svm.set_sysvar(&clock);
     let system = Pubkey::default();
-    let marker = |root: &[u8; 32]| Pubkey::find_program_address(&[b"spent-v3", root], &program).0;
+    let marker = |root: &[u8; 32]| Pubkey::find_program_address(&[b"spent-v3", vault.as_ref(), root], &program).0;
     let mut send = |svm: &mut LiteSVM, ixs: Vec<Instruction>| {
         svm.expire_blockhash();
         let budget = Instruction {
@@ -146,8 +149,6 @@ fn the_compiled_program_accepts_the_client_bytes() {
             AccountMeta::new(payer.pubkey(), true),
             AccountMeta::new(vault, false),
             AccountMeta::new_readonly(system, false),
-            AccountMeta::new_readonly(marker(&op0), false),
-            AccountMeta::new_readonly(marker(&rec0), false),
         ],
         data: [vec![0u8], bytes(&f["initializeData"])].concat(),
     }])
