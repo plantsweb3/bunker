@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- No connection of any kind is permitted. The script is pinned by hash. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '__SCRIPT_HASH__'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
+<title>Bunker recovery tool (offline)</title>
+<style>
+:root{color-scheme:dark;--bg:#0a0a0a;--fg:#f5f7f6;--mist:#9ca3af;--ice:#7dd3c7;--line:#2a3235}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Arial,sans-serif}
+main{max-width:680px;margin:0 auto;padding:40px 20px 80px}
+.mono,code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+.eyebrow{font:12px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.15em;color:var(--ice)}
+h1{font-size:40px;line-height:1.1;letter-spacing:-.04em;font-weight:500;margin:14px 0 10px}
+h2{font-size:22px;letter-spacing:-.02em;font-weight:500;margin:0 0 6px}
+p{color:#a4aeb0;margin:0 0 14px}
+.warn,.note{padding:14px 16px;border-radius:6px;font-size:14px;margin:18px 0}
+.warn{border:1px solid #865c4e;background:#38262077;color:#f0c4b7}
+.note{border:1px solid #564a32;background:#332b1c55;color:#d0c1a2}
+nav{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:26px 0 22px}
+nav button{flex:1;padding:13px 8px;border:0;border-bottom:2px solid transparent;background:none;color:#93a3a8;font:inherit;font-size:14px;cursor:pointer}
+nav button[aria-selected=true]{color:#fff;border-bottom-color:var(--ice)}
+section{display:grid;gap:16px}
+label{display:grid;gap:7px;font-size:14px;color:#c3ccce}
+input[type=password],input[type=text],select{padding:12px 14px;border:1px solid #333e42;border-radius:5px;background:#0c1214;color:var(--fg);font:inherit}
+input[type=file]{font-size:14px;color:#c3ccce}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;color:#adbec3}
+.check input{margin-top:4px}
+.box{display:grid;gap:14px;padding:16px 18px;border:1px dashed #35454b;border-radius:6px}
+button.go{min-height:48px;padding:13px 22px;border:1px solid #e7efec;border-radius:4px;background:#e7efec;color:#11191b;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+button.ghost{min-height:48px;padding:13px 22px;border:1px solid #3e484b;border-radius:4px;background:#151a1c;color:#e4e9e6;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.status{font-size:14px;min-height:22px;color:#93a3a8}
+.status.ok{color:#bfe6d9}.status.bad{color:#f0c4b7}
+code{font-size:13px;color:#d4e9eb;overflow-wrap:anywhere}
+small{color:#839497;font-size:12px}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">BUNKER · OFFLINE · TEST NETWORKS ONLY</div>
+<h1>Recovery tool.</h1>
+<p>This file is the only place your recovery kit is ever opened. It cannot connect to anything: it reads files you give it and saves files you carry back to the website.</p>
+<div class="warn" id="online"><strong>This device is online.</strong> The tool will not send anything, but for a real Bunker you would open it on a device that is disconnected, or never connects.</div>
+<div class="note">Draft protocol, not reviewed. Do not use with real funds.</div>
+<nav role="tablist">
+<button id="tab-build" role="tab" aria-selected="true">Build a new Bunker</button>
+<button id="tab-recover" role="tab" aria-selected="false">Recover or cancel</button>
+</nav>
+<section id="panel-build">
+<h2>One kit, kept for good.</h2>
+<p>The recovery kit is created once and never changes. Whoever holds it and its password controls the Bunker.</p>
+<label>Network card (downloaded from the website)<input id="card" type="file" accept=".json,application/json"></label>
+<label>Recovery password<input id="password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<div class="box">
+<label class="check"><input id="wait" type="checkbox"><span><strong>Add a waiting period</strong> (optional). Off by default: withdrawals leave as soon as you approve them.</span></label>
+<div id="wait-fields" hidden>
+<label>Every withdrawal waits this long before it leaves
+<select id="delay"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option></select></label>
+<label class="check" style="margin-top:14px"><input id="wait-ack" type="checkbox"><span>I understand that every withdrawal from this Bunker will take <span id="delay-echo">24 hours</span> to arrive, with no way to speed one up, and that this cannot be shortened or turned off for this Bunker later. I am choosing it so I have time to cancel a withdrawal I did not make.</span></label>
+</div>
+<small>What it is for: without one, anyone who gets your day key and its password can withdraw immediately. With one, you get that long to cancel with this kit.</small>
+</div>
+<label class="check"><input id="kit-ack" type="checkbox"><span>I will keep the recovery kit off my everyday device, and I understand that losing both it and its password cannot be undone. Test assets only.</span></label>
+<div class="row"><button class="go" id="create">Create recovery kit</button></div>
+<div id="verify-step" hidden>
+<label>Re-open the saved recovery kit to prove it is saved<input id="verify" type="file" accept=".json,application/json"></label>
+</div>
+<div class="status" id="build-status" role="status"></div>
+<div id="built" hidden>
+<p>Bunker address: <code id="built-address"></code></p>
+<p>Three files were saved. <strong>Recovery kit</strong>: keep it here, away from your everyday device. <strong>Day key</strong>: what you open your Bunker with. <strong>Creation request</strong>: public, upload it on the website to build the Bunker.</p>
+</div>
+</section>
+<section id="panel-recover" hidden>
+<h2>Install new keys.</h2>
+<p>A recovery packet replaces every key, kills every earlier day key and cancels a withdrawal that is still waiting. It never moves assets. Making the same packet twice gives the same file, so it is safe to repeat.</p>
+<label>Recovery kit<input id="kit" type="file" accept=".json,application/json"></label>
+<label>Recovery password<input id="kit-password" type="password" autocomplete="off" placeholder="At least 12 characters"></label>
+<label>Current key generation (shown on your Bunker page)<input id="epoch" type="text" inputmode="numeric" placeholder="0"></label>
+<div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key</button></div>
+<div class="status" id="recover-status" role="status"></div>
+</section>
+</main>
+<script>__SCRIPT__</script>
+</body>
+</html>

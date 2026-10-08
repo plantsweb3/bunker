@@ -6,7 +6,7 @@ The frontend uses React/TypeScript and Next.js App Router on Vercel. Eleven rout
 
 `/api/verify` reads executable and upgrade-authority state only for the configured test program. Source equivalence and audit status always remain unverified until actual external evidence is supplied.
 
-`/vault` now renders one of two apps. A test configuration for protocol 2 gets the protocol 2 app described below. The read-only public site and a protocol 3 test configuration (`BUNKER_TEST_PROTOCOL=3`) get the draft protocol 3 app in `components/bunker/v3`, with `/recovery` as its recovery tool. On the public site both are locked: the configuration reports custody disabled and no code path can submit a transaction. See `docs/PROTOCOL-3-DRAFT.md` for what the draft does and does not implement.
+`/vault` now renders one of two apps. A test configuration for protocol 2 gets the protocol 2 app described below. The read-only public site and a protocol 3 test configuration (`BUNKER_TEST_PROTOCOL=3`) get the draft protocol 3 app in `components/bunker/v3`, with `/recovery` as the page that submits public files produced by the offline recovery tool. That tool is a separate single HTML file built from `tools/recovery` into `public/source/bunker-recovery-tool.html` at build time alongside the source archive, with its SHA-256 in `recovery-tool-manifest.json`; it is the only code that handles the archival master and its page policy forbids all connections. On the public site both are locked: the configuration reports custody disabled and no code path can submit a transaction. See `docs/PROTOCOL-3-DRAFT.md` for what the draft does and does not implement.
 
 ## On-chain surface
 
