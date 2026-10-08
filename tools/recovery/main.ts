@@ -45,6 +45,7 @@ function dayKey(kit: ArchivalKit, epoch: bigint): DayKey {
     genesis: kit.genesis,
     program: kit.program,
     salt: kit.salt,
+    trusted: kit.trusted,
     vaultId: kit.vaultId,
     vault: kit.vault,
     delaySecs: kit.delaySecs,
@@ -112,14 +113,43 @@ $("card").addEventListener("change", () => {
 
 // ── Build ────────────────────────────────────────────────────────────────
 let draft: { kit: ArchivalKit; encrypted: string } | null = null;
-$("wait").addEventListener("change", () => {
-  $("wait-fields").hidden = !checked("wait");
-  $<HTMLInputElement>("wait-ack").checked = false;
-});
-$("delay").addEventListener("change", () => {
-  $<HTMLInputElement>("wait-ack").checked = false;
-  $("delay-echo").textContent = $<HTMLSelectElement>("delay").selectedOptions[0].text;
-});
+/** The trusted addresses as typed, in order, each checked to be an address. */
+function trustedAddresses(): string[] {
+  const typed = [1, 2, 3, 4].map((n) => value(`trusted-${n}`).trim()).filter(Boolean);
+  typed.forEach((a, i) => {
+    try {
+      address(a);
+    } catch {
+      throw new Error(`Trusted address ${i + 1} is not a Solana address`);
+    }
+    if (typed.indexOf(a) !== i) throw new Error("A trusted address is listed twice");
+  });
+  return typed;
+}
+/** Says in one sentence what the chosen settings mean, for the user to accept. */
+function policyText(): string {
+  let trusted: string[];
+  try {
+    trusted = trustedAddresses();
+  } catch (e) {
+    return e instanceof Error ? e.message : "Check the trusted addresses";
+  }
+  const wait = Number(value("delay"));
+  const period = $<HTMLSelectElement>("delay").selectedOptions[0].text.toLowerCase();
+  const fixed = " None of this can be changed for this Bunker later.";
+  if (wait === 0)
+    return `I understand that this Bunker has no waiting period: anyone who gets my day key and its password can send everything anywhere, at once, and I will have no chance to cancel.${fixed}`;
+  if (trusted.length === 0)
+    return `I understand that every withdrawal from this Bunker will take ${period} to arrive, with no way to speed one up, because I have listed no trusted address.${fixed}`;
+  return `I understand that withdrawals to my ${trusted.length === 1 ? "trusted address arrive" : `${trusted.length} trusted addresses arrive`} at once, that withdrawals to any other address take ${period}, and that I have checked every character of ${trusted.length === 1 ? "that address" : "those addresses"}.${fixed}`;
+}
+function refreshPolicy() {
+  $("policy-text").textContent = policyText();
+  $<HTMLInputElement>("policy-ack").checked = false;
+}
+for (const id of ["trusted-1", "trusted-2", "trusted-3", "trusted-4", "delay"])
+  $(id).addEventListener("input", refreshPolicy);
+refreshPolicy();
 $("create").addEventListener(
   "click",
   run("build-status", async () => {
@@ -134,12 +164,13 @@ $("create").addEventListener(
     if (!checked("card-ack"))
       throw new Error("Confirm the network and program match the website");
     if (!checked("kit-ack")) throw new Error("Acknowledge what the recovery kit is");
-    if (checked("wait") && !checked("wait-ack"))
-      throw new Error("Acknowledge the waiting period, or turn it off");
+    const trusted = trustedAddresses();
+    if (!checked("policy-ack"))
+      throw new Error("Read and tick the statement about where this Bunker may send");
     const program = address(card.program);
     const salt = crypto.getRandomValues(new Uint8Array(32));
     const master = crypto.getRandomValues(new Uint8Array(32));
-    const delaySecs = checked("wait") ? Number(value("delay")) : 0;
+    const delaySecs = Number(value("delay"));
     // The address is a hash of the keys and the waiting period, so nobody
     // else can create this Bunker with different ones.
     const { d } = genesisVault(master, {
@@ -147,6 +178,7 @@ $("create").addEventListener(
       programId: program,
       salt,
       delaySecs,
+      trusted: trusted.map(address),
     });
     const kit = validateArchival({
       version: 3,
@@ -155,6 +187,7 @@ $("create").addEventListener(
       genesis: card.genesis,
       program: card.program,
       salt: hex(salt),
+      trusted,
       vaultId: hex(d.vaultId),
       vault: base58(vaultAddressBytes(program, d.vaultId)),
       delaySecs,
@@ -188,6 +221,7 @@ $("verify").addEventListener(
       genesis: kit.genesis,
       program: kit.program,
       salt: kit.salt,
+      trusted: kit.trusted,
       vaultId: kit.vaultId,
       vault: kit.vault,
       delaySecs: kit.delaySecs,

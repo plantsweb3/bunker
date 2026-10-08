@@ -70,13 +70,16 @@ small{color:#839497;font-size:12px}
 <label>Confirm day key password<input id="day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <small>The day key password is the one you type on the Bunker website to open your Bunker.</small>
 <div class="box">
-<label class="check"><input id="wait" type="checkbox"><span><strong>Add a waiting period</strong> (optional). Off by default: withdrawals leave as soon as you approve them.</span></label>
-<div id="wait-fields" hidden>
-<label>Every withdrawal waits this long before it leaves
-<select id="delay"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option></select></label>
-<label class="check" style="margin-top:14px"><input id="wait-ack" type="checkbox"><span>I understand that every withdrawal from this Bunker will take <span id="delay-echo">24 hours</span> to arrive, with no way to speed one up, and that this cannot be shortened or turned off for this Bunker later. I am choosing it so I have time to cancel a withdrawal I did not make.</span></label>
-</div>
-<small>What it is for: without one, anyone who gets your day key and its password can withdraw immediately. With one, you get that long to cancel with this kit.</small>
+<strong>Where your Bunker may send, and how fast.</strong>
+<small>Trusted addresses receive withdrawals at once. Everything else waits, and while it waits you can cancel it with this recovery kit. That wait is the only thing that stops someone who steals your day key.</small>
+<label>Trusted address 1 (optional)<input id="trusted-1" type="text" autocomplete="off" spellcheck="false" placeholder="A wallet you control"></label>
+<label>Trusted address 2 (optional)<input id="trusted-2" type="text" autocomplete="off" spellcheck="false"></label>
+<label>Trusted address 3 (optional)<input id="trusted-3" type="text" autocomplete="off" spellcheck="false"></label>
+<label>Trusted address 4 (optional)<input id="trusted-4" type="text" autocomplete="off" spellcheck="false"></label>
+<small>Choose wallets a thief on your everyday computer could not also empty: a hardware wallet, or your own deposit address at an exchange. Not the wallet you connect to websites. Check every character; these cannot be changed for this Bunker.</small>
+<label>Withdrawals to any other address wait
+<select id="delay"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option><option value="0">Not at all (no protection if your day key is stolen)</option></select></label>
+<label class="check" style="margin-top:6px"><input id="policy-ack" type="checkbox"><span id="policy-text"></span></label>
 </div>
 <label class="check"><input id="kit-ack" type="checkbox"><span>I will keep the recovery kit off my everyday device, and I understand that losing both it and its password cannot be undone. Test assets only.</span></label>
 <div class="row"><button class="go" id="create">Create recovery kit</button></div>

@@ -115,7 +115,7 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     return find;
   };
   /** Builds a Bunker: kit and keys offline, creation request submitted on the site. */
-  const build = async (wait: boolean) => {
+  const build = async (wait: boolean, trusted: string[] = []) => {
     await page.goto(`${origin}/recovery`);
     await connect(page);
     const card = await save(
@@ -137,15 +137,26 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await expect(tool.locator("#build-status")).toContainText("different password");
     await tool.locator("#day-password").fill(dayPassword);
     await tool.locator("#day-repeat").fill(dayPassword);
-    // The waiting period is off unless turned on AND acknowledged.
-    await expect(tool.locator("#wait")).not.toBeChecked();
-    if (wait) {
-      await tool.locator("#wait").check();
-      await expect(tool.locator("#delay")).toHaveValue("86400");
-      await tool.locator("#create").click();
-      await expect(tool.locator("#build-status")).toContainText("Acknowledge the waiting period");
-      await tool.locator("#wait-ack").check();
-    }
+    // The tool starts on a 24-hour wait for untrusted addresses, and nothing
+    // is created until the statement describing the choice is accepted.
+    await expect(tool.locator("#delay")).toHaveValue("86400");
+    for (const [i, address] of trusted.entries()) await tool.locator(`#trusted-${i + 1}`).fill(address);
+    if (!wait) await tool.locator("#delay").selectOption("0");
+    await expect(tool.locator("#policy-text")).toContainText(
+      !wait
+        ? "no waiting period"
+        : trusted.length
+          ? "trusted address"
+          : "every withdrawal from this Bunker will take 24 hours",
+    );
+    await tool.locator("#create").click();
+    await expect(tool.locator("#build-status")).toContainText("Read and tick the statement");
+    await tool.locator("#policy-ack").check();
+    // Changing the choice afterwards clears the acceptance.
+    await tool.locator("#delay").selectOption("3600");
+    await expect(tool.locator("#policy-ack")).not.toBeChecked();
+    await tool.locator("#delay").selectOption(wait ? "86400" : "0");
+    await tool.locator("#policy-ack").check();
     const kit = (await toolSaves(() => tool.locator("#create").click(), 1))("RECOVERY-KIT");
     const made = await toolSaves(() => tool.locator("#verify").setInputFiles(kit), 2);
     await expect(tool.locator("#build-status")).toContainText("Verified.");
@@ -158,8 +169,12 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await page.bringToFront();
     await page.getByLabel("Creation request", { exact: true }).setInputFiles(request);
     await expect(
-      page.getByText(wait ? "on every withdrawal" : "None. Withdrawals leave", { exact: false }),
+      page.getByText(
+        !wait ? "None. Withdrawals leave" : trusted.length ? "to any other address" : "on every withdrawal",
+        { exact: false },
+      ),
     ).toBeVisible();
+    for (const address of trusted) await expect(page.getByText(address, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Build Bunker on test network" }).click();
     await expect(page.getByText("Bunker built.", { exact: false })).toBeVisible({ timeout: 25000 });
     const vault = await page.locator(".vault-address code").innerText();
@@ -278,6 +293,71 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   await expect(page.getByText("Bunker sealed.", { exact: false })).toBeVisible();
   await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
   expect(toolRequests, "the offline tool made no network request").toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test("trusted addresses: instant to them, a cancellable wait to anyone else", async ({ page }, info) => {
+  test.setTimeout(150000);
+  const { c, recipient, errors, payer, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  const mint = await createMint(c, payer, payer.publicKey, null, 6);
+  const walletToken = await getOrCreateAssociatedTokenAccount(c, payer, mint, payer.publicKey);
+  await mintTo(c, payer, mint, walletToken.address, payer, 500_000_000);
+  // A Bunker with a 24-hour wait and one trusted address.
+  const trusted = recipient.publicKey;
+  const { day0, vault } = await build(true, [trusted.toBase58()]);
+  const built = await vaultState(vault);
+  expect([built.delaySecs, built.trusted.map((t) => t.toBase58())]).toEqual([86_400, [trusted.toBase58()]]);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("except to trusted addresses", { exact: false })).toBeVisible();
+  await deposit("2");
+  // SOL to the trusted address, picked from the list: no wait.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.5");
+  await page.locator(".trusted-picks button").first().click();
+  await expect(page.getByLabel("Recipient wallet address")).toHaveValue(trusted.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText("one of your Bunker’s trusted addresses", { exact: false })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(trusted)).toBe(500_000_000);
+  expect((await vaultState(vault)).pending).toBeNull();
+  // A token to the trusted address: the program has to find the wallet's
+  // real associated token account for this to be instant.
+  await page.getByRole("button", { name: "Deposit", exact: true }).click();
+  await page.getByLabel("Asset").selectOption({ index: 1 });
+  await page.getByLabel("Amount", { exact: true }).fill("300");
+  await page.getByRole("button", { name: "Review deposit in wallet" }).click();
+  await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Asset").selectOption(mint.toBase58());
+  await page.getByLabel("Amount", { exact: true }).fill("120");
+  await page.getByLabel("Recipient wallet address").fill(trusted.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText("one of your Bunker’s trusted addresses", { exact: false })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  const trustedToken = await getOrCreateAssociatedTokenAccount(c, payer, mint, trusted);
+  expect((await getAccount(c, trustedToken.address)).amount).toBe(120_000_000n);
+  // Anyone else: the same day key can only announce, and it waits.
+  const stranger = Keypair.generate().publicKey;
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Asset").selectOption("SOL");
+  await page.getByLabel("Amount", { exact: true }).fill("1");
+  await page.getByLabel("Recipient wallet address").fill(stranger.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText("It can leave after", { exact: false })).toBeVisible();
+  await expect(page.getByText("your recovery kit can cancel it", { exact: false })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and announce" }).click();
+  await expect(page.getByText("Withdrawal announced.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(stranger)).toBe(0);
+  const waiting = await vaultState(vault);
+  expect(waiting.pending?.destination.toBase58()).toBe(stranger.toBase58());
+  expect(waiting.pending!.opensAt - BigInt(Math.floor(Date.now() / 1000))).toBeGreaterThan(86_000n);
+  await expect(page.getByText("LEAVES IN", { exact: true })).toBeVisible();
   expect(errors).toEqual([]);
 });
 

@@ -50,10 +50,13 @@ export default function Page() {
             withdraw from the vault.
           </li>
           <li>
-            <strong>Your day key.</strong> Can announce withdrawals. If it is
-            stolen and your Bunker has no waiting period, the thief can
-            withdraw immediately. If it has one, you have that long to cancel
-            with your recovery kit.
+            <strong>Your day key.</strong> Can announce withdrawals. A Bunker
+            is built with up to four trusted addresses and a waiting period
+            for everything else. If the day key is stolen, the thief can send
+            at once only to those trusted addresses, which are yours; a
+            withdrawal to any other address waits, and you have that long to
+            cancel it with your recovery kit. If you chose no waiting period,
+            the thief can withdraw anywhere immediately.
           </li>
           <li>
             <strong>Your recovery kit.</strong> Can replace every key. Whoever
@@ -94,8 +97,11 @@ export default function Page() {
           </li>
           <li>
             <strong>A stolen day key with no waiting period.</strong> The
-            waiting period is optional and off by default. Without it there is
-            no time to react.
+            offline tool starts on a 24-hour wait for any address you have not
+            listed as trusted, and lets you turn the wait off. Without it
+            there is no time to react. A trusted address is only as safe as
+            the wallet behind it: list a hardware wallet or an exchange
+            deposit address, not the wallet you connect to websites.
           </li>
           <li>
             <strong>Loss of the recovery kit or its password.</strong> There is

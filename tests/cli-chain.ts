@@ -47,19 +47,20 @@ const rejects = async (fn: () => Promise<unknown>, needle: string, what: string)
   }
   throw new Error(`FAILED: ${what}: expected a refusal`);
 };
-async function build(delaySecs: number) {
+async function build(delaySecs: number, trusted: PublicKey[] = []) {
   const master = crypto.getRandomValues(new Uint8Array(32));
   const g = genesisVault(master, {
     chainTag: new PublicKey(genesis).toBytes(),
     programId: PROGRAM.toBytes(),
     salt: crypto.getRandomValues(new Uint8Array(32)),
     delaySecs,
+    trusted: trusted.map((t) => t.toBytes()),
   });
   const vault = vaultAddress(PROGRAM, g.d.vaultId);
   await sendAndConfirmTransaction(
     c,
     new Transaction().add(
-      initializeIx(PROGRAM, payer.publicKey, { salt: g.d.salt, chainTag: g.d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }),
+      initializeIx(PROGRAM, payer.publicKey, { trusted: g.d.trusted, salt: g.d.salt, chainTag: g.d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }),
       SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: vault, lamports: 3_000_000_000 }),
     ),
     [payer],
@@ -73,6 +74,7 @@ async function build(delaySecs: number) {
     vaultId: hex(g.d.vaultId),
     vault: vault.toBase58(),
     delaySecs,
+    trusted: trusted.map((t) => t.toBase58()),
   };
   const dayKey = (epoch: bigint): DayKey => ({ ...base, kind: "day-key", epoch: epoch.toString(), seed: hex(epochSeed(master, g.d, epoch)) });
   const save = async (epoch: bigint) => {
@@ -134,6 +136,22 @@ try {
   const pathB1 = await b.save(1n);
   const dayB1 = await openDayKey(pathB1, password);
   check((await withdraw(sB, dayB1, pathB1, await review(sB, dayB1, { to: to.toBase58(), amount: "0.1" }))).startsWith("Announced."), "new day key announces");
+
+  // ── Trusted addresses: at once to them, a wait to anyone else ────────────
+  const safe = Keypair.generate().publicKey;
+  const t = await build(86_400, [safe]);
+  const pathT = await t.save(0n);
+  const dayT = await openDayKey(pathT, password);
+  const sT = sessionFor(dayT, RPC, payer, quiet);
+  check(describe(t.vault.toBase58(), await readBunker(sT, t.vault)).some((l) => l.includes(`Trusted address (no wait): ${safe.toBase58()}`)), "status lists trusted addresses");
+  const toSafe = await review(sT, dayT, { to: safe.toBase58(), amount: "1" });
+  check(toSafe.lines.some((l) => l.includes("trusted address: it leaves immediately")), "review says a trusted address does not wait");
+  check((await withdraw(sT, dayT, pathT, toSafe)).startsWith("Sent."), "trusted address is paid at once on a waiting Bunker");
+  check((await c.getBalance(safe)) === 1_000_000_000, "trusted address received it");
+  const toOther = await review(sT, dayT, { to: thief.toBase58(), amount: "1" });
+  check(toOther.lines.some((l) => l.includes("after 86400 seconds of waiting")), "review says anyone else waits");
+  check((await withdraw(sT, dayT, pathT, toOther)).startsWith("Announced."), "anyone else only gets an announcement");
+  check((await c.getBalance(thief)) === 0, "nothing moved to the untrusted address");
 
   // ── The program a user actually runs, with its prompts ───────────────────
   const feeWallet = join(dir, "fee-wallet.json");

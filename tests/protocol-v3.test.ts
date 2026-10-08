@@ -47,6 +47,7 @@ const d: Descriptor = {
   programId: program.toBytes(),
   salt: unhex(fixture.salt),
   delaySecs: fixture.delaySecs,
+  trusted: (fixture.trusted as string[]).map((t) => unhex(t)),
   vaultId: unhex(fixture.vaultId),
 };
 const master = unhex(fixture.master);
@@ -67,13 +68,16 @@ describe("Protocol 3 derivation", () => {
   });
   it("builds the 109-byte context in the specified order", () => {
     const c = context(d);
-    expect(c.length).toBe(113);
+    expect(c.length).toBe(241);
     expect(new TextDecoder().decode(c.slice(0, 12))).toBe("BUNKER-KDF-3");
     expect(c[12]).toBe(0);
     expect(hex(c.slice(13, 45))).toBe(fixture.chainTag);
     expect(hex(c.slice(45, 77))).toBe(fixture.programBytes);
     expect(hex(c.slice(77, 109))).toBe(fixture.salt);
     expect(new DataView(c.buffer, c.byteOffset).getUint32(109, true)).toBe(fixture.delaySecs);
+    // Four 32-byte slots: the trusted wallets first, the rest zero.
+    expect(hex(c.slice(113, 145))).toBe(fixture.trusted[0]);
+    expect(c.slice(145).every((b) => b === 0)).toBe(true);
     expect(() => context({ ...d, salt: new Uint8Array(31) })).toThrow();
   });
   it("separates roles, epochs, indices and vaults", () => {
@@ -104,6 +108,10 @@ describe("Protocol 3 derivation", () => {
     const otherDelay = { ...d, delaySecs: 0 };
     add(recoveryKey(master, otherDelay, 0n));
     add(epochSeed(master, otherDelay, 0n));
+    // And so is the same vault with another trusted list.
+    const otherTrusted = { ...d, trusted: [new Uint8Array(32).fill(0xaa)] };
+    add(recoveryKey(master, otherTrusted, 0n));
+    add(epochSeed(master, otherTrusted, 0n));
     expect(recoveryKey(master, d, 0n).length).toBe(1088);
     expect(seed0.length).toBe(32);
   });
@@ -256,9 +264,9 @@ describe("Protocol 3 authorities", () => {
   it("builds instructions with the account order the program expects", () => {
     const g = genesisAuthorities(master, d);
     const vault = vaultAddress(program, d.vaultId);
-    const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 86_400 };
+    const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: 86_400, trusted: d.trusted };
     const init = initializeIx(program, payer, genesis);
-    expect([init.data[0], init.data.length, init.keys.length]).toEqual([0, 133, 3]);
+    expect([init.data[0], init.data.length, init.keys.length]).toEqual([0, 261, 3]);
     expect(init.keys[1].pubkey.equals(vault)).toBe(true);
     expect(() => initializeIx(program, payer, { ...genesis, delaySecs: 604_801 })).toThrow();
     expect(() => initializeIx(program, payer, { ...genesis, recRoot: g.opRoot })).toThrow();
@@ -279,7 +287,7 @@ describe("Protocol 3 authorities", () => {
 });
 describe("Protocol 3 vault identity", () => {
   const g = genesisAuthorities(master, d);
-  const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: fixture.delaySecs as number };
+  const genesis = { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs: fixture.delaySecs as number, trusted: d.trusted };
   it("is the hash of the creation data, and the address follows from it", () => {
     expect(hex(vaultIdOf(genesis))).toBe(fixture.vaultId);
     expect(vaultAddress(program, vaultIdOf(genesis)).toBase58()).toBe(fixture.vault);
@@ -295,9 +303,20 @@ describe("Protocol 3 vault identity", () => {
         { ...genesis, opRoot: other },
         { ...genesis, recRoot: other },
         { ...genesis, delaySecs: 0 },
+        { ...genesis, trusted: [] },
+        { ...genesis, trusted: [other] },
+        { ...genesis, trusted: [...genesis.trusted, other] },
+        // The same two wallets in the other order are a different vault.
+        { ...genesis, trusted: [other, ...genesis.trusted] },
       ].map((x) => hex(vaultIdOf(x))),
     );
-    expect(ids.size).toBe(6);
+    expect(ids.size).toBe(10);
+    // The list is at most four distinct, non-zero wallets.
+    const w = (n: number) => new Uint8Array(32).fill(n);
+    expect(() => vaultIdOf({ ...genesis, trusted: [w(1), w(2), w(3), w(4), w(5)] })).toThrow("At most 4");
+    expect(() => vaultIdOf({ ...genesis, trusted: [w(1), w(1)] })).toThrow("listed twice");
+    expect(() => vaultIdOf({ ...genesis, trusted: [new Uint8Array(32)] })).toThrow("Invalid trusted address");
+    expect(() => vaultIdOf({ ...genesis, trusted: [new Uint8Array(31)] })).toThrow();
   });
   it("scopes spent markers to one vault", () => {
     const a = vaultAddress(program, vaultIdOf(genesis));

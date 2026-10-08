@@ -25,7 +25,7 @@ const program = new PublicKey(new Uint8Array(32).fill(11));
 const genesis = new PublicKey(new Uint8Array(32).fill(9)).toBase58();
 const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
-const g = genesisVault(master, { chainTag: new PublicKey(genesis).toBytes(), programId: program.toBytes(), salt, delaySecs: 86_400 });
+const g = genesisVault(master, { chainTag: new PublicKey(genesis).toBytes(), programId: program.toBytes(), salt, delaySecs: 86_400 , trusted: []});
 const { d } = g;
 const vaultId = d.vaultId;
 const identity = {
@@ -38,6 +38,7 @@ const base = {
   network: "localnet" as const,
   ...identity,
   salt: hex(salt),
+  trusted: [] as string[],
   vaultId: hex(vaultId),
 };
 const chain = (over: Partial<VaultState> = {}): VaultState => ({
@@ -50,6 +51,7 @@ const chain = (over: Partial<VaultState> = {}): VaultState => ({
   delaySecs: 86_400,
   pending: null,
   bump: 255,
+  trusted: [],
   ...over,
 });
 const withdrawal = {

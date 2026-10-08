@@ -57,8 +57,9 @@ export default function Page() {
           <li>
             <strong>Getting money back out is deliberate.</strong> A
             withdrawal needs your Bunker key, never the trading wallet’s. The
-            protocol also lets you add an optional waiting
-            period, off by default, for holdings you want time to defend. A
+            protocol sends at once to addresses you listed as trusted when
+            you built the Bunker, and makes anything else wait so you have
+            time to cancel it. A
             Bunker is for what you are holding, not for what you need in the
             next trade.
           </li>

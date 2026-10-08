@@ -21,13 +21,13 @@ Fixed points: the vendored Winterwallet verifier at revision `672fc6789b1532ee68
 
 ### 1.1 Derivation
 
-HKDF-SHA256 (RFC 5869) with an empty HKDF salt. All integers are unsigned little endian. `ctx` is a fixed 113-byte prefix:
+HKDF-SHA256 (RFC 5869) with an empty HKDF salt. All integers are unsigned little endian. `ctx` is a fixed 241-byte prefix:
 
 ```
-ctx = "BUNKER-KDF-3" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32) || delay_secs (4)   // 113 bytes
+ctx = "BUNKER-KDF-3" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32) || delay_secs (4) || trusted (4 x 32)   // 241 bytes
 ```
 
-`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them. `delay_secs` is included so that the context holds every input of the vault identity other than the roots: a given recovery key can then only ever sign for one vault. The label `BUNKER-KDF-3` also fixes the message formats in §3; a change to either format needs a new label, so that an existing recovery key is never asked to sign a second encoding.
+`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them. `delay_secs` and the trusted list (§2.1) are included so that the context holds every input of the vault identity other than the roots: a given recovery key can then only ever sign for one vault. The label `BUNKER-KDF-3` also fixes the message formats in §3; a change to either format needs a new label, so that an existing recovery key is never asked to sign a second encoding.
 
 | Output | IKM | info | Length |
 |---|---|---|---|
@@ -40,14 +40,14 @@ The role byte makes the three derivations disjoint. 1,088 bytes is within HKDF-S
 ### 1.2 Vault identity
 
 ```
-vault_id = SHA-256( "BUNKER3_VAULT_ID" (16) || salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4) )
+vault_id = SHA-256( "BUNKER3_VAULT_ID" (16) || salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4) || trusted (4 x 32) )
 ```
 
-The preimage after the domain is exactly the data of `initialize` (§4.0). The program computes `vault_id` itself and derives the vault address from it, so **a vault address commits to every parameter the vault is created with**. Whoever sends `initialize` for an address, and in whatever order, the only vault that can exist there is the one with those roots, that chain tag and that waiting period. A client that derives the address from its own recovery kit therefore needs no trust in who created the account or in what an RPC node reports about how it was created.
+The preimage after the domain is exactly the data of `initialize` (§4.0). The program computes `vault_id` itself and derives the vault address from it, so **a vault address commits to every parameter the vault is created with**. Whoever sends `initialize` for an address, and in whatever order, the only vault that can exist there is the one with those roots, that chain tag, that waiting period and those trusted destinations. A client that derives the address from its own recovery kit therefore needs no trust in who created the account or in what an RPC node reports about how it was created.
 
 ## 2. Accounts
 
-### 2.1 Vault — 287 bytes, PDA `["bunker3", vault_id]`
+### 2.1 Vault — 415 bytes, PDA `["bunker3", vault_id]`
 
 | Offset | Bytes | Field |
 |---|---:|---|
@@ -69,6 +69,7 @@ The preimage after the domain is exactly the data of `initialize` (§4.0). The p
 | 246 | 8 | pending `epoch` at announcement |
 | 254 | 32 | pending `digest`, SHA-256 of the announced message |
 | 286 | 1 | PDA bump |
+| 287 | 128 | `trusted`: four 32-byte wallet addresses, immutable. Unused slots are zero and come last; no wallet appears twice |
 
 When `pending` is 0, bytes 157..286 must be zero. The vault is never closed. At most one pending record exists.
 
@@ -148,9 +149,9 @@ Opcode is the first byte of instruction data. Any account count, data length, ve
 
 In `announce` and `recover` the payer signs only to fund the spent markers. It has no authority over the vault.
 
-### 4.0 `initialize` — data: `salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4)`
+### 4.0 `initialize` — data: `salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4) || trusted (4 x 32)`
 
-Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, and the vault account to be the address derived from `vault_id = SHA-256("BUNKER3_VAULT_ID" || data)` (§1.2). Creates the vault with that `vault_id`, `op_index = 0`, `epoch = 0`, `pending = 0`. The salt is not stored. A prefunded address must not block creation, no wallet key gains any authority over the vault, and a second `initialize` for an existing vault fails. Because the address fixes the data, creation is safe to race: a stranger who sends the same data first has created the owner's vault, and one who sends different data has created a vault at a different address.
+Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, the trusted list in canonical form (used slots first, unused slots zero, no duplicates), and the vault account to be the address derived from `vault_id = SHA-256("BUNKER3_VAULT_ID" || data)` (§1.2). Creates the vault with that `vault_id`, `op_index = 0`, `epoch = 0`, `pending = 0`. The salt is not stored. A prefunded address must not block creation, no wallet key gains any authority over the vault, and a second `initialize` for an existing vault fails. Because the address fixes the data, creation is safe to race: a stranger who sends the same data first has created the owner's vault, and one who sends different data has created a vault at a different address.
 
 ### 4.1 `stage` — data: `digest (32) || offset (2) || chunk (1..600)`
 
@@ -170,7 +171,10 @@ Checks. All must pass; the order below is for reading, and differs from the orde
 7. Proof account owner, magic, full length, and digest equal to SHA-256 of the recomputed message.
 8. Signature verifies against `op_root`.
 
-Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + delay_secs`, `deadline = opens_at + max(delay_secs, 86,400)`, `epoch`, `digest`. **No lamports or tokens move.** The destination's present state is not validated here; it is validated at execution.
+Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + wait`, where `wait` is zero if the destination is trusted (below) and `delay_secs` otherwise, `deadline = opens_at + max(delay_secs, 86,400)`, `epoch`, `digest`. **No lamports or tokens move.**
+
+**Trusted destinations.** A SOL withdrawal is trusted if `destination` equals one of the vault's non-zero `trusted` wallets. A token withdrawal is trusted if `destination` equals the associated token account of one of those wallets for `mint`: the address derived from `[wallet, token program id, mint]` under the associated token account program. Any other token account, including another one the same wallet owns, is not trusted, because only the associated account's address is one that nobody else could have chosen. The trusted list only ever shortens a wait; a vault with `delay_secs = 0` behaves the same with or without one.
+ The destination's present state is not validated here; it is validated at execution.
 
 ### 4.3 `execute` — no data
 
@@ -208,7 +212,7 @@ State is `(epoch e, op_index i, pending P)`. Every row not listed fails with no 
 
 Consequences to check against the implementation:
 
-1. **No transfer before the vault's own waiting period.** The only instruction that debits the vault is `execute`, which requires `now ≥ announced_at + delay_secs`. The waiting period is chosen when the vault is created and cannot change. **It may be zero**, in which case `announce` and `execute` can share one transaction and properties 4 and the cancel path below give no reaction time; see [The waiting period is optional](#the-waiting-period-is-optional).
+1. **No transfer to an untrusted destination before the vault's waiting period.** The only instruction that debits the vault is `execute`, which requires `now ≥ opens_at`, and `opens_at` is the announcement time plus `delay_secs` unless the destination is one of the vault's trusted wallets (or its associated token account), in which case it is the announcement time. Both the waiting period and the trusted list are fixed when the vault is created and are part of its address. **The waiting period may be zero**, in which case every `announce` and `execute` can share one transaction and property 4 and the cancel path below give no reaction time; see [Trusted destinations and the waiting period](#trusted-destinations-and-the-waiting-period).
 2. **At most one transfer per announcement.** `execute` zeroes the record in the same instruction as the transfer.
 3. **No field changes between announcement and execution.** `execute` takes no data; every transfer field comes from the record.
 4. **Recovery always wins over a pending withdrawal that has not executed.** It zeroes the record; a stale `execute` then fails on `pending == 0`.
@@ -220,16 +224,19 @@ Consequences to check against the implementation:
 
 Races that chain ordering decides, and that the product must describe honestly: `execute` against `recover` after `opens_at` (if `execute` lands first, the transfer stands and recovery protects only the remainder); two devices submitting the same recovery packet (one succeeds, the other fails on `epoch`).
 
-## The waiting period is optional
+## Trusted destinations and the waiting period
 
-A vault is created with `delay_secs` anywhere from 0 to 7 days, and the reference interface defaults to 0 and requires an explicit, separately acknowledged choice to set one. This is a product decision: a mandatory 24-hour hold on every withdrawal was judged unacceptable as a default.
+A vault is created with up to four trusted wallets and a waiting period of 0 to 7 days. A withdrawal to a trusted wallet opens at once; a withdrawal to anything else waits. The reference tool starts on 24 hours, lets the owner choose another period or none, and in every case requires the owner to accept a sentence stating exactly what was chosen.
 
-What changes with `delay_secs = 0`:
+This is the design's answer to a stolen day key. An internal design review concluded that with no waiting period a vault protects against a malicious signature in the wallet and against a leaked seed phrase, and not against whoever obtains the day key and its password, by malware, by a copy of the site, or by a compromise of the site itself. A waiting period on every withdrawal closes that, at a cost the owner had judged unacceptable as a default. Trusted destinations keep the owner's own withdrawals immediate while making a thief's wait:
 
-- **Unchanged:** a wallet key alone cannot withdraw; the announcement must be signed by the current one-time operational key; the signed fields fix the amount, asset and destination; the key rotates on use; retired roots are never reinstalled; a lost or exposed day key, an expired announcement and an interrupted signing are all recoverable with the archival kit.
-- **Lost:** the reaction window. Whoever holds a valid day key and its password can announce and execute in a single transaction. Recovery can still replace the keys, but only before a theft, not during one.
+- **With a waiting period and trusted wallets.** The holder of a stolen day key can do two things: send to the owner's own trusted wallets, at once, which returns the assets to the owner; or announce a withdrawal elsewhere, which waits, is visible on-chain, and is cancelled by recovery. The thief gains only if a trusted wallet is one the thief also controls, so those should be wallets that a compromise of the owner's everyday device does not reach.
+- **With a waiting period and no trusted wallets.** Every withdrawal waits.
+- **With no waiting period.** Whoever holds a valid day key and its password can announce and execute to any address in a single transaction. Recovery can still replace the keys, but only before a theft, not during one. A wallet key alone still cannot withdraw.
 
-A vault with a waiting period keeps every property in the table above. The interface states this difference at creation, and a vault's setting is visible on its page. Whether the first reviewed release should permit zero, and whether the choice should be changeable later through a delayed policy operation, are open questions 5 and 11.
+In every configuration: the announcement must be signed by the current one-time operational key; the signed fields fix the amount, asset and destination; the key rotates on use; and a lost or exposed day key, an expired announcement and an interrupted signing are all recoverable with the archival kit.
+
+The trusted list cannot be changed. Changing it would need a second kind of message signed by the recovery key, which today signs exactly one fixed message per epoch (§3.2), and that property is worth more than the convenience. An owner who wants a different list builds a new vault and moves to it; from a vault with a waiting period that means one waiting withdrawal per asset unless the new vault's owner-controlled address was listed as trusted.
 
 ## 6. `chain_tag`
 
@@ -266,9 +273,9 @@ These are trust assumptions, not program guarantees.
 
 | Evidence | Where | Count |
 |---|---|---:|
-| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 21 |
-| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 23 |
-| Isolation, on the same VM: a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 12 |
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 23 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 24 |
+| Isolation, on the same VM: a stolen day key paying trusted wallets at once and a stranger only after a cancellable wait, a malformed trusted list, a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 15 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
 | The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
 
@@ -276,7 +283,7 @@ The second suite covers: nothing leaving before `opens_at` and exactly once afte
 
 Each of the following checks was removed in turn and the suite confirmed to fail (an earlier entry, retiring the displaced operational root, is gone because that rule was itself removed): the waiting period, signature verification, clearing the record on recovery, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`.
 
-Measured on that VM with the 1,400,000-unit limit: `announce` about 597,000 compute units and `recover` about 634,000 for the fixture messages. The cost follows the message digest, about 120 units per chain hash; observed announcements ranged from 470,000 to 626,000, and the worst possible digest extrapolates to about 1,055,000 for `announce` and 1,100,000 for `recover`, inside the limit.
+Measured on that VM with the 1,400,000-unit limit: `announce` about 563,000 compute units and `recover` about 531,000 for the test messages. The cost follows the message digest, about 120 units per chain hash; observed announcements ranged from 470,000 to 626,000, and the worst possible digest extrapolates to about 1,055,000 for `announce` and 1,100,000 for `recover`, inside the limit.
 
 | Public file formats (rejecting secrets, mismatched vaults, a packet whose stated epoch differs from its signed payload, and signatures from another master) and the tool page's policy | `tests/requests-v3.test.ts` | 5 |
 | Randomized: 20,000 sequences of up to 40 interleaved announce, execute, expire, recover and time steps (a quarter corrupted) against invariants, with an operational signer that chooses its next roots adversarially (the current roots, marked roots, and the roots of this and the next recovery packet) and a model of the spent markers; the undamaged recovery packet must always land. And 300,000 arbitrary inputs to every decoder. Fixed seed, no external crates | `programs/bunker3/tests/model.rs` | 2 |
@@ -306,9 +313,10 @@ Each is a decision this draft made provisionally and wants challenged.
 8. **One spent-marker namespace for both roles within a vault, holding only roots that have signed.** An operational root displaced by recovery is not marked. The argument that this is safe is that announcements are bound to their epoch; it deserves an independent check.
 9. **No migration path between program deployments.** A changed layout means a new program id and new vaults. *Decided:* the real-funds program is deployed immutable (docs/DEPLOYMENT.md), so there is no upgrade and no migration instruction; a successor is a new program that users move to by withdrawing.
 10. **`chain_tag` is client-asserted.** It is now part of the vault address, so a wrong tag cannot be attached to an owner's address by someone else, but the owner's own tool still takes it from a file. Is a stronger check worth its cost?
-11. **A zero waiting period is permitted and is the interface default.** It removes the reaction window for a stolen day key in exchange for withdrawals that complete at once. Should a reviewed release allow it, allow it only below a balance, or require a minimum?
+11. **A zero waiting period is permitted.** *Changed after the internal design review:* the reference tool now starts on a 24-hour wait for untrusted destinations, with up to four trusted wallets that do not wait, and zero remains available behind an explicit statement. Should a reviewed release allow zero at all?
 12. **Token-2022 is not supported, and nothing stops someone sending such a token to a vault.** It would be held by an account the program cannot move. Should a reviewed release add support, or a recovery path for tokens it does not handle?
 13. **The recorded `digest` is not read by the program.** It identifies the announcement for clients and alerts. Keep it, or drop 32 bytes from the layout?
 14. **Token decimals shown before signing came from the RPC.** *Decided:* the decimal places are part of the signed announcement and the program checks them against the mint (§3.1, §4.2 5a). A network connection that misreports them now causes a refused announcement, not a different amount. Balances shown are still whatever the connection reports.
 15. **No way to withdraw a pending record except execution, expiry or recovery.** A record that cannot execute (the recipient closed or froze the token account, the destination became a program, a Token-2022 mint was named) held the single pending slot for the waiting period plus seven days. **Decided:** the mint is checked at announcement (§4.2 5a) and the execution window is the waiting period again with a one-day floor (§4.2), so the remaining cases (a recipient who closes or freezes their token account) block the vault for at most the waiting period plus that window. A cancel signed by the operational key was considered and rejected for this version: it needs a second operational message type and consumes a key, and it would invite owners to "cancel" a thief's withdrawal when the only correct response is recovery.
 16. **`announce` and `recover` need most of a transaction's compute budget** (up to about 1.06M and 1.1M units for the worst digest). They work only as top-level instructions with an explicit 1.4M limit; a caller that wraps them in another program or bundles other work beside them can push a valid signature over the limit. Is that acceptable, or should the verifier be made cheaper?
+17. **Trusted destinations are immutable and identified by wallet.** Is four the right number? Should a vault be able to add one after a waiting period of its own, at the price of a second recovery-signed message type? Is matching only the associated token account the right rule for tokens?

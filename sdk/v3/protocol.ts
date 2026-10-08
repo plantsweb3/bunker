@@ -38,7 +38,7 @@ export {
   vaultIdOf,
 };
 export type { Genesis, Recover };
-export const VAULT_SIZE = 287;
+export const VAULT_SIZE = 415;
 export const ANNOUNCE_SIZE = 196;
 export const PROOF_SIZE = 1162;
 export const SIGNATURE_SIZE = 1088;
@@ -193,6 +193,8 @@ export type VaultState = {
   delaySecs: number;
   pending: Pending | null;
   bump: number;
+  /** Wallets a withdrawal may go to without waiting. */
+  trusted: PublicKey[];
 };
 export function parseVault(d: Uint8Array): VaultState {
   if (
@@ -225,6 +227,10 @@ export function parseVault(d: Uint8Array): VaultState {
             digest: d.slice(254, 286),
           },
     bump: d[286],
+    trusted: [0, 1, 2, 3]
+      .map((i) => d.slice(287 + 32 * i, 319 + 32 * i))
+      .filter((w) => !isZero(w))
+      .map((w) => new PublicKey(w)),
   };
 }
 /** Where a vault's withdrawal stands at `now` (Unix seconds). */

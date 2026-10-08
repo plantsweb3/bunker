@@ -6,7 +6,14 @@
 import { scryptAsync } from "@noble/hashes/scrypt";
 import { z } from "zod";
 import { hex, unhex } from "../bytes";
-import { address, base58, MAX_DELAY_SECS, MIN_DELAY_SECS, vaultAddressBytes } from "./core";
+import {
+  address,
+  base58,
+  MAX_DELAY_SECS,
+  MIN_DELAY_SECS,
+  TRUSTED_SLOTS,
+  vaultAddressBytes,
+} from "./core";
 import { genesisVault } from "./master";
 import type { Descriptor } from "./derive";
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
@@ -17,6 +24,8 @@ const base = {
   program: z.string().min(32).max(44),
   /** Random, chosen when the kit is made. Every key is derived under it. */
   salt: hex32,
+  /** Wallets this Bunker pays without waiting. Fixed when it is built. */
+  trusted: z.array(z.string().min(32).max(44)).max(TRUSTED_SLOTS),
   vaultId: hex32,
   vault: z.string().min(32).max(44),
 };
@@ -55,8 +64,15 @@ export function identityOf(k: Identity) {
   return d;
 }
 /** What a key file's secrets are derived under. */
-export function descriptorOf(k: Identity & { salt: string; delaySecs: number }): Descriptor {
-  return { ...identityOf(k), salt: unhex(k.salt, 32), delaySecs: k.delaySecs };
+export function descriptorOf(
+  k: Identity & { salt: string; delaySecs: number; trusted: string[] },
+): Descriptor {
+  return {
+    ...identityOf(k),
+    salt: unhex(k.salt, 32),
+    delaySecs: k.delaySecs,
+    trusted: k.trusted.map(address),
+  };
 }
 /** Also proves the kit's master really creates the vault the kit names: the
  * identity is recomputed from the master, the salt and the waiting period. */

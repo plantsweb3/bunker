@@ -107,7 +107,12 @@ function Page() {
     // exactly the one their recovery kit describes. The identity is a hash of
     // the whole request and never changes; the keys do, once it is used.
     const { state } = await fetchVault(b.connection, program, address);
-    if (hex(state.vaultId) !== request.vaultId || state.delaySecs !== request.delaySecs)
+    if (
+      hex(state.vaultId) !== request.vaultId ||
+      state.delaySecs !== request.delaySecs ||
+      state.trusted.length !== request.trusted.length ||
+      state.trusted.some((t, i) => t.toBase58() !== request.trusted[i])
+    )
       throw new Error(
         "The Bunker at this address does not match your creation request. Do not deposit. Make a new recovery kit.",
       );
@@ -288,10 +293,24 @@ function Page() {
                     </dd>
                   </div>
                   <div>
+                    <dt>Trusted addresses</dt>
+                    <dd>
+                      {request.trusted.length
+                        ? request.trusted.map((t) => (
+                            <code key={t} style={{ display: "block" }}>
+                              {t}
+                            </code>
+                          ))
+                        : "None"}
+                    </dd>
+                  </div>
+                  <div>
                     <dt>Waiting period</dt>
                     <dd>
                       {request.delaySecs
-                        ? `${formatDuration(BigInt(request.delaySecs))} on every withdrawal, fixed for this Bunker`
+                        ? request.trusted.length
+                          ? `${formatDuration(BigInt(request.delaySecs))} to any other address; none to the trusted ones. Fixed for this Bunker.`
+                          : `${formatDuration(BigInt(request.delaySecs))} on every withdrawal, fixed for this Bunker`
                         : "None. Withdrawals leave as soon as they are approved."}
                     </dd>
                   </div>

@@ -26,6 +26,7 @@ export function genesisVault(master: Uint8Array, k: KeyContext) {
     programId: k.programId,
     salt: k.salt,
     delaySecs: k.delaySecs,
+    trusted: k.trusted,
     vaultId: vaultIdOf({ ...k, opRoot: genesis.opRoot, recRoot: genesis.recRoot }),
   };
   return { ...genesis, d, delaySecs: k.delaySecs };

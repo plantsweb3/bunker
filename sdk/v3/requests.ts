@@ -15,6 +15,7 @@ import {
   MAX_DELAY_SECS,
   RECOVER_SIZE,
   recoverMessageBytes,
+  TRUSTED_SLOTS,
   vaultIdOf,
 } from "./core";
 import type { VaultState } from "./protocol";
@@ -44,6 +45,7 @@ export const creationRequestSchema = z
     ...identity,
     kind: z.literal("create"),
     salt: hex32,
+    trusted: z.array(address).max(TRUSTED_SLOTS),
     delaySecs: z.number().int().min(0).max(MAX_DELAY_SECS),
     opRoot: hex32,
     recRoot: hex32,
@@ -82,6 +84,7 @@ export const genesisOf = (r: CreationRequest) => ({
   opRoot: unhex(r.opRoot, 32),
   recRoot: unhex(r.recRoot, 32),
   delaySecs: r.delaySecs,
+  trusted: r.trusted.map(addressBytes),
 });
 export function parseCreationRequest(raw: string): CreationRequest {
   const r = parse(creationRequestSchema, raw, "a Bunker creation request");

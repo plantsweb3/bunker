@@ -24,7 +24,7 @@ const WINDOW: i64 = 86_400;
 const MAX_DELAY: u32 = 604_800;
 /// Decimal places of every test mint.
 const TOKEN_DECIMALS: u8 = 6;
-const VAULT_LEN: usize = 287;
+const VAULT_LEN: usize = 415;
 const SOL: u64 = 1_000_000_000;
 
 fn system() -> Pubkey {
@@ -50,6 +50,8 @@ struct Env {
     id: [u8; 32],
     chain: [u8; 32],
     vault: Pubkey,
+    /// Trusted wallets the next vault is created with. Unused slots are zero.
+    trusted: [[u8; 32]; 4],
 }
 #[derive(Clone)]
 struct Withdrawal {
@@ -71,7 +73,7 @@ impl Env {
             .expect("build bunker3.so first (see the header of this file)");
         let payer = Keypair::new();
         svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
-        let mut env = Self { svm, program, payer, salt: [7u8; 32], id: [0; 32], chain: [9u8; 32], vault: Pubkey::default() };
+        let mut env = Self { svm, program, payer, salt: [7u8; 32], id: [0; 32], chain: [9u8; 32], vault: Pubkey::default(), trusted: [[0; 32]; 4] };
         env.adopt(root(1), root(100), DAY as u32);
         env.set_time(T0);
         env
@@ -109,7 +111,7 @@ impl Env {
         Pubkey::find_program_address(&[b"spent-v3", vault.as_ref(), root], &self.program).0
     }
     fn init_data(&self, salt: &[u8; 32], op: [u8; 32], rec: [u8; 32], delay: u32) -> Vec<u8> {
-        [salt.to_vec(), self.chain.to_vec(), op.to_vec(), rec.to_vec(), delay.to_le_bytes().to_vec()].concat()
+        [salt.to_vec(), self.chain.to_vec(), op.to_vec(), rec.to_vec(), delay.to_le_bytes().to_vec(), self.trusted.concat()].concat()
     }
     /// The identity and address the program will derive for these parameters.
     fn derive(&self, salt: &[u8; 32], op: [u8; 32], rec: [u8; 32], delay: u32) -> ([u8; 32], Pubkey) {
@@ -332,6 +334,7 @@ fn initialize_writes_the_specified_layout_and_cannot_be_repeated() {
     assert_eq!(&d[120..152], &root(100));
     assert_eq!(u32::from_le_bytes(d[152..156].try_into().unwrap()), DAY as u32);
     assert!(d[104..120].iter().all(|b| *b == 0) && d[156..286].iter().all(|b| *b == 0));
+    assert!(d[287..].iter().all(|b| *b == 0), "no trusted wallets");
     assert_eq!(e.svm.get_account(&e.vault).unwrap().owner, e.program);
     // Neither initial root is marked spent by creation.
     assert!(!e.spent(&root(1)) && !e.spent(&root(100)));
@@ -999,3 +1002,62 @@ fn a_token_announcement_is_checked_against_its_mint() {
     assert!(e.pending() && e.spent(&root(1)));
 }
 
+
+/// For a token, "trusted" means the trusted wallet's associated token account
+/// for that mint and nothing else: another token account the same wallet owns
+/// is an address someone else could have chosen, and waits like any stranger's.
+#[test]
+fn a_token_withdrawal_is_instant_only_to_a_trusted_wallets_associated_account() {
+    let mut e = Env::new();
+    let wallet = Pubkey::new_unique();
+    e.trusted[0] = wallet.to_bytes();
+    let ix = e.init_ix(root(1), root(100), DAY as u32);
+    e.send(&[ix]).unwrap();
+    let put = |e: &mut Env, key: Pubkey, data: Vec<u8>| {
+        let lamports = e.svm.minimum_balance_for_rent_exemption(data.len());
+        e.svm
+            .set_account(key, Account { lamports, data, owner: token_program(), executable: false, rent_epoch: 0 })
+            .unwrap();
+    };
+    let (mint, source) = (Pubkey::new_unique(), Pubkey::new_unique());
+    let associated = Pubkey::find_program_address(
+        &[wallet.as_ref(), token_program().as_ref(), mint.as_ref()],
+        &Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap(),
+    )
+    .0;
+    let other_account_of_wallet = Pubkey::new_unique();
+    let vault = e.vault;
+    put(&mut e, mint, mint_data(TOKEN_DECIMALS));
+    put(&mut e, source, token_data(&mint, &vault, 900, false));
+    put(&mut e, associated, token_data(&mint, &wallet, 0, false));
+    put(&mut e, other_account_of_wallet, token_data(&mint, &wallet, 0, false));
+    let to = |destination: Pubkey, index: u64, next: u32| Withdrawal {
+        epoch: 0,
+        index,
+        kind: 1,
+        mint: mint.to_bytes(),
+        destination,
+        amount: 100,
+        announce_by: T0 + 3600,
+        next: root(next),
+    };
+    let accounts = vec![
+        AccountMeta::new(source, false),
+        AccountMeta::new_readonly(mint, false),
+        AccountMeta::new_readonly(token_program(), false),
+    ];
+    // The associated account: opens at once.
+    e.announce(1, &to(associated, 0, 2)).unwrap();
+    let ix = e.execute_ix(associated, accounts.clone());
+    e.send(&[ix]).unwrap();
+    assert_eq!((token_amount(&e, &associated), e.pending()), (100, false));
+    // Another account of the same wallet: waits the full period.
+    e.announce(2, &to(other_account_of_wallet, 1, 3)).unwrap();
+    let ix = e.execute_ix(other_account_of_wallet, accounts.clone());
+    assert!(e.send(&[ix.clone()]).is_err(), "not the associated account: waits");
+    let d = e.vault_data();
+    assert_eq!(i64::from_le_bytes(d[230..238].try_into().unwrap()), T0 + DAY);
+    e.set_time(T0 + DAY);
+    e.send(&[ix]).unwrap();
+    assert_eq!(token_amount(&e, &other_account_of_wallet), 100);
+}
