@@ -7,7 +7,7 @@ test("brand, navigation, release gate, and wallet empty state", async ({
   await page.goto("/");
   await expect(
     page.getByRole("heading", {
-      name: "One bad signature shouldn’t cost you everything.",
+      name: "One bad click shouldn’t cost you everything.",
     }),
   ).toBeVisible();
   await page.screenshot({ path: info.outputPath("bunker-preview.png") });
