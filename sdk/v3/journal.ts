@@ -29,6 +29,10 @@ const entry = z
     signature: z.string().optional(),
     /** Token withdrawals only: the wallet that owns the destination token account. */
     recipient: z.string().optional(),
+    /** The fee wallet that began uploading this signature. The upload lives at
+     * an address derived from that wallet, so finishing with another wallet
+     * means paying for a second upload. */
+    payer: z.string().optional(),
   })
   .strict();
 export type JournalEntry = z.infer<typeof entry>;
@@ -93,13 +97,29 @@ export type SignedAnnouncement = {
   message: Uint8Array;
   signature: Uint8Array;
   recipient?: string;
+  payer?: string;
 };
 const saved = (e: JournalEntry): SignedAnnouncement => ({
   payload: unhex(e.payload!),
   message: unhex(e.message!),
   signature: unhex(e.signature!),
   recipient: e.recipient,
+  payer: e.payer,
 });
+/** Remembers which fee wallet began uploading a signed announcement. Changes
+ * nothing about what was signed; the first wallet recorded stays. */
+export async function notePayer(
+  k: VaultIdentity,
+  tuple: { epoch: bigint; opIndex: bigint },
+  payer: string,
+): Promise<void> {
+  await locked(k, async () => {
+    const j = readJournal(k);
+    const e = at(j, tuple);
+    if (!e || e.status !== "signed" || e.payer) return;
+    write(k, record(j, { ...e, payer }));
+  });
+}
 /** What this browser knows about the operational key the chain says is
  * current.
  *  - `signed`: this key already signed; only those bytes may be sent.

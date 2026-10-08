@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { sha256 } from "@noble/hashes/sha256";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatAmount, hex, parseAmount, unhex } from "@/sdk/bytes";
@@ -23,6 +24,7 @@ import { chainTime, fetchVault, formatDuration, toTrusted, vaultTokens } from "@
 import { Activity, ACTIVITY_LABEL, fetchHistory } from "@/sdk/v3/history";
 import {
   authorizeAnnouncement,
+  notePayer,
   readJournal,
   safeJournalStatus,
   SignedAnnouncement,
@@ -43,6 +45,7 @@ import {
   decodeAnnounce,
   executeIx,
   expireIx,
+  proofAddress,
   executeWindowSecs,
   MAX_ANNOUNCE_AHEAD_SECS,
   pendingPhase,
@@ -487,6 +490,10 @@ function App() {
       );
     // Three approvals follow. Do not start if the wallet cannot finish them.
     await feePreflight(b.connection, payer);
+    // The upload lives at an address derived from this wallet; remember which.
+    await notePayer(day, { epoch: a.epoch, opIndex: a.opIndex }, payer.toBase58()).catch(
+      () => undefined,
+    );
     const instant = state.delaySecs === 0 || (await toTrusted(state, a));
     const vaultKey = new PublicKey(day.vault);
     // For a token, make sure the recipient's token account exists (now, so it
@@ -632,6 +639,17 @@ function App() {
     ]);
     await load(day);
     b.setNotice("Released. The withdrawal reached its destination.");
+  }
+  /** Takes back the deposit on a signature upload that will never be used. */
+  async function reclaim(signed: SignedAnnouncement) {
+    const { program, payer } = b.live();
+    const proof = proofAddress(program, payer, sha256(signed.message));
+    if (!(await b.connection.getAccountInfo(proof)))
+      throw new Error(
+        "There is no upload deposit to take back with this wallet. If you started the withdrawal with a different wallet, connect that one.",
+      );
+    await b.transmit("Taking back the deposit", [closeProofIx(program, payer, signed.message)]);
+    b.setNotice("Deposit returned to your wallet.");
   }
   async function clearExpired() {
     const { program } = b.live();
@@ -874,6 +892,16 @@ function App() {
                   ? "This key signed a withdrawal that did not reach the network in time. It cannot sign again. Install new keys in the recovery tool to continue; your assets have not moved."
                   : `${describe(decodeAnnounce(unfinished.payload).kind, decodeAnnounce(unfinished.payload).mint, decodeAnnounce(unfinished.payload).amount)} to ${unfinished.recipient ?? decodeAnnounce(unfinished.payload).destination.toBase58()} was signed but not announced. Finishing sends the same authorization.`}
               </p>
+              {unfinished.payer &&
+                b.wallet.address &&
+                unfinished.payer !== b.wallet.address.toBase58() && (
+                  <p className="micro wait-hint">
+                    This was started with wallet {unfinished.payer.slice(0, 4)}…
+                    {unfinished.payer.slice(-4)}. Reconnect that wallet to reuse the upload it
+                    already paid for and get its deposit back. With this wallet it still works,
+                    but pays for the upload again.
+                  </p>
+                )}
               <div className="actions">
                 {!unfinishedExpired && (
                   <button
@@ -882,6 +910,15 @@ function App() {
                     onClick={() => b.task("Announcing", () => publish(unfinished))}
                   >
                     Finish announcing
+                  </button>
+                )}
+                {unfinishedExpired && (
+                  <button
+                    className="button ghost"
+                    disabled={!can}
+                    onClick={() => b.task("Checking", () => reclaim(unfinished))}
+                  >
+                    Take back the upload deposit
                   </button>
                 )}
                 <Link className="button ghost" href="/recovery">
@@ -1035,6 +1072,7 @@ function App() {
                 </div>
               ) : step === "withdraw" ? (
                 <div className="inline-form">
+                  <h2>Withdraw.</h2>
                   <label className="field">
                     <span>Asset</span>
                     <select
@@ -1064,6 +1102,21 @@ function App() {
                       onChange={(e) => setAmount(e.target.value)}
                     />
                   </label>
+                  <button
+                    type="button"
+                    className="link-button field-aside"
+                    disabled={!!b.busy}
+                    onClick={() => {
+                      const token = vault.tokens.find((t) => t.mint === assetKey);
+                      setAmount(
+                        token
+                          ? formatAmount(token.amount, token.decimals)
+                          : formatAmount(available, 9),
+                      );
+                    }}
+                  >
+                    Use everything available
+                  </button>
                   <label className="field">
                     <span>Recipient wallet address</span>
                     <input
@@ -1075,6 +1128,16 @@ function App() {
                       onChange={(e) => setRecipient(e.target.value)}
                     />
                   </label>
+                  {recipient.trim() && vault.state.delaySecs > 0 && (
+                    <p
+                      className={`micro wait-hint ${vault.state.trusted.some((t) => t.toBase58() === recipient.trim()) ? "is-trusted" : ""}`}
+                      role="status"
+                    >
+                      {vault.state.trusted.some((t) => t.toBase58() === recipient.trim())
+                        ? "A trusted address: this arrives as soon as you approve it."
+                        : `Not a trusted address: this waits ${formatDuration(BigInt(vault.state.delaySecs))} before it can leave, and you can cancel it during that time.`}
+                    </p>
+                  )}
                   {vault.state.trusted.length > 0 && (
                     <div className="trusted-picks">
                       <small>
@@ -1191,6 +1254,11 @@ function App() {
                       approvals.
                     </span>
                   </label>
+                  <p className="micro">
+                    Signing uses up this Bunker’s current one-time key for exactly this
+                    withdrawal. After that it can be finished or cancelled, not changed. If you
+                    are interrupted, come back and you will be offered “Finish announcing”.
+                  </p>
                   <div className="actions">
                     <button
                       className="button light"
@@ -1414,6 +1482,12 @@ function App() {
                 {b.enabled && passkeys.length > 0 && (
                   <p className="micro">
                     <Link href="/recovery">Build another Bunker</Link>
+                  </p>
+                )}
+                {b.enabled && !b.wallet.address && (
+                  <p className="micro">
+                    Connect a wallet first. It pays the network fees and has no say over your
+                    Bunker; any wallet will do.
                   </p>
                 )}
                 <span className="micro">

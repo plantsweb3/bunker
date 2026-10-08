@@ -7,6 +7,7 @@ import {
   authorizeAnnouncement,
   journalKey,
   journalStatus,
+  notePayer,
   readJournal,
   safeJournalStatus,
 } from "../sdk/v3/journal";
@@ -182,6 +183,21 @@ describe("Protocol 3 signing journal", () => {
       authorizeAnnouncement(identity, g.seed, d, chain(), { ...withdrawal, amount: 0n }),
     ).rejects.toThrow("Invalid announcement");
     expect(b.storage.size).toBe(0);
+  });
+  it("remembers the first fee wallet that began an upload, and nothing else changes", async () => {
+    browser();
+    const signed = await authorizeAnnouncement(identity, g.seed, d, chain(), withdrawal);
+    await notePayer(identity, { epoch: 0n, opIndex: 0n }, "WalletOne");
+    await notePayer(identity, { epoch: 0n, opIndex: 0n }, "WalletTwo");
+    const status = journalStatus(identity, chain());
+    expect(status.state).toBe("signed");
+    if (status.state === "signed") {
+      expect(status.announcement.payer).toBe("WalletOne");
+      expect(hex(status.announcement.signature)).toBe(hex(signed.signature));
+    }
+    // A tuple that was never signed here is not created by noting a payer.
+    await notePayer(identity, { epoch: 0n, opIndex: 9n }, "WalletOne");
+    expect(journalStatus(identity, at(9n)).state).toBe("unused");
   });
   it("reads the earlier single-entry format and refuses an unreadable journal", async () => {
     const b = browser();
