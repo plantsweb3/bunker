@@ -74,6 +74,7 @@ fn random_interleavings_keep_every_invariant() {
             delay_secs: delay,
             pending: None,
             bump: 255,
+            trusted: [[0; 32]; TRUSTED_SLOTS],
         };
         let mut now: i64 = 1_800_000_000;
         // The spent markers the program keeps for this vault, and every announcement that paid out.
@@ -114,7 +115,10 @@ fn random_interleavings_keep_every_invariant() {
                         bytes[at] ^= 1 << rng.below(8);
                     }
                     let digest = rng.root();
-                    match decode_announce(&bytes).and_then(|a| apply_announce(&mut v, &a, digest, now).map(|old| (a, old))) {
+                    // The program's finding about the destination; either may occur.
+                    let to_trusted = rng.below(3) == 0;
+                    let wait = if to_trusted { 0 } else { delay };
+                    match decode_announce(&bytes).and_then(|a| apply_announce(&mut v, &a, digest, now, to_trusted).map(|old| (a, old))) {
                         Ok((a, displaced)) => {
                             assert_eq!(displaced, before.op_root, "{context}");
                             assert!(before.pending.is_none(), "{context}: announced over a pending record");
@@ -123,8 +127,8 @@ fn random_interleavings_keep_every_invariant() {
                             assert!(retired.insert(displaced), "{context}: an authority was used twice");
                             assert!(!retired.contains(&v.op_root) && v.op_root != v.rec_root, "{context}");
                             let p = v.pending.as_ref().unwrap();
-                            assert_eq!(p.opens_at - now, delay as i64, "{context}: wrong wait");
-                            assert_eq!((p.deadline - p.opens_at, p.epoch, p.digest), (execute_window(delay), v.epoch, digest), "{context}");
+                            assert_eq!(p.opens_at - now, wait as i64, "{context}: wrong wait");
+                            assert_eq!((p.deadline - p.opens_at, p.epoch, p.digest), (execute_window(wait), v.epoch, digest), "{context}");
                             announced += 1;
                         }
                         Err(_) => {
@@ -184,7 +188,7 @@ fn random_interleavings_keep_every_invariant() {
                 _ => now += [1, 60, 3_600, 86_400, 700_000][rng.below(5) as usize],
             }
             // Whatever happened: identity and delay never change, counters never go back, the layout round-trips.
-            assert_eq!((v.vault_id, v.chain_tag, v.delay_secs, v.bump), (before.vault_id, before.chain_tag, before.delay_secs, before.bump), "{context}");
+            assert_eq!((v.vault_id, v.chain_tag, v.delay_secs, v.bump, v.trusted), (before.vault_id, before.chain_tag, before.delay_secs, before.bump, before.trusted), "{context}");
             assert!((v.epoch, v.op_index) >= (before.epoch, before.op_index) || v.epoch > before.epoch, "{context}: counters went backwards");
             let mut packed = [0u8; VAULT_LEN];
             v.pack(&mut packed).unwrap();

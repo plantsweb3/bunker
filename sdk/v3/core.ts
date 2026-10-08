@@ -81,15 +81,32 @@ export const vaultAddressBytes = (programId: Uint8Array, vaultId: Uint8Array) =>
   programAddress([text("bunker3"), bytes32(vaultId, "Vault id")], programId);
 
 // ── Vault identity ──────────────────────────────────────────────────────────
+/** How many trusted destinations a vault may name. */
+export const TRUSTED_SLOTS = 4;
+/** The trusted list as the program stores it: four 32-byte slots, the wallets
+ * first in the order given, unused slots zero. No wallet may appear twice. */
+export function trustedBytes(wallets: Uint8Array[]): Uint8Array {
+  if (wallets.length > TRUSTED_SLOTS) throw new Error(`At most ${TRUSTED_SLOTS} trusted addresses`);
+  const out = new Uint8Array(32 * TRUSTED_SLOTS);
+  wallets.forEach((w, i) => {
+    if (isZero(bytes32(w, "Trusted address"))) throw new Error("Invalid trusted address");
+    if (wallets.slice(0, i).some((earlier) => same(earlier, w)))
+      throw new Error("A trusted address is listed twice");
+    out.set(w, 32 * i);
+  });
+  return out;
+}
 export type Genesis = {
   salt: Uint8Array;
   chainTag: Uint8Array;
   opRoot: Uint8Array;
   recRoot: Uint8Array;
   delaySecs: number;
+  /** Wallets a withdrawal may go to without waiting. Fixed for the vault's life. */
+  trusted: Uint8Array[];
 };
-/** `salt || chain_tag || op_root || rec_root || delay_secs`: the data of
- * `initialize`, and the preimage of the vault identity. */
+/** `salt || chain_tag || op_root || rec_root || delay_secs || trusted`: the
+ * data of `initialize`, and the preimage of the vault identity. */
 export function genesisData(g: Genesis): Uint8Array {
   if (
     !Number.isInteger(g.delaySecs) ||
@@ -108,6 +125,7 @@ export function genesisData(g: Genesis): Uint8Array {
     g.opRoot,
     g.recRoot,
     delay,
+    trustedBytes(g.trusted),
   );
 }
 /** The vault identity: a hash of everything the vault is created with. The

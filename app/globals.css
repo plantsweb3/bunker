@@ -3864,3 +3864,5 @@ details.advanced .field {
 .brand img { display: block; width: 232px; height: auto; }
 .brand.small img { width: 194px; }
 @media(max-width: 640px) { .brand img { width: 172px; } }
+.trusted-picks{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;font-size:13px}
+.trusted-picks small{color:#839497}

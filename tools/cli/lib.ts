@@ -21,7 +21,7 @@ import {
 } from "../../sdk/classic-token";
 import { Asset, send, withdrawalDestination } from "../../sdk/client";
 import { feePreflight, withdrawalPreflight } from "../../sdk/preflight";
-import { chainTime, fetchVault, vaultTokens } from "../../sdk/v3/chain";
+import { chainTime, fetchVault, toTrusted, vaultTokens } from "../../sdk/v3/chain";
 import { authorizeAnnouncement, journalStatus, SignedAnnouncement } from "../../sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "../../sdk/v3/kit";
 import {
@@ -157,6 +157,7 @@ export function describe(vault: string, b: Awaited<ReturnType<typeof readBunker>
     `Bunker ${vault}`,
     `Key generation ${b.state.epoch}, withdrawals announced ${b.state.opIndex}`,
     `Waiting period: ${b.state.delaySecs ? `${b.state.delaySecs} seconds` : "none"}`,
+    ...b.state.trusted.map((t) => `Trusted address (no wait): ${t.toBase58()}`),
     `SOL available: ${formatAmount(b.spendable, 9)}`,
     ...b.tokens.filter((t) => t.amount > 0n).map((t) => `Token ${t.mint}: ${formatAmount(t.amount, t.decimals)}${t.frozen ? " (frozen)" : ""}`),
     p
@@ -170,6 +171,8 @@ function admit(day: DayKey, state: VaultState) {
     throw new Error(`This day key is for key generation ${day.epoch}; the Bunker is on ${state.epoch}. Submit the recovery packet first.`);
   if (BigInt(day.epoch) !== state.epoch)
     throw new Error(`This day key (generation ${day.epoch}) has been replaced. The Bunker is on generation ${state.epoch}.`);
+  if (day.trusted.length !== state.trusted.length || day.trusted.some((t, i) => t !== state.trusted[i].toBase58()))
+    throw new Error("The network reports different trusted addresses from the ones this Bunker was built with. Nothing was done.");
   if (day.delaySecs !== state.delaySecs)
     throw new Error("The network reports a different waiting period from the one this Bunker was built with. Nothing was done.");
 }
@@ -198,9 +201,12 @@ export async function review(s: Session, day: DayKey, r: Request): Promise<Revie
   if (!PublicKey.isOnCurve(to.toBytes()) || to.equals(vault))
     throw new Error("Use a normal wallet address outside this Bunker");
   const base = { recipient: to.toBase58(), epoch: b.state.epoch, opIndex: b.state.opIndex };
-  const when = b.state.delaySecs
-    ? `It can leave after ${b.state.delaySecs} seconds of waiting; until then your recovery kit can cancel it.`
-    : "It leaves immediately and cannot be cancelled.";
+  const timing = async (w: { kind: 0 | 1; mint: PublicKey; destination: PublicKey }) =>
+    b.state.delaySecs === 0
+      ? "It leaves immediately and cannot be cancelled."
+      : (await toTrusted(b.state, w))
+        ? "This is a trusted address: it leaves immediately and cannot be cancelled."
+        : `It can leave after ${b.state.delaySecs} seconds of waiting; until then your recovery kit can cancel it.`;
   if (!r.mint) {
     const lamports = parseAmount(r.amount, 9);
     if (lamports > b.spendable) throw new Error(`At most ${formatAmount(b.spendable, 9)} SOL is available`);
@@ -213,7 +219,11 @@ export async function review(s: Session, day: DayKey, r: Request): Promise<Revie
       decimals: 9,
       amount: lamports,
       destination: to,
-      lines: [`Withdraw ${formatAmount(lamports, 9)} SOL`, `to ${to.toBase58()}`, when],
+      lines: [
+        `Withdraw ${formatAmount(lamports, 9)} SOL`,
+        `to ${to.toBase58()}`,
+        await timing({ kind: 0, mint: PublicKey.default, destination: to }),
+      ],
     };
   }
   const token = b.tokens.find((t) => t.mint === r.mint);
@@ -235,7 +245,7 @@ export async function review(s: Session, day: DayKey, r: Request): Promise<Revie
       `(${amount} of its smallest unit, assuming ${token.decimals} decimal places)`,
       `to wallet ${to.toBase58()}`,
       `(its token account ${dest.destination.toBase58()})`,
-      when,
+      await timing({ kind: 1, mint: new PublicKey(token.mint!), destination: dest.destination }),
     ],
   };
 }
@@ -252,7 +262,7 @@ async function publish(s: Session, day: DayKey, signed: SignedAnnouncement): Pro
   if (state.epoch !== a.epoch || state.opIndex !== a.opIndex || state.pending)
     throw new Error("The Bunker's keys were replaced after this withdrawal was signed. It can no longer be announced. Nothing moved.");
   await feePreflight(s.connection, s.payer.publicKey);
-  const instant = state.delaySecs === 0;
+  const instant = state.delaySecs === 0 || (await toTrusted(state, a));
   const setup: TransactionInstruction[] = [];
   let source: PublicKey | undefined;
   if (a.kind === 1) {

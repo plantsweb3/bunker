@@ -21,11 +21,13 @@ export function vectors() {
     programId: program.toBytes(),
     salt: new Uint8Array(32).fill(7),
     delaySecs,
+    trusted: [new Uint8Array(32).fill(6)],
   });
   const { d } = genesis;
   const payer = new PublicKey(new Uint8Array(32).fill(5));
   const init = initializeIx(program, payer, {
     salt: d.salt,
+    trusted: d.trusted,
     chainTag: d.chainTag,
     opRoot: genesis.opRoot,
     recRoot: genesis.recRoot,
@@ -59,6 +61,7 @@ export function vectors() {
     program: program.toBase58(),
     programBytes: hex(d.programId),
     salt: hex(d.salt),
+    trusted: d.trusted.map((t) => hex(t)),
     vaultId: hex(d.vaultId),
     vault: vaultAddress(program, d.vaultId).toBase58(),
     delaySecs,

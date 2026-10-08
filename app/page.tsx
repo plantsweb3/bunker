@@ -41,7 +41,7 @@ const stops = [
 ];
 const limits = [
   "Malware on the device where you open your keys. It can copy a key file and record its password.",
-  "A stolen day key, if you chose no waiting period. Whoever has it and its password can withdraw at once.",
+  "A stolen day key, if you chose no waiting period. Whoever has it and its password can withdraw at once. With a waiting period, a thief can only pay your own trusted addresses at once; anything else waits, and you can cancel it.",
   "A lost recovery kit. There is no reset and no administrator, and it is the only thing that replaces a lost key.",
 ];
 const gates = [

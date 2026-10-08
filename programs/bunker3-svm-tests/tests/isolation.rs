@@ -38,6 +38,7 @@ struct Party {
     op: [u8; 32],
     rec: [u8; 32],
     delay: u32,
+    trusted: Vec<Pubkey>,
     id: [u8; 32],
     vault: Pubkey,
 }
@@ -57,18 +58,29 @@ impl World {
         w
     }
     fn init_data(salt: &[u8; 32], chain: &[u8; 32], op: &[u8; 32], rec: &[u8; 32], delay: u32) -> Vec<u8> {
-        [salt.to_vec(), chain.to_vec(), op.to_vec(), rec.to_vec(), delay.to_le_bytes().to_vec()].concat()
+        Self::init_data_with(salt, chain, op, rec, delay, &[])
+    }
+    fn init_data_with(salt: &[u8; 32], chain: &[u8; 32], op: &[u8; 32], rec: &[u8; 32], delay: u32, trusted: &[Pubkey]) -> Vec<u8> {
+        let mut list = [[0u8; 32]; 4];
+        for (slot, w) in list.iter_mut().zip(trusted) {
+            *slot = w.to_bytes();
+        }
+        [salt.to_vec(), chain.to_vec(), op.to_vec(), rec.to_vec(), delay.to_le_bytes().to_vec(), list.concat()].concat()
     }
     fn address(&self, data: &[u8]) -> ([u8; 32], Pubkey) {
         let id = hashv(&[b"BUNKER3_VAULT_ID", data]).to_bytes();
         (id, Pubkey::find_program_address(&[b"bunker3", &id], &self.program).0)
     }
     fn party(&mut self, salt: u8, op: [u8; 32], rec: [u8; 32], delay: u32) -> Party {
+        self.party_trusting(salt, op, rec, delay, &[])
+    }
+    /// A party whose vault names `trusted` as wallets it may pay without waiting.
+    fn party_trusting(&mut self, salt: u8, op: [u8; 32], rec: [u8; 32], delay: u32, trusted: &[Pubkey]) -> Party {
         let payer = Keypair::new();
         self.svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
         let salt = [salt; 32];
-        let (id, vault) = self.address(&Self::init_data(&salt, &CHAIN, &op, &rec, delay));
-        Party { payer, salt, op, rec, delay, id, vault }
+        let (id, vault) = self.address(&Self::init_data_with(&salt, &CHAIN, &op, &rec, delay, trusted));
+        Party { payer, salt, op, rec, delay, trusted: trusted.to_vec(), id, vault }
     }
     fn set_time(&mut self, unix: i64) {
         let mut clock: Clock = self.svm.get_sysvar();
@@ -112,7 +124,7 @@ impl World {
         }
     }
     fn init(&mut self, p: &Party, fund: u64) {
-        let ix = self.init_ix(&p.payer, p.vault, &Self::init_data(&p.salt, &CHAIN, &p.op, &p.rec, p.delay));
+        let ix = self.init_ix(&p.payer, p.vault, &Self::init_data_with(&p.salt, &CHAIN, &p.op, &p.rec, p.delay, &p.trusted));
         self.send(&p.payer, &[ix]).unwrap();
         if fund > 0 {
             let f = system_instruction::transfer(&p.payer.pubkey(), &p.vault, fund);
@@ -271,6 +283,8 @@ fn the_address_commits_to_every_creation_parameter() {
         World::init_data(&owner.salt, &CHAIN, &root(500), &owner.rec, owner.delay),
         World::init_data(&owner.salt, &CHAIN, &owner.op, &root(500), owner.delay),
         World::init_data(&owner.salt, &CHAIN, &owner.op, &owner.rec, 0),
+        // A trusted wallet the owner did not choose.
+        World::init_data_with(&owner.salt, &CHAIN, &owner.op, &owner.rec, owner.delay, &[Pubkey::new_unique()]),
     ];
     for data in &changed {
         assert_ne!(w.address(data).1, owner.vault);
@@ -571,5 +585,76 @@ fn stage_requires_the_system_program_on_every_chunk() {
     second.accounts[2] = AccountMeta::new_readonly(Pubkey::new_unique(), false);
     assert!(w.send(&p.payer, &[second]).is_err());
     w.send(&p.payer, &[good]).unwrap();
+}
+
+/// The point of trusted wallets: a stolen day key can pay the owner's own
+/// wallets at once, and anyone else only after a wait the owner can cancel in.
+#[test]
+fn a_stolen_day_key_can_only_pay_trusted_wallets_without_waiting() {
+    let mut w = World::new();
+    let (cold, exchange) = (Pubkey::new_unique(), Pubkey::new_unique());
+    let owner = w.party_trusting(7, root(1), root(100), DAY as u32, &[cold, exchange]);
+    w.init(&owner, 10 * SOL);
+    let d = w.vault_data(&owner);
+    assert_eq!((&d[287..319], &d[319..351]), (&cold.to_bytes()[..], &exchange.to_bytes()[..]));
+    assert!(d[351..].iter().all(|b| *b == 0));
+    // To a trusted wallet: released in the same moment, no waiting.
+    w.announce(&owner, 1, 0, 0, cold, SOL, root(2)).unwrap();
+    w.execute(&owner, cold).unwrap();
+    assert_eq!(w.lamports(&cold), SOL);
+    w.announce(&owner, 2, 0, 1, exchange, SOL, root(3)).unwrap();
+    w.execute(&owner, exchange).unwrap();
+    // The thief, holding the same day key, pays themselves: it waits.
+    let thief = Pubkey::new_unique();
+    w.announce(&owner, 3, 0, 2, thief, 7 * SOL, root(4)).unwrap();
+    assert!(w.execute(&owner, thief).is_err(), "not trusted: nothing leaves yet");
+    let d = w.vault_data(&owner);
+    assert_eq!(i64::from_le_bytes(d[230..238].try_into().unwrap()), T0 + DAY, "opens after the full waiting period");
+    w.set_time(T0 + DAY - 1);
+    assert!(w.execute(&owner, thief).is_err());
+    // The owner cancels with the recovery kit; the thief's key is dead.
+    w.recover(&owner, 100, 0, root(101), root(10)).unwrap();
+    w.set_time(T0 + 2 * DAY);
+    assert!(w.execute(&owner, thief).is_err());
+    assert_eq!(w.lamports(&thief), 0);
+    // The trusted list survives recovery, and still applies under the new keys.
+    assert_eq!(&w.vault_data(&owner)[287..319], &cold.to_bytes()[..]);
+    w.announce(&owner, 10, 1, 0, cold, SOL, root(11)).unwrap();
+    w.execute(&owner, cold).unwrap();
+    assert_eq!(w.lamports(&cold), 2 * SOL);
+}
+
+/// A vault with no waiting period and a trusted list behaves as before: the
+/// list only ever shortens a wait.
+#[test]
+fn trusted_wallets_never_add_a_wait() {
+    let mut w = World::new();
+    let cold = Pubkey::new_unique();
+    let owner = w.party_trusting(7, root(1), root(100), 0, &[cold]);
+    w.init(&owner, 10 * SOL);
+    let anyone = Pubkey::new_unique();
+    w.announce(&owner, 1, 0, 0, anyone, SOL, root(2)).unwrap();
+    w.execute(&owner, anyone).unwrap();
+    assert_eq!(w.lamports(&anyone), SOL);
+}
+
+/// Creation data with a malformed trusted list is refused.
+#[test]
+fn a_malformed_trusted_list_cannot_create_a_vault() {
+    let mut w = World::new();
+    let payer = Keypair::new();
+    w.svm.airdrop(&payer.pubkey(), 10 * SOL).unwrap();
+    let (a, b) = (Pubkey::new_unique(), Pubkey::new_unique());
+    let z = Pubkey::default();
+    for (what, list) in [("a duplicate", vec![a, a]), ("a gap", vec![z, a]), ("a gap between", vec![a, z, b])] {
+        let data = World::init_data_with(&[7; 32], &CHAIN, &root(1), &root(100), 0, &list);
+        let (_, vault) = w.address(&data);
+        let ix = w.init_ix(&payer, vault, &data);
+        assert!(w.send(&payer, &[ix]).is_err(), "{what}");
+    }
+    let data = World::init_data_with(&[7; 32], &CHAIN, &root(1), &root(100), 0, &[a, b]);
+    let (_, vault) = w.address(&data);
+    let ix = w.init_ix(&payer, vault, &data);
+    w.send(&payer, &[ix]).unwrap();
 }
 

@@ -19,6 +19,7 @@ fn vault() -> Vault {
         delay_secs: DAY,
         pending: None,
         bump: 254,
+        trusted: [[0; 32]; TRUSTED_SLOTS],
     }
 }
 fn announce_bytes(v: &Vault, next: [u8; 32]) -> Vec<u8> {
@@ -48,7 +49,7 @@ fn recover_bytes(v: &Vault, next_rec: [u8; 32], next_op: [u8; 32]) -> Vec<u8> {
 fn announced() -> Vault {
     let mut v = vault();
     let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
-    assert_eq!(apply_announce(&mut v, &a, root(99), NOW).unwrap(), root(10));
+    assert_eq!(apply_announce(&mut v, &a, root(99), NOW, false).unwrap(), root(10));
     v
 }
 
@@ -58,7 +59,7 @@ fn layout_sizes_match_the_specification() {
     assert_eq!(recover_bytes(&vault(), root(21), root(12)).len(), RECOVER_LEN);
     assert_eq!(ANNOUNCE_DOMAIN.len(), RECOVER_DOMAIN.len());
     assert_ne!(ANNOUNCE_DOMAIN, RECOVER_DOMAIN);
-    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (287, 196, 138, 132));
+    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (415, 196, 138, 260));
 }
 
 #[test]
@@ -103,6 +104,7 @@ fn initialization_rules() {
     data.extend(root(10));
     data.extend(root(20));
     data.extend(DAY.to_le_bytes());
+    data.extend([0u8; 128]); // no trusted wallets
     let v = new_vault(root(1), &data, 250).unwrap();
     assert_eq!((v.op_index, v.epoch, v.pending.clone(), v.bump), (0, 0, None, 250));
     let with = |range: std::ops::Range<usize>, bytes: &[u8]| {
@@ -119,7 +121,8 @@ fn initialization_rules() {
     }
     assert!(with(128..132, &(MAX_DELAY_SECS + 1).to_le_bytes()).is_err());
     assert!(with(128..132, &MAX_DELAY_SECS.to_le_bytes()).is_ok());
-    assert!(new_vault(root(1), &data[..131], 250).is_err());
+    assert!(new_vault(root(1), &data[..259], 250).is_err());
+    assert!(new_vault(root(1), &data[..132], 250).is_err(), "the earlier, shorter creation data");
 }
 
 #[test]
@@ -193,7 +196,7 @@ fn announce_guards() {
         edit(&mut d);
         let mut v = state.clone();
         let before = v.clone();
-        let result = decode_announce(&d).and_then(|a| apply_announce(&mut v, &a, root(99), now));
+        let result = decode_announce(&d).and_then(|a| apply_announce(&mut v, &a, root(99), now, false));
         if result.is_err() {
             assert_eq!(v, before, "a rejected announcement must not change state");
         }
@@ -223,7 +226,7 @@ fn announce_guards() {
     d[74..82].copy_from_slice(&1u64.to_le_bytes());
     let mut v = pending.clone();
     let a = decode_announce(&d).unwrap();
-    assert!(apply_announce(&mut v, &a, root(98), NOW).is_err());
+    assert!(apply_announce(&mut v, &a, root(98), NOW, false).is_err());
     assert_eq!(v, pending);
 }
 
@@ -232,12 +235,12 @@ fn announce_fails_closed_on_counter_and_time_overflow() {
     let mut v = vault();
     v.op_index = u64::MAX;
     let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
-    assert!(apply_announce(&mut v, &a, root(99), NOW).is_err());
+    assert!(apply_announce(&mut v, &a, root(99), NOW, false).is_err());
     let mut v = vault();
     let mut d = announce_bytes(&v, root(11));
     d[155..163].copy_from_slice(&i64::MAX.to_le_bytes());
     let a = decode_announce(&d).unwrap();
-    assert!(apply_announce(&mut v, &a, root(99), i64::MAX - 10).is_err());
+    assert!(apply_announce(&mut v, &a, root(99), i64::MAX - 10, false).is_err());
     assert_eq!(v, vault());
 }
 
@@ -260,7 +263,7 @@ fn a_vault_without_a_waiting_period_can_execute_at_once() {
     let mut v = vault();
     v.delay_secs = 0;
     let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
-    apply_announce(&mut v, &a, root(99), NOW).unwrap();
+    apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
     let p = v.pending.clone().unwrap();
     // With no waiting period the window is the one-day minimum.
     assert_eq!((p.opens_at, p.deadline), (NOW, NOW + MIN_EXECUTE_WINDOW_SECS));
@@ -360,7 +363,7 @@ fn a_full_life_cycle_never_reuses_an_authority_tuple() {
             assert!(seen.insert((v.epoch, v.op_index)), "tuple reused");
             next += 1;
             let a = decode_announce(&announce_bytes(&v, root(next))).unwrap();
-            apply_announce(&mut v, &a, root(99), NOW).unwrap();
+            apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
             let deadline = v.pending.as_ref().unwrap().deadline;
             apply_expire(&mut v, deadline + 1).unwrap();
         }
@@ -379,7 +382,7 @@ fn an_operational_key_cannot_make_the_recovery_packet_fail() {
     for (label, planted) in [("next operational root", root(12)), ("next recovery root", root(21))] {
         let mut v = vault();
         let a = decode_announce(&announce_bytes(&v, planted)).unwrap();
-        apply_announce(&mut v, &a, root(99), NOW).unwrap();
+        apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
         assert_eq!(v.op_root, planted);
         let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
         // Only the recovery root that signed is handed back for marking.
@@ -408,7 +411,7 @@ fn the_execution_window_follows_the_waiting_period_with_a_one_day_floor() {
         let mut v = vault();
         v.delay_secs = delay;
         let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
-        apply_announce(&mut v, &a, root(99), NOW).unwrap();
+        apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
         let p = v.pending.unwrap();
         assert_eq!((p.opens_at, p.deadline), (NOW + delay as i64, NOW + delay as i64 + window));
     }
@@ -428,4 +431,66 @@ fn an_announcement_states_the_tokens_decimals_and_sol_states_none() {
     token[195] = 6;
     assert_eq!(decode_announce(&token).unwrap().decimals, 6);
     assert!(decode_announce(&sol[..195]).is_err(), "the earlier, shorter payload");
+}
+
+fn with_trusted(wallets: &[[u8; 32]]) -> Vault {
+    let mut v = vault();
+    for (slot, w) in v.trusted.iter_mut().zip(wallets) {
+        *slot = *w;
+    }
+    v
+}
+
+#[test]
+fn a_withdrawal_to_a_trusted_wallet_does_not_wait_and_any_other_does() {
+    // `announce_bytes` sends to root(77).
+    let mut v = with_trusted(&[root(70), root(77)]);
+    assert!(v.trusts(&root(77)) && v.trusts(&root(70)) && !v.trusts(&root(78)) && !v.trusts(&[0; 32]));
+    let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
+    apply_announce(&mut v, &a, root(99), NOW, true).unwrap();
+    let p = v.pending.clone().unwrap();
+    assert_eq!((p.opens_at, p.deadline), (NOW, NOW + MIN_EXECUTE_WINDOW_SECS), "trusted: opens at once");
+    assert_eq!(check_execute(&v, NOW).unwrap(), p);
+    // The same vault, a destination the caller did not find trusted.
+    let mut v = with_trusted(&[root(70)]);
+    let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
+    apply_announce(&mut v, &a, root(99), NOW, false).unwrap();
+    let p = v.pending.clone().unwrap();
+    assert_eq!(p.opens_at, NOW + DAY as i64, "not trusted: waits");
+    assert!(check_execute(&v, NOW + DAY as i64 - 1).is_err());
+}
+
+#[test]
+fn the_trusted_list_is_stored_canonically() {
+    let base = {
+        let mut d = Vec::new();
+        d.extend(root(1));
+        d.extend(root(2));
+        d.extend(root(10));
+        d.extend(root(20));
+        d.extend(DAY.to_le_bytes());
+        d
+    };
+    let init = |wallets: [[u8; 32]; 4]| {
+        let mut d = base.clone();
+        for w in wallets {
+            d.extend(w);
+        }
+        new_vault(root(1), &d, 250)
+    };
+    let z = [0u8; 32];
+    assert!(init([z, z, z, z]).is_ok(), "none");
+    assert!(init([root(70), z, z, z]).is_ok());
+    assert!(init([root(70), root(71), root(72), root(73)]).is_ok(), "all four");
+    assert!(init([z, root(70), z, z]).is_err(), "a gap before a wallet");
+    assert!(init([root(70), z, root(71), z]).is_err(), "a gap between wallets");
+    assert!(init([root(70), root(70), z, z]).is_err(), "the same wallet twice");
+    assert!(init([root(70), root(71), root(70), z]).is_err(), "the same wallet twice, apart");
+    // The list round-trips through the account, and a non-canonical account does not load.
+    let v = init([root(70), root(71), z, z]).unwrap();
+    let mut d = [0u8; VAULT_LEN];
+    v.pack(&mut d).unwrap();
+    assert_eq!(Vault::unpack(&d).unwrap().trusted, [root(70), root(71), z, z]);
+    d[287 + 64..287 + 96].copy_from_slice(&root(70));
+    assert!(Vault::unpack(&d).is_err(), "a duplicate written into the account");
 }

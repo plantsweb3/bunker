@@ -19,7 +19,7 @@ import {
 } from "@/sdk/classic-token";
 import { mintLabel } from "@/sdk/known-mints";
 import { feePreflight, withdrawalPreflight } from "@/sdk/preflight";
-import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
+import { chainTime, fetchVault, formatDuration, toTrusted, vaultTokens } from "@/sdk/v3/chain";
 import { Activity, ACTIVITY_LABEL, fetchHistory } from "@/sdk/v3/history";
 import {
   authorizeAnnouncement,
@@ -88,6 +88,10 @@ type Intent = {
    * time it is signed, the review no longer describes what would happen. */
   epoch: bigint;
   opIndex: bigint;
+  /** Whether it leaves at once: no waiting period, or a trusted address. */
+  instant: boolean;
+  /** Whether the recipient is one of this Bunker's trusted addresses. */
+  trusted: boolean;
 };
 type Step = "idle" | "open" | "deposit" | "withdraw" | "review" | "sweep";
 /** Left in the wallet by a sweep so it can still pay fees. */
@@ -278,6 +282,13 @@ function App() {
         "This browser is not letting the page store anything (private mode or blocked site data), so it cannot keep the record that stops a key being used twice. Open your Bunker in a normal window.",
       );
     }
+    if (
+      key.trusted.length !== loaded.state.trusted.length ||
+      key.trusted.some((t, i) => t !== loaded.state.trusted[i].toBase58())
+    )
+      throw new Error(
+        "The network reports different trusted addresses from the ones this Bunker was built with. Nothing was opened. Try again later or on another connection.",
+      );
     if (key.delaySecs !== loaded.state.delaySecs)
       throw new Error(
         "The network reports a different waiting period from the one this Bunker was built with. Nothing was opened. Try again later or on another connection.",
@@ -374,6 +385,13 @@ function App() {
     await load(day);
     b.setNotice("Deposit confirmed.");
   }
+  /** Whether a withdrawal to this destination waits. The program decides; this
+   * is the same rule, so the review can say what will happen. */
+  async function timing(w: { kind: 0 | 1; mint: PublicKey; destination: PublicKey }) {
+    if (!vault) throw new Error("Open your Bunker first");
+    const trusted = await toTrusted(vault.state, w);
+    return { trusted, instant: trusted || vault.state.delaySecs === 0 };
+  }
   async function review() {
     if (!day || !vault) throw new Error("Open your Bunker first");
     const { payer } = b.live();
@@ -408,6 +426,7 @@ function App() {
         destination: to,
         epoch: vault.state.epoch,
         opIndex: vault.state.opIndex,
+        ...(await timing({ kind: 0, mint: PublicKey.default, destination: to })),
       });
     } else {
       const qty = parseAmount(amount, chosen.decimals);
@@ -432,6 +451,11 @@ function App() {
         destination: dest.destination,
         epoch: vault.state.epoch,
         opIndex: vault.state.opIndex,
+        ...(await timing({
+          kind: 1,
+          mint: new PublicKey(chosen.mint!),
+          destination: dest.destination,
+        })),
       });
     }
     setStep("review");
@@ -462,7 +486,7 @@ function App() {
       );
     // Three approvals follow. Do not start if the wallet cannot finish them.
     await feePreflight(b.connection, payer);
-    const instant = state.delaySecs === 0;
+    const instant = state.delaySecs === 0 || (await toTrusted(state, a));
     const vaultKey = new PublicKey(day.vault);
     // For a token, make sure the recipient's token account exists (now, so it
     // is there when a waiting withdrawal is released) and name the Bunker's own.
@@ -679,10 +703,24 @@ function App() {
                 {!vault
                   ? "—"
                   : vault.state.delaySecs
-                    ? formatDuration(BigInt(vault.state.delaySecs))
+                    ? vault.state.trusted.length
+                      ? `${formatDuration(BigInt(vault.state.delaySecs))}, except to trusted addresses`
+                      : formatDuration(BigInt(vault.state.delaySecs))
                     : "None"}
               </dd>
             </div>
+            {vault && vault.state.trusted.length > 0 && (
+              <div>
+                <dt>Trusted addresses</dt>
+                <dd>
+                  {vault.state.trusted.map((t) => (
+                    <code key={t.toBase58()} title={t.toBase58()} style={{ display: "block" }}>
+                      {t.toBase58()}
+                    </code>
+                  ))}
+                </dd>
+              </div>
+            )}
             <div>
               <dt>Key generation</dt>
               <dd>{vault ? vault.state.epoch.toString() : "—"}</dd>
@@ -1030,6 +1068,27 @@ function App() {
                       onChange={(e) => setRecipient(e.target.value)}
                     />
                   </label>
+                  {vault.state.trusted.length > 0 && (
+                    <div className="trusted-picks">
+                      <small>
+                        {vault.state.delaySecs
+                          ? "Trusted addresses, no wait:"
+                          : "Trusted addresses:"}
+                      </small>
+                      {vault.state.trusted.map((t) => (
+                        <button
+                          key={t.toBase58()}
+                          type="button"
+                          className="link-button"
+                          disabled={!!b.busy}
+                          title={t.toBase58()}
+                          onClick={() => setRecipient(t.toBase58())}
+                        >
+                          {t.toBase58().slice(0, 6)}…{t.toBase58().slice(-6)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   <div className="actions">
                     <button
                       className="button light"
@@ -1081,7 +1140,16 @@ function App() {
                         <code>{intent.recipient}</code>
                       </dd>
                     </div>
-                    {vault.state.delaySecs ? (
+                    {intent.instant && intent.trusted && vault.state.delaySecs ? (
+                      <div>
+                        <dt>When it leaves</dt>
+                        <dd>
+                          Immediately, on the third approval. This is one of
+                          your Bunker’s trusted addresses, so it does not
+                          wait and cannot be cancelled once sent.
+                        </dd>
+                      </div>
+                    ) : vault.state.delaySecs ? (
                       <>
                         <div>
                           <dt>It can leave after</dt>
@@ -1122,7 +1190,7 @@ function App() {
                       disabled={!can || !ack}
                       onClick={() => b.task("Signing", announce)}
                     >
-                      {vault.state.delaySecs ? "Sign and announce" : "Sign and send"}
+                      {intent.instant ? "Sign and send" : "Sign and announce"}
                     </button>
                     <button
                       className="button ghost"

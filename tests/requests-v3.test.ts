@@ -14,7 +14,7 @@ import {
 const program = new PublicKey(new Uint8Array(32).fill(11));
 const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
-const g = genesisVault(master, { chainTag: new Uint8Array(32).fill(9), programId: program.toBytes(), salt, delaySecs: 0 });
+const g = genesisVault(master, { chainTag: new Uint8Array(32).fill(9), programId: program.toBytes(), salt, delaySecs: 0 , trusted: []});
 const { d } = g;
 const vaultId = d.vaultId;
 const identity = {
@@ -30,7 +30,7 @@ const packet = (epoch: bigint) => {
   return JSON.stringify({ ...identity, kind: "recover", epoch: epoch.toString(), payload: hex(p.payload), signature: hex(p.signature) });
 };
 const chain = (over: Partial<VaultState> = {}): VaultState => ({
-  vaultId, chainTag: d.chainTag, opRoot: g.opRoot, opIndex: 0n, epoch: 0n, recRoot: g.recRoot, delaySecs: 0, pending: null, bump: 255, ...over,
+  vaultId, chainTag: d.chainTag, opRoot: g.opRoot, opIndex: 0n, epoch: 0n, recRoot: g.recRoot, delaySecs: 0, pending: null, bump: 255, trusted: [], ...over,
 });
 describe("Public files between the offline tool and the site", () => {
   it("accepts a network card and rejects other files", () => {
@@ -41,7 +41,7 @@ describe("Public files between the offline tool and the site", () => {
     expect(() => parseNetworkCard("x".repeat(9000))).toThrow("too large");
   });
   it("validates a creation request and carries no secret", () => {
-    const request = { ...identity, kind: "create", salt: hex(salt), delaySecs: 0, opRoot: hex(g.opRoot), recRoot: hex(g.recRoot) };
+    const request = { ...identity, kind: "create", salt: hex(salt), trusted: [] as string[], delaySecs: 0, opRoot: hex(g.opRoot), recRoot: hex(g.recRoot) };
     expect(parseCreationRequest(JSON.stringify(request))).toEqual(request);
     expect(JSON.stringify(request)).not.toContain(hex(master));
     expect(JSON.stringify(request)).not.toContain(hex(g.seed));
@@ -55,6 +55,9 @@ describe("Public files between the offline tool and the site", () => {
     expect(bad({ recRoot: "ab".repeat(32) })).toThrow("does not match its vault address");
     expect(bad({ opRoot: "ab".repeat(32) })).toThrow("does not match its vault address");
     expect(bad({ salt: "ab".repeat(32) })).toThrow("does not match its vault address");
+    // A trusted address slipped into the request changes the address it would create.
+    expect(bad({ trusted: [identity.program] })).toThrow("does not match its vault address");
+    expect(bad({ trusted: Array(5).fill(identity.program) })).toThrow("not a Bunker creation request");
     expect(bad({ vault: vaultAddress(program, new Uint8Array(32).fill(8)).toBase58() })).toThrow("does not match");
     expect(bad({ master: hex(master) })).toThrow("not a Bunker creation request");
   });

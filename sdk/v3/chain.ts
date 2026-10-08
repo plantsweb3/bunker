@@ -32,6 +32,19 @@ export async function fetchVault(
   const spendable = lamports - BigInt(rent);
   return { state, lamports, spendable: spendable > 0n ? spendable : 0n };
 }
+/** Whether a withdrawal to `destination` skips the vault's waiting period: the
+ * destination is a trusted wallet (SOL) or a trusted wallet's associated
+ * token account for the mint. The program makes the same finding itself; this
+ * is so the interface can say what will happen before anything is signed. */
+export async function toTrusted(
+  state: Pick<VaultState, "trusted">,
+  w: { kind: 0 | 1; mint: PublicKey; destination: PublicKey },
+): Promise<boolean> {
+  if (w.kind === 0) return state.trusted.some((t) => t.equals(w.destination));
+  for (const t of state.trusted)
+    if ((await getAssociatedTokenAddress(w.mint, t, true)).equals(w.destination)) return true;
+  return false;
+}
 /** Classic SPL token accounts owned by the vault. Token-2022 is not supported. */
 export async function vaultTokens(connection: Connection, vault: PublicKey): Promise<Asset[]> {
   const accounts = await connection.getParsedTokenAccountsByOwner(vault, {

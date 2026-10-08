@@ -62,9 +62,9 @@ async function vaultWith(delaySecs: number) {
   const g = genesisVault(master, {
       chainTag: new PublicKey(genesis).toBytes(),
       programId: PROGRAM.toBytes(),
-      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: delaySecs });
+      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: delaySecs , trusted: []});
   const d: Descriptor = g.d;
-  await send(initializeIx(PROGRAM, payer.publicKey, { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }));
+  await send(initializeIx(PROGRAM, payer.publicKey, { trusted: [], salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }));
   return { master, d, g, vault: vaultAddress(PROGRAM, d.vaultId) };
 }
 const start = (vault: PublicKey) =>

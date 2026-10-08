@@ -9,7 +9,7 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Secret | Held | If stolen |
 |---|---|---|
 | Wallet key (fee payer) | The user's everyday wallet | Nothing leaves the vault. It can pay fees and deposit. |
-| Day key (one epoch's seed) and its password, or the passkey that unlocks it | The vault page, in one tab; optionally ciphertext in one browser's storage | The thief can announce withdrawals. With no waiting period they complete at once. With one, the owner has that long to recover. |
+| Day key (one epoch's seed) and its password, or the passkey that unlocks it | The vault page, in one tab; optionally ciphertext in one browser's storage | The thief can announce withdrawals. With no waiting period they complete at once. With one, only those to the owner's trusted wallets do; for any other the owner has that long to recover. |
 | Recovery kit (archival master) and its password | The offline tool only | Total. The thief can install their own keys. |
 
 ## Adversaries and failures
@@ -22,8 +22,9 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Someone else sends `initialize` for the owner's address first | The address is a hash of the creation data; other roots, another chain tag or another waiting period produce a different address | None. Identical data creates the owner's own vault. |
 | A stranger builds a vault holding the owner's public roots and retires them there | Spent markers belong to one vault | None. An earlier draft shared markers across vaults; see [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md) P-1. |
 | Replay of a used signature | The root is retired at announcement; index and epoch no longer match | Fork or rollback behaviour needs analysis |
-| Day key stolen, vault has a waiting period | Withdrawal is visible on-chain and waits; recovery cancels it and kills the key | The owner must notice in time. Telegram alerts are optional, best effort, and depend on the project's server, Telegram and an RPC provider. |
-| Day key stolen, vault has **no** waiting period | Nothing | Immediate loss. This is the default and is stated when a vault is created. |
+| Day key stolen, vault has a waiting period | The thief can send at once only to the vault's trusted wallets, which are the owner's. A withdrawal anywhere else is visible on-chain and waits; recovery cancels it and kills the key | The owner must notice in time: Telegram alerts are optional, best effort, and depend on the project's server, Telegram and an RPC provider. A trusted wallet the thief also controls defeats this, so trusted wallets should be ones a compromise of the everyday device does not reach. |
+| Day key stolen, vault has **no** waiting period | Nothing | Immediate loss. The tool starts on a 24-hour wait; choosing none requires accepting a statement that says this. |
+| A trusted address was mistyped, or the owner loses access to it | The tool makes the owner accept a statement naming the count and that every character was checked; the list is shown on the site before the vault is built | The list cannot be changed. A withdrawal to a wrong trusted address is immediate and lost. A lost trusted wallet is merely unused. |
 | Day key lost, passkey or device lost | Recovery kit re-issues a day key or installs a new epoch | None while the kit exists |
 | Signed announcement never lands, tab closed mid-signing | Journal refuses to sign that key again; recovery installs a new epoch | None while the kit exists |
 | Day key stolen and the thief has read a recovery packet, for this key generation or a later one | Recovery neither reads nor marks the operational root, so nothing the day key does can make a packet fail | None beyond the row above. Two earlier drafts let the thief block this recovery, then a future one; see [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md) P-8 and P-11. |
@@ -41,9 +42,9 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Someone tries to hide or fake an alert with transactions | Alerts are derived from changes in the vault account itself, which only the program can change | None from traffic. Dust below 0.001 SOL is not reported. |
 | Alert service compromised or impersonated | It holds no keys and cannot move assets; messages are plain text and state that Bunker never asks for a key | Its operator, its RPC provider or Telegram can silence it or make it send false alarms. A fake bot can phish. Alerts name bunkermode.io/recovery, which never accepts a kit. |
 
-## What the waiting period is
+## What the waiting period and trusted addresses are
 
-Optional, chosen when a vault is created, fixed for that vault, off by default. It is the only protection against a stolen day key. Without it, a Bunker protects against theft of the wallet key and seed phrase and against a bad signature in the wallet, and not against theft of the day key.
+Chosen when a vault is created, fixed for that vault and part of its address. The waiting period applies to every withdrawal except those to the vault's trusted wallets (at most four). It is the only protection against a stolen day key. Without it, a Bunker protects against theft of the wallet key and seed phrase and against a bad signature in the wallet, and not against theft of the day key. With it, a stolen day key can pay only the owner's own trusted wallets without waiting. The reference tool starts on 24 hours.
 
 ## Explicit non-goals
 

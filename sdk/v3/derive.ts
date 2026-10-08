@@ -8,6 +8,7 @@ import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { concat, u64 } from "../bytes";
 import { SECRET_BYTES } from "../winternitz";
+import { trustedBytes } from "./core";
 export const MASTER_BYTES = 32;
 export const SEED_BYTES = 32;
 const LABEL = new TextEncoder().encode("BUNKER-KDF-3");
@@ -25,6 +26,8 @@ export type KeyContext = {
    * its keys are bound to: the same master and salt with another waiting
    * period derive unrelated keys. */
   delaySecs: number;
+  /** The vault's trusted destinations, for the same reason. */
+  trusted: Uint8Array[];
 };
 /** A key context plus the identity of the vault its genesis keys create. The
  * identity is a hash over the genesis commitments (protocol.ts `vaultIdOf`),
@@ -34,8 +37,9 @@ const index = (n: bigint) => {
   if (n < 0n || n > 0xffffffffffffffffn) throw new Error("Index out of range");
   return u64(n);
 };
-/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt || delay_secs`,
- * 113 bytes. Every input of the vault identity except the roots themselves. */
+/** `"BUNKER-KDF-3" || 0x00 || chain_tag || program_id || salt || delay_secs ||
+ * trusted`, 241 bytes. Every input of the vault identity except the roots
+ * themselves. */
 export function context(d: KeyContext): Uint8Array {
   for (const part of [d.chainTag, d.programId, d.salt])
     if (part.length !== 32) throw new Error("Descriptor fields are 32 bytes");
@@ -43,7 +47,15 @@ export function context(d: KeyContext): Uint8Array {
     throw new Error("Invalid waiting period");
   const delay = new Uint8Array(4);
   new DataView(delay.buffer).setUint32(0, d.delaySecs, true);
-  return concat(LABEL, new Uint8Array([0]), d.chainTag, d.programId, d.salt, delay);
+  return concat(
+    LABEL,
+    new Uint8Array([0]),
+    d.chainTag,
+    d.programId,
+    d.salt,
+    delay,
+    trustedBytes(d.trusted),
+  );
 }
 function expand(ikm: Uint8Array, expected: number, info: Uint8Array, length: number) {
   if (ikm.length !== expected) throw new Error("Invalid key material length");

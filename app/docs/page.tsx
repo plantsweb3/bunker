@@ -37,7 +37,7 @@ export default function Page() {
           whose own security policy stops it making network connections, and it
           only runs from the copy you saved, never from the website. In it
           you choose two passwords, one for the recovery kit and a different
-          one for the day key, and whether to add a waiting period. It saves
+          one for the day key, your trusted addresses, and how long everything else waits. It saves
           three files: the recovery kit, your first day key, and a creation
           request. Only the creation request, which holds public commitments
           and nothing secret, is uploaded to the site to create the vault
@@ -55,12 +55,21 @@ export default function Page() {
         </p>
       </section>
       <section>
-        <h2>2. The waiting period is your choice</h2>
+        <h2>2. Trusted addresses and the waiting period</h2>
         <p>
-          Off by default: a withdrawal leaves as soon as you approve it. If
-          you turn it on, every withdrawal from that Bunker waits the time you
-          picked, from one hour to seven days, and you can cancel it during
-          the wait. It is fixed for that Bunker.
+          When you build a Bunker you can list up to four trusted addresses.
+          A withdrawal to one of them arrives as soon as you approve it. A
+          withdrawal to any other address waits, 24 hours unless you pick
+          another period from one hour to seven days, and you can cancel it
+          during the wait. You can also turn the wait off entirely. The
+          addresses and the period are part of the Bunker’s own address and
+          cannot be changed afterwards; to change them, build a new Bunker
+          and move to it.
+        </p>
+        <p>
+          Trusted addresses should be wallets that a thief on your everyday
+          computer could not also empty: a hardware wallet, or your own
+          deposit address at an exchange.
         </p>
         <p>
           What it buys: without one, anyone who gets your day key and its

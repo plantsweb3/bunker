@@ -57,11 +57,11 @@ for (let n = 0; n < cycles; n++) {
   const g = genesisVault(master, {
       chainTag: new PublicKey(genesis).toBytes(),
       programId: PROGRAM.toBytes(),
-      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: instant ? 0 : 86_400 });
+      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: instant ? 0 : 86_400 , trusted: []});
   const d: Descriptor = g.d;
   const vault = vaultAddress(PROGRAM, d.vaultId);
   await send(
-    initializeIx(PROGRAM, payer.publicKey, {
+    initializeIx(PROGRAM, payer.publicKey, { trusted: [],
       salt: d.salt,
       chainTag: d.chainTag,
       opRoot: g.opRoot,

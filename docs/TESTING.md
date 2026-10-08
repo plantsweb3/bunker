@@ -35,7 +35,8 @@ The validator loads the program at the fixed test-only address `k7FaK87WHGVXzkao
 
 Every case gives the day key a different password from the recovery kit and asserts the tool refuses equal ones.
 
-1. **Default, no waiting period:** build, deposit, withdraw; the funds arrive on the third approval; a second withdrawal uses the next key.
+0. **Trusted addresses:** a Bunker with a 24-hour wait and one trusted address; SOL and a token to the trusted address arrive on the third approval (the token case proves the program finds the wallet's real associated token account); the same day key sending to a stranger only gets an announcement that waits.
+1. **No waiting period:** build, deposit, withdraw; the funds arrive on the third approval; a second withdrawal uses the next key.
 2. **Opted-in waiting period:** the kit cannot be created until the waiting period is acknowledged; announce; on-chain state and balances asserted; countdown shown; a packet for the wrong generation is refused; cancel by recovery; the old day key is refused; the new one announces; seal.
 3. **Tokens:** mint a test token, deposit, withdraw to a recipient with no token account, assert both balances, refuse an amount above the balance.
 4. **Passkey:** with a simulated authenticator supporting PRF: save a day key, assert storage holds no plaintext, reopen with the passkey (after the cross-device statement, without which the button is disabled), withdraw, then alter the ciphertext and assert it does not unlock.

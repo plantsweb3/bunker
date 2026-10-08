@@ -55,8 +55,14 @@ fn rust_derivation_matches_the_client() {
     context.extend(bytes(&f["programBytes"]));
     context.extend(bytes(&f["salt"]));
     context.extend((f["delaySecs"].as_u64().unwrap() as u32).to_le_bytes());
+    // Four trusted-wallet slots, the listed ones first and the rest zero.
+    let mut trusted = [0u8; 128];
+    for (i, wallet) in f["trusted"].as_array().unwrap().iter().enumerate() {
+        trusted[32 * i..32 * i + 32].copy_from_slice(&bytes(wallet));
+    }
+    context.extend(trusted);
     assert_eq!(context, bytes(&f["context"]));
-    assert_eq!(context.len(), 113);
+    assert_eq!(context.len(), 241);
     let seed = |epoch: u64| expand(&master, &info(&context, 2, &[epoch]), 32);
     let recovery = |epoch: u64| expand(&master, &info(&context, 1, &[epoch]), 1088);
     let operational = |epoch: u64, index: u64| expand(&seed(epoch), &info(&context, 3, &[epoch, index]), 1088);

@@ -3,10 +3,12 @@
 //! Layouts are specified in docs/PROTOCOL.md.
 use solana_program_error::ProgramError;
 
-pub const VAULT_LEN: usize = 287;
+pub const VAULT_LEN: usize = 415;
 pub const ANNOUNCE_LEN: usize = 196;
 pub const RECOVER_LEN: usize = 138;
-pub const INIT_LEN: usize = 132;
+pub const INIT_LEN: usize = 260;
+/// How many trusted destinations a vault may name.
+pub const TRUSTED_SLOTS: usize = 4;
 pub const VERSION: u8 = 3;
 pub const ROLE_OPERATIONAL: u8 = 1;
 pub const ROLE_RECOVERY: u8 = 2;
@@ -72,8 +74,29 @@ pub struct Vault {
     pub delay_secs: u32,
     pub pending: Option<Pending>,
     pub bump: u8,
+    /// Wallets a withdrawal may go to with no waiting period. Fixed when the
+    /// vault is created and part of its identity. Unused slots are zero and
+    /// come last.
+    pub trusted: [[u8; 32]; TRUSTED_SLOTS],
+}
+/// Unused slots zero and last; no wallet listed twice.
+fn trusted_is_canonical(t: &[[u8; 32]; TRUSTED_SLOTS]) -> bool {
+    let used = t.iter().take_while(|w| **w != ZERO).count();
+    t[used..].iter().all(|w| *w == ZERO)
+        && (0..used).all(|i| (i + 1..used).all(|j| t[i] != t[j]))
+}
+fn read_trusted(d: &[u8]) -> [[u8; 32]; TRUSTED_SLOTS] {
+    let mut t = [ZERO; TRUSTED_SLOTS];
+    for (slot, bytes) in t.iter_mut().zip(d.chunks_exact(32)) {
+        *slot = arr(bytes);
+    }
+    t
 }
 impl Vault {
+    /// Whether `wallet` is one of this vault's trusted destinations.
+    pub fn trusts(&self, wallet: &[u8; 32]) -> bool {
+        *wallet != ZERO && self.trusted.contains(wallet)
+    }
     pub fn unpack(d: &[u8]) -> Result<Self, ProgramError> {
         require(d.len() == VAULT_LEN && &d[..8] == VAULT_MAGIC)?;
         let pending = match d[156] {
@@ -104,6 +127,13 @@ impl Vault {
             delay_secs: u32::from_le_bytes(d[152..156].try_into().unwrap()),
             pending,
             bump: d[286],
+            trusted: {
+                let t = read_trusted(&d[287..VAULT_LEN]);
+                if !trusted_is_canonical(&t) {
+                    return Err(ProgramError::InvalidAccountData);
+                }
+                t
+            },
         })
     }
     pub fn pack(&self, d: &mut [u8]) -> Result<(), ProgramError> {
@@ -129,11 +159,15 @@ impl Vault {
             d[254..286].copy_from_slice(&p.digest);
         }
         d[286] = self.bump;
+        for (i, wallet) in self.trusted.iter().enumerate() {
+            d[287 + 32 * i..319 + 32 * i].copy_from_slice(wallet);
+        }
         Ok(())
     }
 }
 
-/// `data` is `salt || chain_tag || op_root || rec_root || delay_secs`.
+/// `data` is `salt || chain_tag || op_root || rec_root || delay_secs ||
+/// trusted (4 x 32)`.
 /// `vault_id` is the caller's hash of `VAULT_ID_DOMAIN || data`; the salt is
 /// not stored.
 pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, ProgramError> {
@@ -148,7 +182,9 @@ pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, Pro
         delay_secs: u32::from_le_bytes(data[128..132].try_into().unwrap()),
         pending: None,
         bump,
+        trusted: read_trusted(&data[132..INIT_LEN]),
     };
+    require(trusted_is_canonical(&v.trusted))?;
     require(
         v.op_root != ZERO
             && v.rec_root != ZERO
@@ -230,11 +266,16 @@ pub fn decode_recover(d: &[u8]) -> Result<Recover, ProgramError> {
 /// Rotates the operational authority and records the pending withdrawal.
 /// Returns the displaced operational root, which the caller must mark spent.
 /// The caller has already verified the signature against `v.op_root`.
+///
+/// `to_trusted` is the caller's finding that the destination belongs to one
+/// of the vault's trusted wallets. Such a withdrawal opens at once; any other
+/// waits the vault's waiting period.
 pub fn apply_announce(
     v: &mut Vault,
     a: &Announce,
     digest: [u8; 32],
     now: i64,
+    to_trusted: bool,
 ) -> Result<[u8; 32], ProgramError> {
     require(
         a.vault_id == v.vault_id
@@ -245,11 +286,12 @@ pub fn apply_announce(
     require(v.pending.is_none())?;
     require(now <= a.announce_by && a.announce_by.saturating_sub(now) <= MAX_ANNOUNCE_AHEAD_SECS)?;
     require(a.next_op_root != v.op_root && a.next_op_root != v.rec_root)?;
+    let wait = if to_trusted { 0 } else { v.delay_secs };
     let opens_at = now
-        .checked_add(v.delay_secs as i64)
+        .checked_add(wait as i64)
         .ok_or(ProgramError::ArithmeticOverflow)?;
     let deadline = opens_at
-        .checked_add(execute_window(v.delay_secs))
+        .checked_add(execute_window(wait))
         .ok_or(ProgramError::ArithmeticOverflow)?;
     let displaced = v.op_root;
     v.op_index = v

@@ -26,6 +26,28 @@ const SPENT_MAGIC: &[u8; 8] = b"BKSPENT3";
 const VAULT_SEED: &[u8] = b"bunker3";
 const PROOF_SEED: &[u8] = b"proof";
 const SPENT_SEED: &[u8] = b"spent-v3";
+/// The associated token account program. A wallet's token account for a mint
+/// has an address anyone can compute, and nobody else can occupy it.
+const ASSOCIATED_TOKEN_PROGRAM: Pubkey =
+    solana_pubkey::pubkey!("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL");
+
+/// Whether an announced destination belongs to one of the vault's trusted
+/// wallets: for SOL the wallet itself, for a token that wallet's associated
+/// token account for the mint.
+fn to_trusted(v: &Vault, a: &Announce) -> bool {
+    if a.kind == 0 {
+        return v.trusts(&a.destination);
+    }
+    v.trusted.iter().filter(|w| **w != [0; 32]).any(|wallet| {
+        Pubkey::find_program_address(
+            &[wallet, spl_token::id().as_ref(), &a.mint],
+            &ASSOCIATED_TOKEN_PROGRAM,
+        )
+        .0
+        .to_bytes()
+            == a.destination
+    })
+}
 
 fn owned(a: &AccountInfo, id: &Pubkey, len: usize, magic: &[u8; 8]) -> ProgramResult {
     require(a.owner == id && a.data_len() == len)?;
@@ -255,7 +277,8 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
     let message: &[&[u8]] = &[ANNOUNCE_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
     let digest = hashv(message).to_bytes();
     // Cheap state checks first; `displaced` is the root the signature must match.
-    let displaced = apply_announce(&mut v, &a, digest, Clock::get()?.unix_timestamp)?;
+    let trusted = to_trusted(&v, &a);
+    let displaced = apply_announce(&mut v, &a, digest, Clock::get()?.unix_timestamp, trusted)?;
     verify_proof(id, proof, message, &digest, &displaced)?;
     mark_spent(payer, spent, system, id, vault.key, &displaced)?;
     store_vault(vault, &v)
