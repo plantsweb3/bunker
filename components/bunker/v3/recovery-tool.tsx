@@ -1,183 +1,137 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { PublicKey } from "@solana/web3.js";
-import { Check } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { hex, unhex } from "@/sdk/bytes";
-import { genesisAuthorities, recoveryPacket } from "@/sdk/v3/authority";
-import { epochSeed } from "@/sdk/v3/derive";
+import { unhex } from "@/sdk/bytes";
 import { fetchVault, formatDuration } from "@/sdk/v3/chain";
-import {
-  ArchivalKit,
-  DayKey,
-  decryptArchival,
-  descriptorOf,
-  download,
-  encryptFile,
-  fileName,
-  validateArchival,
-} from "@/sdk/v3/kit";
+import { download } from "@/sdk/v3/kit";
 import {
   closeProofIx,
   computeIx,
   initializeIx,
   recoverIx,
   stageIxs,
-  vaultAddress,
   VaultState,
 } from "@/sdk/v3/protocol";
+import {
+  CreationRequest,
+  NetworkCard,
+  parseCreationRequest,
+  parseRecoveryFile,
+  recoveryFileStatus,
+} from "@/sdk/v3/requests";
 import { BIcon } from "../icon";
 import { WalletButton, WalletProvider } from "../wallet";
-import { FileField, Messages, NetworkPill, PasswordField, readKeyFile, useBunker } from "./shared";
-const DELAYS = [
-  [3_600, "1 hour"],
-  [86_400, "24 hours"],
-  [259_200, "3 days"],
-  [604_800, "7 days"],
-] as const;
-const delayLabel = (secs: number) =>
-  DELAYS.find(([s]) => s === secs)?.[1] ?? formatDuration(BigInt(secs));
-function dayKeyFor(kit: ArchivalKit, epoch: bigint): DayKey {
-  const { delaySecs: _delay, master, kind: _kind, ...identity } = kit;
-  void _delay;
-  void _kind;
-  return {
-    ...identity,
-    kind: "day-key",
-    epoch: epoch.toString(),
-    seed: hex(epochSeed(unhex(master), descriptorOf(kit), epoch)),
-  };
-}
-function Tool() {
+import { FileField, Messages, NetworkPill, readKeyFile, useBunker } from "./shared";
+type Packet = ReturnType<typeof parseRecoveryFile>;
+type Manifest = { sha256: string; bytes: number };
+const TOOL = "/source/bunker-recovery-tool.html";
+function Page() {
   const b = useBunker();
   const [mode, setMode] = useState<"create" | "recover">("create");
-  // create
-  const [password, setPassword] = useState("");
-  const [repeat, setRepeat] = useState("");
-  // Off unless the user turns it on and acknowledges what it means.
-  const [wait, setWait] = useState(false);
-  const [delay, setDelay] = useState<number>(86_400);
-  const [waitAck, setWaitAck] = useState(false);
-  const [ack, setAck] = useState(false);
-  const [draft, setDraft] = useState<{ kit: ArchivalKit; encrypted: string } | null>(null);
-  const [verified, setVerified] = useState("");
-  const [created, setCreated] = useState<ArchivalKit | null>(null);
-  // recover
-  const [file, setFile] = useState<File | null>(null);
-  const [opened, setOpened] = useState<{ kit: ArchivalKit; chain: VaultState } | null>(null);
-  const [recovered, setRecovered] = useState<bigint | null>(null);
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [request, setRequest] = useState<CreationRequest | null>(null);
+  const [built, setBuilt] = useState("");
+  const [packet, setPacket] = useState<{
+    file: Packet;
+    chain: VaultState;
+    status: ReturnType<typeof recoveryFileStatus>;
+  } | null>(null);
+  const [recovered, setRecovered] = useState(false);
+  useEffect(() => {
+    fetch("/source/recovery-tool-manifest.json")
+      .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
+      .then(setManifest)
+      .catch(() => setManifest(null));
+  }, []);
   const reset = (next: "create" | "recover") => {
     setMode(next);
-    setPassword("");
-    setRepeat("");
-    setAck(false);
-    setWait(false);
-    setWaitAck(false);
-    setDraft(null);
-    setVerified("");
-    setCreated(null);
-    setFile(null);
-    setOpened(null);
-    setRecovered(null);
+    setRequest(null);
+    setBuilt("");
+    setPacket(null);
+    setRecovered(false);
     b.setError("");
     b.setNotice("");
   };
-  async function giveDayKey(kit: ArchivalKit, epoch: bigint) {
-    const day = dayKeyFor(kit, epoch);
-    download(fileName(day), await encryptFile(day, password));
-  }
-  async function makeKit() {
+  function belongs(f: { program: string; genesis: string }) {
     const { c, program } = b.live();
-    if (password !== repeat) throw new Error("Passwords do not match");
-    if (!ack) throw new Error("Acknowledge what the recovery kit is");
-    if (wait && !waitAck)
-      throw new Error("Acknowledge the waiting period, or turn it off");
-    const vaultId = crypto.getRandomValues(new Uint8Array(32));
-    const master = crypto.getRandomValues(new Uint8Array(32));
-    // Canonical field order, so the re-opened file compares equal.
-    const kit: ArchivalKit = validateArchival({
+    if (f.program !== program.toBase58() || f.genesis !== c.expectedGenesis)
+      throw new Error("That file was made for a different network or program");
+    return program;
+  }
+  function networkCard() {
+    const { c, program } = b.live();
+    const card: NetworkCard = {
       version: 3,
-      kind: "archival",
+      kind: "network",
       network: c.network as "devnet" | "localnet",
       genesis: c.expectedGenesis,
       program: program.toBase58(),
-      vaultId: hex(vaultId),
-      vault: vaultAddress(program, vaultId).toBase58(),
-      delaySecs: wait ? delay : 0,
-      master: hex(master),
-    });
-    master.fill(0);
-    const encrypted = await encryptFile(kit, password);
-    setDraft({ kit, encrypted });
-    setVerified("");
-    download(fileName(kit), encrypted);
+    };
+    download(`bunker-test-network-card-${c.network}.json`, JSON.stringify(card, null, 2));
   }
-  async function verify(f: File) {
-    if (!draft) return;
-    const reopened = await decryptArchival(await readKeyFile(f), password);
-    if (JSON.stringify(reopened) !== JSON.stringify(draft.kit))
-      throw new Error("Choose the recovery kit that was just downloaded");
-    setVerified(f.name);
+  async function loadRequest(f: File | null) {
+    const r = parseCreationRequest(await readKeyFile(f));
+    belongs(r);
+    setRequest(r);
   }
   async function create() {
     const { program, payer } = b.live();
-    if (!draft || !verified) throw new Error("Re-open the saved recovery kit first");
-    const d = descriptorOf(draft.kit);
-    const g = genesisAuthorities(unhex(draft.kit.master), d);
+    if (!request) throw new Error("Choose a creation request");
     await b.transmit("Building your Bunker", [
       initializeIx(program, payer, {
-        vaultId: d.vaultId,
-        chainTag: d.chainTag,
-        opRoot: g.opRoot,
-        recRoot: g.recRoot,
-        delaySecs: draft.kit.delaySecs,
+        vaultId: unhex(request.vaultId),
+        chainTag: new PublicKey(request.genesis).toBytes(),
+        opRoot: unhex(request.opRoot),
+        recRoot: unhex(request.recRoot),
+        delaySecs: request.delaySecs,
       }),
     ]);
-    await giveDayKey(draft.kit, 0n);
-    setCreated(draft.kit);
-    setDraft(null);
-    b.setNotice("Bunker built. Your first day key was downloaded.");
+    setBuilt(request.vault);
+    setRequest(null);
+    b.setNotice("Bunker built. Open it with the day key the tool saved.");
   }
-  async function open() {
-    const { c, program } = b.live();
-    const kit = await decryptArchival(await readKeyFile(file), password);
-    if (kit.program !== program.toBase58() || kit.genesis !== c.expectedGenesis)
-      throw new Error("This recovery kit belongs to a different network or program");
-    const { state } = await fetchVault(b.connection, program, new PublicKey(kit.vault));
-    setOpened({ kit, chain: state });
-    setRecovered(null);
+  async function loadPacket(f: File | null) {
+    const file = parseRecoveryFile(await readKeyFile(f));
+    const program = belongs(file);
+    const { state } = await fetchVault(b.connection, program, new PublicKey(file.vault));
+    setPacket({ file, chain: state, status: recoveryFileStatus(file, state) });
+    setRecovered(false);
   }
   async function recover() {
     const { program, payer } = b.live();
-    if (!opened) throw new Error("Open your recovery kit first");
-    const { kit } = opened;
-    // Read the epoch again: the packet is fixed by it and nothing else.
-    const { state } = await fetchVault(b.connection, program, new PublicKey(kit.vault));
-    const packet = recoveryPacket(unhex(kit.master), descriptorOf(kit), state.epoch);
-    const stages = stageIxs(program, payer, packet.message, packet.signature);
+    if (!packet) throw new Error("Choose a recovery packet");
+    const { file } = packet;
+    // Check against the chain again immediately before spending fees.
+    const { state } = await fetchVault(b.connection, program, new PublicKey(file.vault));
+    const status = recoveryFileStatus(file, state);
+    if (status !== "ready") {
+      setPacket({ file, chain: state, status });
+      throw new Error("This packet no longer applies to the Bunker");
+    }
+    const stages = stageIxs(program, payer, file.message, file.signatureBytes);
     for (let i = 0; i < stages.length; i++)
       await b.transmit(`Approval ${i + 1} of 3 · publishing the recovery packet`, [stages[i]]);
     await b.transmit("Approval 3 of 3 · installing new keys", [
       computeIx(),
-      recoverIx(program, payer, packet.payload, state),
-      closeProofIx(program, payer, packet.message),
+      recoverIx(program, payer, file.payloadBytes, state),
+      closeProofIx(program, payer, file.message),
     ]);
-    await giveDayKey(kit, state.epoch + 1n);
-    const after = await fetchVault(b.connection, program, new PublicKey(kit.vault));
-    setOpened({ kit, chain: after.state });
-    setRecovered(after.state.epoch);
+    const after = await fetchVault(b.connection, program, new PublicKey(file.vault));
+    setPacket({ file, chain: after.state, status: recoveryFileStatus(file, after.state) });
+    setRecovered(true);
     b.setNotice(
-      "Recovered. Every earlier day key is dead, any pending withdrawal was cancelled, and a new day key was downloaded.",
+      "Recovered. Every earlier day key is dead and any waiting withdrawal was cancelled. Open your Bunker with the new day key the tool saved.",
     );
   }
-  const pending = opened?.chain.pending;
+  const can = b.enabled && !!b.wallet.address && !b.busy;
+  const pending = packet?.chain.pending;
   return (
     <main className="vault-page recovery-page">
       <div className="app-top">
         <div className="app-breadcrumb">
           <BIcon name="recovery-kit" size={18} />
-          Recovery tool
+          Recovery
         </div>
         <div className="app-top-actions">
           <NetworkPill config={b.config} />
@@ -186,12 +140,12 @@ function Tool() {
       </div>
       <div className="vault-heading">
         <div>
-          <div className="eyebrow">THE ONLY PLACE THE RECOVERY KIT IS OPENED</div>
-          <h1>Recovery tool.</h1>
+          <div className="eyebrow">YOUR RECOVERY KIT NEVER COMES HERE</div>
+          <h1>Recovery.</h1>
           <p>
-            Build a Bunker, cancel a withdrawal, or replace a lost or exposed
-            day key. Everything here uses your recovery kit; the vault page
-            never does.
+            The recovery kit is opened only in a separate tool that cannot
+            connect to anything. This page takes the public files that tool
+            produces and submits them.
           </p>
         </div>
       </div>
@@ -203,9 +157,9 @@ function Tool() {
           <div>
             <h2>Not available in this release.</h2>
             <p>
-              The recovery tool belongs to the next protocol version, which is
-              a draft under review. It runs only against an isolated test
-              network.
+              Recovery belongs to the next protocol version, a draft under
+              review. It runs only against an isolated test network. The
+              offline tool below can be inspected today.
             </p>
             <Link href="/verify">View release requirements</Link>
           </div>
@@ -214,13 +168,36 @@ function Tool() {
       ) : (
         <div className="notice">
           <BIcon name="simulation" size={18} />
-          <span>
-            Draft protocol on a test network. No real assets. In a real
-            release this tool would run offline, away from your browser.
-          </span>
+          <span>Draft protocol on a test network. No real assets.</span>
         </div>
       )}
       <Messages busy={b.busy} error={b.error} notice={b.notice} />
+      <section className="panel tool-panel offline-tool">
+        <div>
+          <span className="eyebrow">STEP ZERO</span>
+          <h2>Get the offline recovery tool.</h2>
+          <p className="modal-copy">
+            One file, no installation. Save it, move it to a device you trust,
+            and open it there. Its own security policy forbids every network
+            connection.
+          </p>
+        </div>
+        <div className="actions">
+          <a className="button light" href={TOOL} download="bunker-recovery-tool.html">
+            <BIcon name="recovery-kit" size={17} />
+            Download the tool
+          </a>
+          <button className="button ghost" disabled={!b.enabled || !b.wallet.address} onClick={networkCard}>
+            Download network card
+          </button>
+        </div>
+        {manifest && (
+          <p className="micro">
+            SHA-256 <code>{manifest.sha256}</code> · {manifest.bytes.toLocaleString("en-US")} bytes ·
+            built from <code>tools/recovery</code> in the public source
+          </p>
+        )}
+      </section>
       <div className="tool-tabs" role="tablist">
         <button role="tab" aria-selected={mode === "create"} onClick={() => reset("create")}>
           Build a new Bunker
@@ -231,245 +208,127 @@ function Tool() {
       </div>
       {mode === "create" ? (
         <section className="panel tool-panel">
-          {created ? (
+          {built ? (
             <>
               <h2>Your Bunker is built.</h2>
-              <ol className="tool-steps">
-                <li>
-                  <strong>Recovery kit</strong> — move it off this device now.
-                  It never changes and you will rarely need it.
-                </li>
-                <li>
-                  <strong>Day key</strong> — this is what opens your Bunker for
-                  withdrawals. If it is lost or stolen, the recovery kit
-                  replaces it.
-                </li>
-              </ol>
               <div className="vault-address">
                 <span>Bunker address</span>
-                <code>{created.vault}</code>
+                <code>{built}</code>
               </div>
-              <div className="actions">
-                <Link className="button light" href="/vault">
-                  Go to my Bunker
-                </Link>
-                <button
-                  className="button ghost"
-                  disabled={!!b.busy || password.length < 12}
-                  onClick={() => b.task("Preparing day key", () => giveDayKey(created, 0n))}
-                >
-                  Download the day key again
-                </button>
-              </div>
-            </>
-          ) : draft ? (
-            <>
-              <h2>Prove the recovery kit is saved.</h2>
-              <p className="modal-copy">
-                A file named <code>{fileName(draft.kit)}</code> was downloaded.
-                Re-open it here. Nothing is built until this check passes.
-              </p>
-              <button
-                className="button ghost"
-                onClick={() => download(fileName(draft.kit), draft.encrypted)}
-              >
-                Download the recovery kit again
-              </button>
-              <FileField
-                label="Re-open the saved recovery kit"
-                disabled={!!b.busy}
-                onFile={(f) => f && void b.task("Checking the kit", () => verify(f))}
-              />
-              {verified && (
-                <p className="ice">
-                  <Check size={16} style={{ display: "inline", marginRight: 8 }} />
-                  Verified: {verified}
-                </p>
-              )}
-              <button
-                className="button light"
-                disabled={!!b.busy || !verified}
-                onClick={() => b.task("Building your Bunker", create)}
-              >
-                Build Bunker on test network
-              </button>
+              <Link className="button light" href="/vault">
+                Go to my Bunker
+              </Link>
             </>
           ) : (
             <>
-              <h2>One kit, kept for good.</h2>
+              <h2>Submit a creation request.</h2>
               <p className="modal-copy">
-                The recovery kit is created once and never changes. It can
-                cancel any withdrawal and replace any day key, so whoever holds
-                it and its password controls the Bunker.
+                In the offline tool, choose “Build a new Bunker”. It saves a
+                recovery kit, a day key and a creation request. Only the
+                creation request comes here; it holds two public commitments
+                and nothing secret.
               </p>
-              <PasswordField label="Recovery password" value={password} onChange={setPassword} />
-              <PasswordField label="Confirm recovery password" value={repeat} onChange={setRepeat} />
-              <div className={`wait-option ${wait ? "on" : ""}`}>
-                <label className="check-label">
-                  <Checkbox
-                    aria-label="Add a waiting period"
-                    checked={wait}
-                    onCheckedChange={(v) => {
-                      setWait(v === true);
-                      setWaitAck(false);
-                    }}
-                  />
-                  <span>
-                    <strong>Add a waiting period</strong> (optional). Off by
-                    default: withdrawals leave as soon as you approve them.
-                  </span>
-                </label>
-                {wait ? (
-                  <>
-                    <label className="field">
-                      <span>Every withdrawal waits this long before it leaves</span>
-                      <select
-                        aria-label="Waiting period"
-                        value={delay}
-                        onChange={(e) => {
-                          setDelay(Number(e.target.value));
-                          setWaitAck(false);
-                        }}
-                      >
-                        {DELAYS.map(([secs, label]) => (
-                          <option key={secs} value={secs}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label className="check-label">
-                      <Checkbox
-                        aria-label="Acknowledge the waiting period"
-                        checked={waitAck}
-                        onCheckedChange={(v) => setWaitAck(v === true)}
-                      />
-                      <span>
-                        I understand that every withdrawal from this Bunker
-                        will take {delayLabel(delay)} to arrive, with no way to
-                        speed one up, and that this cannot be shortened or
-                        turned off for this Bunker later. I am choosing it so
-                        I have time to cancel a withdrawal I did not make.
-                      </span>
-                    </label>
-                  </>
-                ) : (
-                  <p className="micro">
-                    What it is for: without one, anyone who gets your day key
-                    and its password can withdraw immediately. With one, you
-                    get that long to cancel with your recovery kit.
-                  </p>
-                )}
-              </div>
-              <label className="check-label">
-                <Checkbox
-                  aria-label="Acknowledge the recovery kit"
-                  checked={ack}
-                  onCheckedChange={(v) => setAck(v === true)}
-                />
-                <span>
-                  I will keep the recovery kit off this device, and I
-                  understand that losing both it and its password cannot be
-                  undone. Test assets only.
-                </span>
-              </label>
+              <FileField
+                label="Creation request"
+                disabled={!!b.busy}
+                onFile={(f) => f && void b.task("Reading", () => loadRequest(f))}
+              />
+              {request && (
+                <dl className="withdraw-review">
+                  <div>
+                    <dt>Bunker address</dt>
+                    <dd>
+                      <code>{request.vault}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Waiting period</dt>
+                    <dd>
+                      {request.delaySecs
+                        ? `${formatDuration(BigInt(request.delaySecs))} on every withdrawal, fixed for this Bunker`
+                        : "None. Withdrawals leave as soon as they are approved."}
+                    </dd>
+                  </div>
+                </dl>
+              )}
               <button
                 className="button light"
-                disabled={
-                  !b.enabled ||
-                  !b.wallet.address ||
-                  !!b.busy ||
-                  !ack ||
-                  (wait && !waitAck) ||
-                  password.length < 12
-                }
-                onClick={() => b.task("Preparing recovery kit", makeKit)}
+                disabled={!can || !request}
+                onClick={() => b.task("Building your Bunker", create)}
               >
-                Create recovery kit
+                Build Bunker on test network
               </button>
             </>
           )}
         </section>
       ) : (
         <section className="panel tool-panel">
-          {!opened ? (
+          <h2>{recovered ? "New keys installed." : "Submit a recovery packet."}</h2>
+          <p className="modal-copy">
+            In the offline tool, open your recovery kit and enter your
+            Bunker’s current key generation. It saves a recovery packet and a
+            new day key. Only the packet comes here. Anyone holding a packet
+            can do exactly one thing with it: install the keys it names.
+          </p>
+          <FileField
+            label="Recovery packet"
+            disabled={!!b.busy}
+            onFile={(f) => f && void b.task("Checking packet", () => loadPacket(f))}
+          />
+          {packet && (
             <>
-              <h2>Open your recovery kit.</h2>
-              <p className="modal-copy">
-                Recovering installs brand-new keys. It kills every earlier day
-                key, cancels any withdrawal that is still waiting, and never
-                moves your assets.
-              </p>
-              <FileField label="Recovery kit" onFile={setFile} disabled={!!b.busy} />
-              <PasswordField label="Recovery password" value={password} onChange={setPassword} />
-              <button
-                className="button light"
-                disabled={!b.enabled || !b.wallet.address || !!b.busy || !file || password.length < 12}
-                onClick={() => b.task("Opening recovery kit", open)}
-              >
-                Open recovery kit
-              </button>
-            </>
-          ) : (
-            <>
-              <h2>{recovered !== null ? "New keys installed." : "Ready to recover."}</h2>
               <dl className="withdraw-review">
                 <div>
                   <dt>Bunker</dt>
                   <dd>
-                    <code>{opened.kit.vault}</code>
+                    <code>{packet.file.vault}</code>
                   </dd>
                 </div>
                 <div>
-                  <dt>Key generation</dt>
-                  <dd>{opened.chain.epoch.toString()}</dd>
+                  <dt>Key generation on-chain</dt>
+                  <dd>{packet.chain.epoch.toString()}</dd>
                 </div>
                 <div>
-                  <dt>Pending withdrawal</dt>
+                  <dt>This packet</dt>
+                  <dd>
+                    {packet.status === "ready"
+                      ? `Valid for generation ${packet.file.epoch}. Signature checked against the Bunker’s recovery commitment.`
+                      : packet.status === "already-applied"
+                        ? "Already applied. The Bunker has moved past this generation."
+                        : packet.status === "wrong-epoch"
+                          ? "Made for a later generation than the Bunker is at. Make one for the generation shown above."
+                          : "Signature does not match this Bunker’s recovery commitment. Wrong kit, or a damaged file."}
+                  </dd>
+                </div>
+                <div>
+                  <dt>Waiting withdrawal</dt>
                   <dd>
                     {pending
                       ? `${pending.amount.toString()} lamports to ${pending.destination.toBase58()} — will be cancelled`
                       : "None"}
                   </dd>
                 </div>
-                <div>
-                  <dt>Waiting period</dt>
-                  <dd>
-                    {opened.chain.delaySecs
-                      ? formatDuration(BigInt(opened.chain.delaySecs))
-                      : "None"}
-                  </dd>
-                </div>
               </dl>
-              {recovered === null && (
+              {packet.status === "ready" && (
                 <div className="notice">
-                  Safe to retry: the recovery packet for this key generation is
-                  always the same bytes. Expect 3 wallet approvals.
+                  Safe to retry: this packet is always the same bytes. Expect
+                  3 wallet approvals.
                 </div>
               )}
               <div className="actions">
                 <button
                   className="button light"
-                  disabled={!!b.busy || recovered !== null}
+                  disabled={!can || packet.status !== "ready"}
                   onClick={() => b.task("Recovering", recover)}
                 >
                   {pending ? "Cancel withdrawal and install new keys" : "Install new keys"}
                 </button>
-                <button
-                  className="button ghost"
-                  disabled={!!b.busy}
-                  onClick={() =>
-                    b.task("Preparing day key", () => giveDayKey(opened.kit, opened.chain.epoch))
-                  }
-                >
-                  Download current day key
-                </button>
+                {recovered && (
+                  <Link className="button ghost" href="/vault">
+                    Go to my Bunker
+                  </Link>
+                )}
               </div>
-              {recovered !== null && (
-                <Link className="security-link" href="/vault">
-                  Go to my Bunker
-                </Link>
-              )}
             </>
           )}
         </section>
@@ -480,7 +339,7 @@ function Tool() {
 export default function RecoveryTool() {
   return (
     <WalletProvider>
-      <Tool />
+      <Page />
     </WalletProvider>
   );
 }
