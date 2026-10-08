@@ -448,47 +448,58 @@ export default function Home() {
         />
         <section className="section role" data-level="03">
           <div className="eyebrow">
-            <b>03 / INSIDE</b>YOUR PART
+            <b>03 / INSIDE</b>WHAT YOU HOLD
           </div>
           <div className="split-title">
             <h2>
-              Bunker holds the line.
+              Four things.
               <br />
-              You hold the key.
+              You hold all of them.
             </h2>
             <p>
-              The program gives nobody an account behind your vault and has
-              no reset button. A day key opens it; one recovery kit, made once,
-              replaces that key if it is ever lost or stolen. Three habits
-              keep it yours.
+              Nobody at Bunker has a copy, and there is no reset button. That
+              is what keeps a thief out, and it is why these four matter.
             </p>
           </div>
-          <ol className="role-grid">
+          <ol className="hold-grid">
             <li>
-              <BIcon name="recovery-kit" size={26} />
-              <h3>Keep the kit off your everyday device</h3>
-              <p>
-                Store the recovery kit somewhere your daily browser and wallet
-                are not, and keep its password separately.
-              </p>
+              <div className="hold-pic wallet" aria-hidden="true">
+                <span className="p-wallet" />
+                <span className="p-coin a" />
+                <span className="p-coin b" />
+                <span className="p-reach" />
+              </div>
+              <h3>Your wallet</h3>
+              <strong>For spending.</strong>
+              <p>Keep a little here. A thief can reach it.</p>
             </li>
             <li>
-              <BIcon name="approved-address" size={26} />
-              <h3>Never give it to a website</h3>
-              <p>
-                The kit is opened only in the offline recovery tool. No page,
-                including this one, and nobody from Bunker will ever ask for
-                it.
-              </p>
+              <div className="hold-pic key" aria-hidden="true">
+                <span className="p-door" />
+                <span className="p-key" />
+                <span className="p-coin out" />
+              </div>
+              <h3>Your day key</h3>
+              <strong>Opens the door.</strong>
+              <p>To your own wallets: right away. To anyone else: after a day.</p>
             </li>
             <li>
-              <BIcon name="bunker-key" size={26} />
-              <h3>Use your day key on one device</h3>
-              <p>
-                A second device cannot know what the first has signed. If a
-                device is lost or you stop trusting it, the kit installs new
-                keys.
-              </p>
+              <div className="hold-pic stop" aria-hidden="true">
+                <span className="p-ring" />
+                <span className="p-stop">STOP</span>
+              </div>
+              <h3>Your stop button</h3>
+              <strong>Stops a thief.</strong>
+              <p>One file. Keep it close. It cancels a withdrawal you did not make.</p>
+            </li>
+            <li>
+              <div className="hold-pic kit" aria-hidden="true">
+                <span className="p-drawer" />
+                <span className="p-box" />
+              </div>
+              <h3>Your recovery kit</h3>
+              <strong>Makes new keys.</strong>
+              <p>Hide it. Never on the internet. Never shown to a website, not even this one.</p>
             </li>
           </ol>
         </section>

@@ -4755,3 +4755,240 @@ details.advanced .field {
 .demo-deeper[open] > summary {
   margin-bottom: 24px;
 }
+
+/* ── What you hold: four picture cards on the landing page ── */
+.hold-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  margin: 56px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #2b3336;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.hold-grid li {
+  padding: 0 0 26px;
+  background: #0d1112;
+}
+.hold-grid li + li {
+  border-left: 1px solid #2b3336;
+}
+.hold-grid h3 {
+  margin: 20px 24px 0;
+  font: 600 12px / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #8a9699;
+}
+.hold-grid strong {
+  display: block;
+  margin: 10px 24px 0;
+  font: 500 26px / 1.1 "Space Grotesk", "Inter", sans-serif;
+  color: #f5f7f6;
+}
+.hold-grid p {
+  margin: 10px 24px 0;
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+.hold-pic {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-bottom: 1px solid #2b3336;
+  background: radial-gradient(70% 70% at 50% 100%, rgba(125, 211, 199, 0.07), transparent 70%), #0a0c0d;
+  overflow: hidden;
+}
+.hold-pic.wallet {
+  background: radial-gradient(70% 70% at 50% 100%, rgba(243, 150, 135, 0.07), transparent 70%), #0a0c0d;
+}
+.hold-pic span {
+  position: absolute;
+}
+.p-coin {
+  width: 9%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2bb55 55%, #a9832a);
+}
+/* Wallet: a hand reaches in and a coin goes with it. */
+.p-wallet {
+  left: 26%;
+  top: 34%;
+  width: 40%;
+  height: 40%;
+  border: 2px solid #56646a;
+  border-radius: 9px;
+  background: #12181a;
+}
+.p-coin.a {
+  left: 34%;
+  top: 48%;
+}
+.p-coin.b {
+  left: 47%;
+  top: 48%;
+  animation: hold-taken 4.5s ease-in-out infinite;
+}
+.p-reach {
+  right: 4%;
+  top: 16%;
+  width: 46%;
+  border-top: 2px dashed #f39687;
+  transform-origin: right center;
+  transform: rotate(-22deg) scaleX(0);
+  animation: hold-reach 4.5s ease-in-out infinite;
+}
+@keyframes hold-reach {
+  20%, 55% { transform: rotate(-22deg) scaleX(1); }
+  75%, 100% { transform: rotate(-22deg) scaleX(0); }
+}
+@keyframes hold-taken {
+  0%, 25% { left: 47%; top: 48%; opacity: 1; }
+  55% { left: 86%; top: 14%; opacity: 1; }
+  70% { left: 86%; top: 14%; opacity: 0; }
+  71% { left: 47%; top: 48%; opacity: 0; }
+  100% { left: 47%; top: 48%; opacity: 1; }
+}
+/* Day key: the key meets the door, and a coin comes out. */
+.p-door {
+  left: 36%;
+  top: 22%;
+  width: 28%;
+  height: 58%;
+  border: 3px solid var(--ice);
+  border-bottom-width: 5px;
+  border-radius: 46% 46% 4px 4px / 32% 32% 4px 4px;
+  background: linear-gradient(180deg, rgba(125, 211, 199, 0.14), rgba(125, 211, 199, 0.03));
+}
+.p-key {
+  left: 8%;
+  top: 50%;
+  width: 20%;
+  height: 0;
+  border-top: 4px solid #f5f7f6;
+  animation: hold-key 4.5s ease-in-out infinite;
+}
+.p-key::before {
+  content: "";
+  position: absolute;
+  left: -34%;
+  top: -11px;
+  width: 16px;
+  height: 16px;
+  border: 4px solid #f5f7f6;
+  border-radius: 50%;
+}
+@keyframes hold-key {
+  0%, 10% { transform: translateX(0); }
+  35%, 70% { transform: translateX(60%); }
+  100% { transform: translateX(0); }
+}
+.p-coin.out {
+  left: 46%;
+  top: 50%;
+  opacity: 0;
+  animation: hold-out 4.5s ease-in-out infinite;
+}
+@keyframes hold-out {
+  0%, 38% { left: 46%; opacity: 0; }
+  45% { left: 46%; opacity: 1; }
+  70% { left: 84%; opacity: 1; }
+  82%, 100% { left: 84%; opacity: 0; }
+}
+/* Stop button */
+.p-ring {
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  margin: -23% 0 0 -23%;
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 rgba(125, 211, 199, 0.55);
+  animation: hold-ring 1.8s ease-out infinite;
+}
+@keyframes hold-ring {
+  to { box-shadow: 0 0 0 26px rgba(125, 211, 199, 0); }
+}
+.p-stop {
+  left: 50%;
+  top: 50%;
+  width: 46%;
+  aspect-ratio: 1;
+  margin: -23% 0 0 -23%;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ice);
+  color: #06100f;
+  font: 700 clamp(13px, 1.5vw, 20px) / 1 "Space Grotesk", "Inter", sans-serif;
+  letter-spacing: 0.1em;
+}
+/* Recovery kit: a box that slides into a drawer. */
+.p-drawer {
+  left: 22%;
+  top: 46%;
+  width: 56%;
+  height: 34%;
+  border: 2px solid #56646a;
+  border-radius: 5px;
+  background: #12181a;
+}
+.p-drawer::after {
+  content: "";
+  position: absolute;
+  left: 42%;
+  top: 44%;
+  width: 16%;
+  border-top: 3px solid #56646a;
+}
+.p-box {
+  left: 38%;
+  top: 14%;
+  width: 24%;
+  height: 22%;
+  border: 2px solid var(--ice);
+  border-radius: 4px;
+  background: #10201f;
+  animation: hold-hide 4.5s ease-in-out infinite;
+}
+@keyframes hold-hide {
+  0%, 20% { transform: translateY(0); opacity: 1; }
+  55% { transform: translateY(150%); opacity: 1; }
+  68%, 88% { transform: translateY(150%); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}
+@media (max-width: 980px) {
+  .hold-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .hold-grid li:nth-child(3) {
+    border-left: 0;
+  }
+  .hold-grid li:nth-child(n + 3) {
+    border-top: 1px solid #2b3336;
+  }
+}
+@media (max-width: 520px) {
+  .hold-grid {
+    margin-top: 36px;
+  }
+  .hold-grid h3,
+  .hold-grid strong,
+  .hold-grid p {
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+  .hold-grid strong {
+    font-size: 20px;
+  }
+  .hold-grid p {
+    font-size: 14px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hold-pic span {
+    animation: none !important;
+  }
+}
