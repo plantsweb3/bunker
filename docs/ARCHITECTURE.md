@@ -31,7 +31,7 @@ Three public files cross between the offline tool and the site (`sdk/v3/requests
 
 `scripts/build-recovery-tool.mjs` bundles `tools/recovery` into one HTML file, `public/source/bunker-recovery-tool.html`, at build time, and writes its SHA-256 to `recovery-tool-manifest.json`. The page's own Content Security Policy is `default-src 'none'; connect-src 'none'; form-action 'none'` with the inline script pinned by hash. The build is reproducible and its output is not committed.
 
-It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
+CI builds the tool on every run, checks that a second build is byte-identical, prints its manifest and uploads the file as a workflow artifact, so there is a copy and a hash that do not come from the website. It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
 
 ## The web app
 

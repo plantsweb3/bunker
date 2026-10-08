@@ -32,6 +32,22 @@ jobs:
       - run: npx tsx scripts/v3-vectors.ts > /tmp/bunker-v3.json
       - run: diff fixtures/bunker-v3.json /tmp/bunker-v3.json
       - run: npm run source:bundle
+      - name: Offline recovery tool builds reproducibly
+        run: |
+          cp public/source/bunker-recovery-tool.html /tmp/tool-first.html
+          npm run tool:build
+          cmp /tmp/tool-first.html public/source/bunker-recovery-tool.html
+          cat public/source/recovery-tool-manifest.json
+      # An independent build of the tool, so its hash does not rest only on
+      # the copy the website serves.
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bunker-recovery-tool
+          path: |
+            public/source/bunker-recovery-tool.html
+            public/source/recovery-tool-manifest.json
+          if-no-files-found: error
+          retention-days: 90
       - run: npm run build
   browser-release:
     runs-on: ubuntu-latest
