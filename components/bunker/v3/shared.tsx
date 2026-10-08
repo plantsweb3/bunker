@@ -52,9 +52,9 @@ export function useBunker() {
       inFlight.current = false;
     }
   }
-  /** Test custody under the protocol 3 draft program, with a wallet connected. */
+  /** Test custody, with a wallet connected to pay fees. */
   function live() {
-    if (!config?.custodyEnabled || !config.programId || config.protocolVersion !== 3)
+    if (!config?.custodyEnabled || !config.programId)
       throw new Error(config?.releaseStatus ?? "Configuration unavailable");
     if (!wallet.address) throw new Error("Connect a wallet to pay network fees");
     return { c: config, program: new PublicKey(config.programId), payer: wallet.address };
@@ -64,7 +64,7 @@ export function useBunker() {
     setBusy(label);
     return send(connection, c, payer, ixs, wallet.sign);
   }
-  const enabled = !!config?.custodyEnabled && config.protocolVersion === 3;
+  const enabled = !!config?.custodyEnabled;
   return { wallet, config, connection, busy, error, notice, setError, setNotice, task, live, transmit, enabled };
 }
 export function Messages({ busy, error, notice }: { busy: string; error: string; notice: string }) {

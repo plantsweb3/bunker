@@ -1,8 +1,6 @@
 # Proposal: recoverable authority and delayed withdrawals
 
-**Status: design proposal, not implemented or approved.** 7 October 2026. Baseline: protocol 2, commit `88bf8a8`. This document proposes a later, incompatible protocol version. No runtime behavior, expiry default, primitive, deployment or release gate is changed by it. Real-fund custody remains disabled. No independent audit is complete.
-
-A draft byte-level specification of sections 1 to 3 is in [PROTOCOL-3-DRAFT.md](PROTOCOL-3-DRAFT.md). It is also unimplemented and unapproved.
+**Status: historical design rationale.** Written 7 October 2026 against an earlier protocol that has since been removed. Sections 1 to 3 were made concrete in [PROTOCOL.md](PROTOCOL.md) and implemented in draft; the waiting period described here as mandatory became optional there; pre-approved destinations (section 4) and the alert service (section 6) are not built. Where this document and PROTOCOL.md differ, PROTOCOL.md is current. References below to "protocol 2" or "v2" describe the removed design.
 
 ## Decision requested
 

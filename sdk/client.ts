@@ -15,7 +15,6 @@ import {
   getMint,
 } from "./classic-token";
 import { BunkerConfig, MAINNET_GENESIS } from "../lib/bunker-config";
-import { VAULT_SIZE, parseVault, vaultAddress } from "./protocol";
 import { formatAmount } from "./bytes";
 export type Asset = {
   key: string;
@@ -57,16 +56,12 @@ export async function assertNetwork(
 export async function assets(
   connection: Connection,
   owner: PublicKey,
-  vault = false,
 ): Promise<Asset[]> {
-  const [balance, tokens, rent] = await Promise.all([
+  const [balance, tokens] = await Promise.all([
     connection.getBalance(owner),
     connection.getParsedTokenAccountsByOwner(owner, {
       programId: TOKEN_PROGRAM_ID,
     }),
-    vault
-      ? connection.getMinimumBalanceForRentExemption(VAULT_SIZE)
-      : Promise.resolve(0),
   ]);
   if (!Number.isSafeInteger(balance))
     throw new Error("SOL balance exceeds this RPC client’s safe integer range");
@@ -76,7 +71,7 @@ export async function assets(
       mint: null,
       account: null,
       label: "SOL",
-      amount: BigInt(Math.max(0, balance - rent)),
+      amount: BigInt(balance),
       decimals: 9,
       frozen: false,
     },
@@ -96,19 +91,6 @@ export async function assets(
       ];
     }),
   ];
-}
-export async function fetchVault(
-  connection: Connection,
-  program: PublicKey,
-  address: PublicKey,
-) {
-  const info = await connection.getAccountInfo(address);
-  if (!info || !info.owner.equals(program))
-    throw new Error("Vault not found under the configured Bunker program");
-  const state = parseVault(info.data);
-  if (!vaultAddress(program, state.id).equals(address))
-    throw new Error("Vault address does not match its stored identity");
-  return state;
 }
 export function explorer(
   signature: string,

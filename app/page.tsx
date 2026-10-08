@@ -40,9 +40,9 @@ const stops = [
   "A reused authorization. Every successful withdrawal replaces the key in the same transaction.",
 ];
 const limits = [
-  "Malware on the device where you open your recovery kit. It can copy the kit and record the password.",
-  "A fake Bunker site. Anyone who gets your recovery kit and its password has your Bunker key.",
-  "A lost recovery kit or password. There is no reset and no administrator.",
+  "Malware on the device where you open your keys. It can copy a key file and record its password.",
+  "A stolen day key, if you chose no waiting period. Whoever has it and its password can withdraw at once.",
+  "A lost recovery kit. There is no reset and no administrator, and it is the only thing that replaces a lost key.",
 ];
 const gates = [
   [
@@ -96,10 +96,12 @@ const faq: [string, React.ReactNode][] = [
   [
     "What happens if I lose my recovery kit or its password?",
     <>
-      The assets in that vault cannot be recovered. Nobody, including the
-      people who build Bunker, can reset it. That is the cost of having no
-      back door, and it is why the app makes you prove the kit is saved before
-      a vault is created.
+      Your day key keeps working, so nothing is lost that day. But the kit is
+      the only thing that can replace a lost or stolen day key, and nobody,
+      including the people who build Bunker, can reset it. Lose both and the
+      vault cannot be opened. That is the cost of having no back door, and it
+      is why the tool makes you prove the kit is saved before anything is
+      built.
     </>,
   ],
   [
@@ -110,7 +112,8 @@ const faq: [string, React.ReactNode][] = [
       <a href={REPO} target="_blank" rel="noreferrer">
         public
       </a>
-      . A recovery tool that works without this site is on the list before
+      . The recovery tool is a file you keep and runs without this site. A
+      way to submit a withdrawal without this site is on the list before
       mainnet.
     </>,
   ],
@@ -302,7 +305,7 @@ export default function Home() {
               [
                 "bunker-key",
                 "A different key to the door",
-                "Withdrawals need the Bunker key from your recovery kit. Your connected wallet only pays the network fee.",
+                "Withdrawals need your Bunker key, which your wallet never holds. Your connected wallet only pays the network fee.",
               ],
               [
                 "simulation",
@@ -440,8 +443,9 @@ export default function Home() {
             </h2>
             <p>
               There is no company account behind your vault and no reset
-              button. The Bunker key lives in an encrypted recovery kit that
-              only you have. Three habits keep it yours.
+              button. A day key opens it; one recovery kit, made once,
+              replaces that key if it is ever lost or stolen. Three habits
+              keep it yours.
             </p>
           </div>
           <ol className="role-grid">
@@ -455,18 +459,20 @@ export default function Home() {
             </li>
             <li>
               <BIcon name="approved-address" size={26} />
-              <h3>Open it in one place only</h3>
+              <h3>Never give it to a website</h3>
               <p>
-                The kit is only ever used at bunkermode.io. Nobody from Bunker
-                will ask for it by message, email or form.
+                The kit is opened only in the offline recovery tool. No page,
+                including this one, and nobody from Bunker will ever ask for
+                it.
               </p>
             </li>
             <li>
               <BIcon name="bunker-key" size={26} />
-              <h3>Treat it as the only copy of the key</h3>
+              <h3>Use your day key on one device</h3>
               <p>
-                If the kit or its password is lost, the vault cannot be opened
-                by anyone. Keep the newest kit after every withdrawal.
+                A second device cannot know what the first has signed. If a
+                device is lost or you stop trusting it, the kit installs new
+                keys.
               </p>
             </li>
           </ol>

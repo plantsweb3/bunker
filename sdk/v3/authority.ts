@@ -1,4 +1,4 @@
-/** Protocol 3 authorities built from derived keys (docs/PROTOCOL-3-DRAFT.md
+/** Protocol 3 authorities built from derived keys (docs/PROTOCOL.md
  * §3). DRAFT: not reviewed, not used by the released app.
  *
  * Two deliberately different surfaces:

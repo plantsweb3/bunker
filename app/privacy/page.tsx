@@ -20,8 +20,9 @@ export default function Page() {
           </li>
           <li>No cookies are set by this site.</li>
           <li>
-            Recovery kits, passwords and Bunker keys are never sent to a
-            server. They are handled in your browser.
+            Passwords and Bunker keys are never sent to a server. A day key
+            is handled in your browser; a recovery kit is handled only in the
+            offline tool and never by this site.
           </li>
         </ul>
       </section>
@@ -50,9 +51,11 @@ export default function Page() {
         <h2>What is stored on your device</h2>
         <p>
           In test configurations that allow creating a vault, the app keeps a
-          signing journal and a password-encrypted checkpoint of an in-progress
-          withdrawal in this browser’s local storage, so that an interrupted
-          withdrawal can be resumed. Clearing site data removes them. The
+          record in this browser’s local storage of which one-time keys it
+          has used and of a signed withdrawal that has not been announced yet,
+          so that an interrupted one can be resumed. If you choose passkey
+          unlock, an encrypted copy of your day key is stored there too.
+          Clearing site data removes them. The
           public mainnet site is read-only and stores nothing.
         </p>
       </section>

@@ -1,57 +1,55 @@
 # Testing
 
-- `npm run typecheck`: strict TypeScript checks.
-- `npm test`: exact amounts, canonical payload context, cross-language cryptographic vectors, tamper rejection, authenticated recovery encryption, release gate and simulation state machine.
-- `cargo test --workspace`: unchanged upstream crypto, mnemonic and BIP39 tests, plus Rust protocol-v2 encoding, signature/context, rotation fixtures and expiry boundary.
-- `npm run program:build`: compiles the SBF binary.
-- `npm run test:chain`: real transactions against the isolated validator on 127.0.0.1:19099. Test program public ID is `AhZPKQAwKeCJ47PVKz5QZmBwf1PE8BHcmcqsjvSdPaZ`. The tests fund fresh local wallets from the local faucet. They do not use user wallets or network funds.
-- `npm run test:e2e`: authored browser regression suite against a running local app. It checks routes, release gate, modal behavior, simulation, mobile overflow and errors. With the isolated validator running, a disposable Wallet Standard test wallet also exercises vault creation, encrypted backup verification, SOL deposit/withdrawal, key rotation, stale-file rejection and restoration after reload, on desktop and mobile. No user wallet or real funds are involved. Without the validator those custody cases report an explicit skip. See evidence for which checks were executed.
+Automated tests do not establish cryptographic security and are not an audit.
 
-Local-chain evidence is in `docs/evidence/local-chain-tests.json`; its program is a local test identity, not a deployed mainnet address. Automated tests do not establish cryptographic security or replace independent audit.
+## Commands
 
-Launch the validator with `scripts/local-validator.sh` in one terminal, then run `npm run test:chain`. The script uses dedicated RPC/gossip/faucet ports and a workspace-local ledger. It does not reset existing user ledgers. Set `BUNKER_LOCAL_LEDGER` if desired. Stop with Ctrl-C. The browser test configuration can be generated with `npm run setup:local`; restarting `npm run dev` picks it up. Remove `.env.local` to restore the mainnet read-only release.
+| Command | What it covers |
+|---|---|
+| `npm run typecheck`, `npm run lint` | Strict TypeScript and lint over app, client, tool, scripts and tests |
+| `npm test` | Client: exact amounts, the vendored-primitive vectors, key derivation and encodings, byte-for-byte reproduction of `fixtures/bunker-v3.json`, signing journal, key files, public file formats, wallet-check classification, preflight decisions, RPC proxy rules, release gate, source-bundle exclusions |
+| `cargo test --workspace --locked` | The unchanged upstream primitive's own tests; the program's state machine row by row (`programs/bunker3/tests/state.rs`); fixed-seed randomized sequences and decoder inputs (`tests/model.rs`) |
+| `npm run program:build` | Compiles the program to `target/deploy/bunker3.so` |
+| `cd programs/bunker3-svm-tests && cargo test --locked` | The compiled program in an in-process Solana VM (LiteSVM) with the Clock sysvar set, so waiting periods and deadlines are tested to the second; plus the client's vectors against an independent Rust derivation |
+| `npm run test:chain` | Repeated create, withdraw, replay and recovery cycles on the local validator through the client. `CYCLES=40` sets the count. Prints a summary. |
+| `npm run test:e2e` | Browser, desktop and mobile. Always: routes, the content security policy on every page, release gate, demo, wallet check, mobile overflow. With the local validator running: the full custody flows below. |
 
-The Vercel web build is native Next.js 16.4.0. CI runs browser checks against a production build. The RPC regression suite checks mainnet write refusal, pinned-genesis enforcement, malformed/cross-origin requests, and streaming byte limits. Browser checks verify nonce freshness and rejection of injected inline scripts. CI skips local custody cases unless a validator is explicitly available; the checked-in local-chain evidence is separate from GitHub CI.
+The VM suite is a standalone crate with its own lockfile so the VM's dependencies stay out of the program's. It needs `bunker3.so` built first. GitHub CI builds and tests the workspace and runs the browser suite against a production build; it does not run the VM suite, the chain cycles, or the custody browser cases, which need the Solana toolchain and a validator.
 
-The browser CI job uses the official Playwright 1.56.1 Noble container pinned by digest, with its preinstalled Chromium. Match the container version and npm Playwright version when upgrading. Production smoke tests can run with `BUNKER_E2E_BASE_URL=https://bunkermode.io npm run test:e2e -- tests/browser/app.spec.ts`; they do not sign transactions.
-
-## Protocol 3 draft
-
-The draft program in `programs/bunker3` is not deployed and not used by the web app.
-
-```sh
-cargo test -p bunker3 --locked
-cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy
-cd programs/bunker3-svm-tests && cargo test --locked
-```
-
-`npm test` also runs the TypeScript client tests (`tests/protocol-v3.test.ts`) and checks that `npx tsx scripts/v3-vectors.ts` reproduces `fixtures/bunker-v3.json` exactly. The VM suite re-derives those vectors independently in Rust and drives the compiled program with the client's bytes.
-
-`npm run source:bundle` also builds the offline recovery tool (`npm run tool:build` builds it alone); the protocol 3 browser test opens that file from disk. `CYCLES=40 npm run test:chain:v3` runs repeated create, withdraw, replay and recovery cycles against the local validator and prints a summary; it does not write an evidence file. With `target/deploy/bunker3.so` built, `scripts/local-validator.sh` also loads the draft program at the fixed test address `k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn`, and `tests/browser/custody3.spec.ts` drives the protocol 3 app against it (it skips otherwise).
-
-The first command exercises the state machine directly. The last loads `target/deploy/bunker3.so` into an in-process Solana VM (LiteSVM) and sets the Clock sysvar to test the waiting period and deadlines to the second. That crate is deliberately outside the workspace and has its own lockfile so the VM's dependency tree stays out of the program's. GitHub CI builds and tests the workspace; it does not run the VM suite.
-
-## Protocol 2 reproduction
+## Local validator
 
 ```sh
-cargo run -p bunker --locked --example protocol_vectors > /tmp/bunker-v2.json
-diff fixtures/bunker-v2.json /tmp/bunker-v2.json
-npm test
-cargo test --workspace --locked
 npm run program:build
-BUNKER_LOCAL_LEDGER=./work/validator-v2 ./scripts/local-validator.sh
-# In a second terminal:
-npm run test:chain
+./scripts/local-validator.sh          # terminal 1; set BUNKER_LOCAL_LEDGER to choose the ledger path
+npm run source:bundle && npm run build && npm start   # terminal 2
+npm run test:e2e && npm run test:chain                # terminal 3
 ```
 
-Use a new ledger path when changing program versions; an existing ledger does not reload the binary from `--bpf-program`. The chain report includes protocol version, local genesis, test program and binary SHA-256. It covers create/deposit/withdraw for SOL and classic SPL, remainder authority, identical proof retries, replay, a second valid signature under the spent key, attempts to reinstall a spent root, expiry after publication, malformed/truncated payloads, missing next commitments, account/mint/program/destination substitution, partial failure after journal advance, exact-signature retry and two separately restored copies racing different messages.
+The validator loads the program at the fixed test-only address `k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn`, the same one `fixtures/bunker-v3.json` uses. It uses dedicated ports and needs no program keypair. Use a new ledger path after rebuilding the program: an existing ledger keeps its old binary. `npm run setup:local` writes a `.env.local` so `npm run dev` talks to it; remove that file to return to the read-only configuration. Tests fund fresh disposable wallets from the local faucet and never use a user wallet.
 
-Same-origin journal tests block both identical and different re-signing, stale import, mismatched encrypted checkpoints, wrong chain state and storage failures. Separate-origin tests intentionally permit two signatures and prove only at-most-one accepted on-chain withdrawal. They do not establish cryptographic safety after split-brain. No automated test is an audit.
+`npm run source:bundle` also builds the offline recovery tool (`npm run tool:build` builds it alone). The custody browser cases open that file from disk as a `file://` page, pass every file between it and the site through the filesystem, and assert the tool page issued no network request.
 
-For a full browser-to-server custody check, start a separate local web server using the existing local-only environment settings (with the validator's actual genesis), then run:
+## Custody browser cases (`tests/browser/custody3.spec.ts`)
 
-```sh
-BUNKER_E2E_BASE_URL=http://127.0.0.1:5175 BUNKER_E2E_REAL_RPC=true npm run test:e2e -- tests/browser/custody.spec.ts
-```
+1. **Default, no waiting period:** build, deposit, withdraw; the funds arrive on the third approval; a second withdrawal uses the next key.
+2. **Opted-in waiting period:** the kit cannot be created until the waiting period is acknowledged; announce; on-chain state and balances asserted; countdown shown; a packet for the wrong generation is refused; cancel by recovery; the old day key is refused; the new one announces; seal.
+3. **Tokens:** mint a test token, deposit, withdraw to a recipient with no token account, assert both balances, refuse an amount above the balance.
+4. **Passkey:** with a simulated authenticator supporting PRF: save a day key, assert storage holds no plaintext, reopen with the passkey alone, withdraw, then alter the ciphertext and assert it does not unlock.
 
-This test mode requires `/api/config` to match the isolated validator and does not intercept `/api/config` or `/api/rpc`. Both desktop and mobile complete create, backup verification, deposit, withdrawal, stale-file rejection, restore after reload, and a second withdrawal under the recovered next key. The standard browser suite uses the read-only app with a local-only API fixture for custody, and independently checks actual mainnet submission refusal.
+The browser cannot wait 24 hours, so releasing after a wait is exercised by the VM suite, not by a click.
+
+## How the tests were checked
+
+For the program, eight safety checks were removed one at a time and the VM suite re-run. Seven were caught immediately; removing destination binding was not caught by the first version of the suite, and a dedicated test was added and confirmed to fail without the check. This has not been repeated for every later change.
+
+## Known gaps
+
+- No coverage-guided fuzzing. The randomized tests cover the pure state machine and decoders, not account validation.
+- No independent implementation by a second author.
+- Passkeys are tested only with Chromium's virtual authenticator; no real phone or wallet in-app browser.
+- One token scenario in the VM suite and one in the browser.
+- No test of fork, rollback or clock-drift behaviour.
+
+## Other
+
+CI runs the browser job in the official Playwright container pinned by digest; match its version to `package-lock.json` when upgrading. A read-only smoke test of the live site: `BUNKER_E2E_BASE_URL=https://bunkermode.io npm run test:e2e -- tests/browser/app.spec.ts`.

@@ -38,7 +38,7 @@ const timed = <T,>(fn: () => T): [T, string] => {
   const v = fn();
   return [v, `${Math.max(1, Math.round(performance.now() - t))} ms`];
 };
-// Demo-only message. Real withdrawals sign the fixed layout in sdk/protocol.ts.
+// Demo-only message. Real withdrawals sign the fixed layout in sdk/v3/protocol.ts.
 const demoMessage = (root: Uint8Array, next: Uint8Array) =>
   encode(
     `BUNKER_DEMO_ONLY|withdraw|500|to:new-wallet|lock:${hex(root)}|next:${hex(next)}`,
@@ -467,8 +467,8 @@ export default function Demo() {
                 : stage === "compromised"
                   ? "The $200 left in the wallet is gone. The drainer now signs a withdrawal from your Bunker using the wallet it controls."
                   : stage === "rejected"
-                    ? "The vault only releases assets to the separate key in your recovery kit, which the drainer never saw. Now use that key yourself."
-                    : "$500 went to a new, clean wallet and the vault’s key was replaced in the same step. Your part: keep the recovery kit off the device you browse with. If the drainer had that too, this would have ended differently."}
+                    ? "The vault only releases assets to your Bunker key, which the drainer never saw. Now use that key yourself."
+                    : "$500 went to a new, clean wallet and the vault’s key was replaced in the same step. Your part: keep your Bunker keys off the device you browse with. If the drainer had those too, this would have ended differently."}
           </p>
           <div className="sim-controls">
             {stage === "wallet" ? (

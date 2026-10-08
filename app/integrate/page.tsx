@@ -57,7 +57,7 @@ export default function Page() {
           <li>
             <strong>Getting money back out is deliberate.</strong> A
             withdrawal needs your Bunker key, never the trading wallet’s. The
-            next protocol version also lets you add an optional waiting
+            protocol also lets you add an optional waiting
             period, off by default, for holdings you want time to defend. A
             Bunker is for what you are holding, not for what you need in the
             next trade.
@@ -108,24 +108,16 @@ export default function Page() {
           </li>
         </ul>
         <p>
-          The account layouts are specified in the repository:{" "}
+          The account layouts are specified in the{" "}
           <a
-            href="https://github.com/plantsweb3/bunker/blob/main/docs/ARCHITECTURE.md"
+            href="https://github.com/plantsweb3/bunker/blob/main/docs/PROTOCOL.md"
             target="_blank"
             rel="noreferrer"
           >
-            current protocol
-          </a>{" "}
-          and the{" "}
-          <a
-            href="https://github.com/plantsweb3/bunker/blob/main/docs/PROTOCOL-3-DRAFT.md"
-            target="_blank"
-            rel="noreferrer"
-          >
-            draft of the next one
+            protocol specification
           </a>
-          . Both will change before mainnet; build against a reviewed release,
-          not a draft.
+          . It is a draft and will change before mainnet; build against a
+          reviewed release.
         </p>
       </section>
       <section>
