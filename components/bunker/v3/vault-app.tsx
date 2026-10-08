@@ -663,7 +663,7 @@ function App() {
                 <h2>{b.enabled ? "The door is sealed." : "A separate home for your assets."}</h2>
                 <p>
                   {b.enabled
-                    ? "Open your Bunker with its day key, or build a new one in the recovery tool."
+                    ? "Open your Bunker with its day key, or build a new one with the offline recovery tool."
                     : "Deposits go in from any wallet. Withdrawals wait, and you can cancel them."}
                 </p>
                 <div className="actions">

@@ -1,4 +1,6 @@
-import { test, expect, Page, TestInfo } from "@playwright/test";
+import { test, expect, Download, Page, TestInfo } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { parseVault } from "../../sdk/v3/protocol";
 import { connect, installLocalWallet } from "./local-wallet";
@@ -70,32 +72,89 @@ async function setup(page: Page, info: TestInfo) {
     parseVault((await c.getAccountInfo(new PublicKey(address)))!.data);
 
 
-  /** Builds a Bunker in the recovery tool. `wait` opts into a 24-hour waiting period. */
+  // The offline tool is a local file. It must never touch the network.
+  const tool = await page.context().newPage();
+  const toolRequests: string[] = [];
+  tool.on("request", (r) => {
+    if (!r.url().startsWith("file:") && !r.url().startsWith("blob:")) toolRequests.push(r.url());
+  });
+  tool.on("pageerror", (e) => errors.push(`tool: ${e.message}`));
+  await tool.goto(`file://${resolve("public/source/bunker-recovery-tool.html")}`);
+  /** Runs `trigger` on the tool page and saves the `count` files it downloads, by name. */
+  const toolSaves = async (trigger: () => Promise<void>, count: number) => {
+    const files: Record<string, string> = {};
+    const done = new Promise<void>((finish) => {
+      const onDownload = async (d: Download) => {
+        const path = info.outputPath(`${Object.keys(files).length}-${d.suggestedFilename()}`);
+        await d.saveAs(path);
+        files[d.suggestedFilename()] = path;
+        if (Object.keys(files).length === count) {
+          tool.off("download", onDownload);
+          finish();
+        }
+      };
+      tool.on("download", onDownload);
+    });
+    await trigger();
+    await done;
+    const find = (part: string) => {
+      const name = Object.keys(files).find((n) => n.includes(part));
+      if (!name) throw new Error(`Tool did not save a ${part} file`);
+      return files[name];
+    };
+    return find;
+  };
+  /** Builds a Bunker: kit and keys offline, creation request submitted on the site. */
   const build = async (wait: boolean) => {
     await page.goto("/recovery");
     await connect(page);
-    await page.getByLabel("Recovery password", { exact: true }).fill(password);
-    await page.getByLabel("Confirm recovery password", { exact: true }).fill(password);
-    await page.getByLabel("Acknowledge the recovery kit").check();
-    const create = page.getByRole("button", { name: "Create recovery kit" });
-    // The waiting period is off unless turned on AND acknowledged.
-    await expect(page.getByLabel("Add a waiting period")).not.toBeChecked();
-    if (wait) {
-      await page.getByLabel("Add a waiting period").check();
-      await expect(create).toBeDisabled();
-      await expect(page.getByLabel("Waiting period", { exact: true })).toHaveValue("86400");
-      await page.getByLabel("Acknowledge the waiting period").check();
-    }
-    const kit = await save(() => create.click(), "recovery-kit.json");
-    await page.getByLabel("Re-open the saved recovery kit").setInputFiles(kit);
-    await expect(page.getByText("Verified:", { exact: false })).toBeVisible();
-    const day0 = await save(
-      () => page.getByRole("button", { name: "Build Bunker on test network" }).click(),
-      "day-key-0.json",
+    const card = await save(
+      () => page.getByRole("button", { name: "Download network card" }).click(),
+      "network-card.json",
     );
+    await tool.bringToFront();
+    await tool.locator("#card").setInputFiles(card);
+    await tool.locator("#password").fill(password);
+    await tool.locator("#repeat").fill(password);
+    await tool.locator("#kit-ack").check();
+    // The waiting period is off unless turned on AND acknowledged.
+    await expect(tool.locator("#wait")).not.toBeChecked();
+    if (wait) {
+      await tool.locator("#wait").check();
+      await expect(tool.locator("#delay")).toHaveValue("86400");
+      await tool.locator("#create").click();
+      await expect(tool.locator("#build-status")).toContainText("Acknowledge the waiting period");
+      await tool.locator("#wait-ack").check();
+    }
+    const kit = (await toolSaves(() => tool.locator("#create").click(), 1))("RECOVERY-KIT");
+    const made = await toolSaves(() => tool.locator("#verify").setInputFiles(kit), 2);
+    await expect(tool.locator("#build-status")).toContainText("Verified.");
+    const day0 = made("day-key");
+    const request = made("creation-request");
+    // The file that goes to the website holds no secret.
+    const masterHex = JSON.stringify(readFileSync(request, "utf8"));
+    expect(masterHex).not.toContain("master");
+    expect(masterHex).not.toContain("seed");
+    await page.bringToFront();
+    await page.getByLabel("Creation request", { exact: true }).setInputFiles(request);
+    await expect(
+      page.getByText(wait ? "on every withdrawal" : "None. Withdrawals leave", { exact: false }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Build Bunker on test network" }).click();
     await expect(page.getByText("Bunker built.", { exact: false })).toBeVisible({ timeout: 25000 });
     const vault = await page.locator(".vault-address code").innerText();
     return { kit, day0, vault };
+  };
+  /** Makes a recovery packet offline for `epoch` and returns it with the next day key. */
+  const makePacket = async (kit: string, epoch: string) => {
+    await tool.bringToFront();
+    await tool.locator("#tab-recover").click();
+    await tool.locator("#kit").setInputFiles(kit);
+    await tool.locator("#kit-password").fill(password);
+    await tool.locator("#epoch").fill(epoch);
+    const made = await toolSaves(() => tool.locator("#recover").click(), 2);
+    await page.bringToFront();
+    return { packet: made("recovery-packet"), nextDay: made("day-key") };
   };
   const unseal = async (dayKey: string) => {
     await page.goto("/vault");
@@ -113,13 +172,13 @@ async function setup(page: Page, info: TestInfo) {
     await page.getByRole("button", { name: "Review deposit in wallet" }).click();
     await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
   };
-  return { c, recipient, errors, password, save, vaultState, build, unseal, deposit };
+  return { c, recipient, errors, vaultState, build, unseal, deposit, makePacket, toolRequests };
 }
 test("with a waiting period: announce, count down, cancel by recovery, continue with new keys", async ({
   page,
 }, info) => {
   test.setTimeout(120000);
-  const { c, recipient, errors, password, save, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  const { c, recipient, errors, vaultState, build, unseal, deposit, makePacket, toolRequests }: Ctx = await setup(page, info);
   // 1. Build a Bunker WITH a 24-hour waiting period, opted into explicitly.
   const { kit, day0, vault } = await build(true);
   expect((await vaultState(vault)).delaySecs).toBe(86_400);
@@ -152,18 +211,19 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   expect(await c.getBalance(recipient.publicKey)).toBe(0);
   await page.screenshot({ path: info.outputPath("v3-waiting.png"), fullPage: true });
 
-  // 4. Cancel it with the recovery kit. New keys, nothing moved.
+  // 4. Cancel it: the packet is made offline, the site only submits it.
+  const stale = await makePacket(kit, "1");
+  const { packet, nextDay: day1 } = await makePacket(kit, "0");
   await page.goto("/recovery");
   await connect(page);
   await page.getByRole("tab", { name: "Recover or cancel" }).click();
-  await page.getByLabel("Recovery kit", { exact: true }).setInputFiles(kit);
-  await page.getByLabel("Recovery password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Open recovery kit" }).click();
-  await expect(page.getByText("will be cancelled", { exact: false })).toBeVisible({ timeout: 15000 });
-  const day1 = await save(
-    () => page.getByRole("button", { name: "Cancel withdrawal and install new keys" }).click(),
-    "day-key-1.json",
-  );
+  await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(stale.packet);
+  await expect(page.getByText("Made for a later generation", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByRole("button", { name: /install new keys/i })).toBeDisabled();
+  await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(packet);
+  await expect(page.getByText("Signature checked against", { exact: false })).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText("will be cancelled", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Cancel withdrawal and install new keys" }).click();
   await expect(page.getByText("Recovered.", { exact: false })).toBeVisible({ timeout: 40000 });
   state = await vaultState(vault);
   expect([state.epoch, state.opIndex, state.pending]).toEqual([1n, 0n, null]);
@@ -190,6 +250,7 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   await page.getByRole("button", { name: "Seal Bunker" }).click();
   await expect(page.getByText("Bunker sealed.", { exact: false })).toBeVisible();
   await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
+  expect(toolRequests, "the offline tool made no network request").toEqual([]);
   expect(errors).toEqual([]);
 });
 
@@ -197,7 +258,7 @@ test("default, no waiting period: a withdrawal arrives on the third approval", a
   page,
 }, info) => {
   test.setTimeout(120000);
-  const { c, recipient, errors, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  const { c, recipient, errors, vaultState, build, unseal, deposit, toolRequests }: Ctx = await setup(page, info);
   const { day0, vault } = await build(false);
   expect((await vaultState(vault)).delaySecs).toBe(0);
   await unseal(day0);
@@ -226,5 +287,6 @@ test("default, no waiting period: a withdrawal arrives on the third approval", a
   await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
   expect(await c.getBalance(recipient.publicKey)).toBe(500_000_000);
   expect((await vaultState(vault)).opIndex).toBe(2n);
+  expect(toolRequests, "the offline tool made no network request").toEqual([]);
   expect(errors).toEqual([]);
 });
