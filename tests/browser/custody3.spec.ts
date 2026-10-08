@@ -196,7 +196,14 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await tool.bringToFront();
     await tool.locator("#tab-recover").click();
     await tool.locator("#kit").setInputFiles(kit);
+    // The kit can be checked without making anything.
+    await tool.locator("#kit-password").fill("not the recovery password");
+    await tool.locator("#check-kit").click();
+    await expect(tool.locator("#recover-status")).toContainText("Incorrect password");
     await tool.locator("#kit-password").fill(password);
+    await tool.locator("#check-kit").click();
+    await expect(tool.locator("#recover-status")).toContainText("This kit opens with that password");
+    await expect(tool.locator("#recover-status")).toContainText("Nothing was created or changed");
     await tool.locator("#epoch").fill(epoch);
     await tool.locator("#new-day-password").fill(dayPassword);
     await tool.locator("#new-day-repeat").fill(dayPassword);

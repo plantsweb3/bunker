@@ -355,6 +355,20 @@ $("recover").addEventListener(
     );
   }),
 );
+$("check-kit").addEventListener(
+  "click",
+  run("recover-status", async () => {
+    const kit = await openKit();
+    const trusted = kit.trusted.length
+      ? `${kit.trusted.length} trusted address${kit.trusted.length === 1 ? "" : "es"}`
+      : "no trusted addresses";
+    say(
+      "recover-status",
+      `This kit opens with that password. It is for Bunker ${kit.vault}, with ${trusted}. Nothing was created or changed.`,
+      "ok",
+    );
+  }),
+);
 $("reissue").addEventListener(
   "click",
   run("recover-status", async () => {

@@ -149,6 +149,11 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 <label>Password for the new day key (not the recovery password)<input id="new-day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <label>Confirm new day key password<input id="new-day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key</button></div>
+<div class="box">
+<strong>Not recovering today?</strong>
+<small>A forgotten recovery password is the most likely way to lose a Bunker for good. Every few months, choose your kit above, type its password and press this. It only checks that the kit still opens; it creates nothing and changes nothing.</small>
+<div class="row"><button class="ghost" id="check-kit" type="button">Check that my kit still opens</button></div>
+</div>
 <div class="status" id="recover-status" role="status"></div>
 <ul class="files" id="recover-files" hidden></ul>
 </section>
