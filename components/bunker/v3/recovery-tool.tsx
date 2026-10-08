@@ -185,9 +185,9 @@ function Page() {
           <div className="eyebrow">YOUR RECOVERY KIT NEVER COMES HERE</div>
           <h1>Recovery.</h1>
           <p>
-            The recovery kit is opened only in a separate tool that cannot
-            connect to anything. This page takes the public files that tool
-            produces and submits them.
+            The recovery kit is opened only in a separate tool, away from this
+            website. This page takes the public files that tool produces and
+            submits them.
           </p>
         </div>
       </div>
@@ -215,17 +215,32 @@ function Page() {
       <Messages busy={b.busy} error={b.error} notice={b.notice} />
       <section className="panel tool-panel offline-tool">
         <div>
-          <span className="eyebrow">STEP ZERO</span>
+          <span className="eyebrow">START HERE</span>
           <h2>Get the offline recovery tool.</h2>
           <p className="modal-copy">
-            One file, no installation. Save it, move it to a device you trust,
-            and open it there. Its own security policy stops it making network
-            connections; check its SHA-256 below against a copy from another
-            source if you can. It needs a computer or an Android phone: an iPhone
-            cannot open a saved web page this way, and the browsers built into
-            wallet apps usually cannot save its files.
+            One file, no installation. It makes and opens your recovery kit,
+            so it is built to run away from this website: its own security
+            policy stops it making network connections.
           </p>
         </div>
+        <ol className="tool-route">
+          <li>
+            <b>Download both files.</b>
+            <span>The tool, and a network card that tells it which network it is building for.</span>
+          </li>
+          <li>
+            <b>Open the tool from where you saved it.</b>
+            <span>
+              On a device you trust, offline if you can. It needs a computer or an Android phone;
+              an iPhone cannot open it, and browsers inside wallet apps usually cannot save its
+              files.
+            </span>
+          </li>
+          <li>
+            <b>Bring back only the public file it gives you.</b>
+            <span>A creation request to build a Bunker, or a recovery packet to replace its keys.</span>
+          </li>
+        </ol>
         <div className="actions">
           <a className="button light" href={TOOL} download="bunker-recovery-tool.html">
             <BIcon name="recovery-kit" size={17} />
@@ -244,8 +259,9 @@ function Page() {
         )}
         {manifest && (
           <p className="micro">
-            SHA-256 <code>{manifest.sha256}</code> · {manifest.bytes.toLocaleString("en-US")} bytes ·
-            built from <code>tools/recovery</code> in the public source
+            To check you have the real tool, compare its SHA-256 with a copy from another source:{" "}
+            <code>{manifest.sha256}</code> · {manifest.bytes.toLocaleString("en-US")} bytes · built
+            from <code>tools/recovery</code> in the public source
           </p>
         )}
       </section>
@@ -276,8 +292,9 @@ function Page() {
               <p className="modal-copy">
                 In the offline tool, choose “Build a new Bunker”. It saves a
                 recovery kit, a day key and a creation request. Only the
-                creation request comes here; it holds two public commitments
-                and nothing secret.
+                creation request comes here; it holds your trusted addresses,
+                your waiting period and two public commitments, and nothing
+                secret.
               </p>
               <FileField
                 label="Creation request"

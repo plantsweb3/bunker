@@ -1666,8 +1666,9 @@ body {
   .door-plate dl {
     gap: 20px;
   }
-  /* Deposit and withdraw stay within reach of a thumb. */
-  .balance-panel > .actions {
+  /* Deposit and withdraw stay within reach of a thumb, once a Bunker is open.
+     The sealed panel is short, and a pinned bar would sit on top of its text. */
+  .balance-panel.is-open > .actions {
     position: sticky;
     bottom: calc(12px + env(safe-area-inset-bottom));
     z-index: 5;
@@ -1678,7 +1679,7 @@ body {
     background: #0f1517f2;
     backdrop-filter: blur(12px);
   }
-  .balance-panel > .actions .button {
+  .balance-panel.is-open > .actions .button {
     flex: 1;
   }
 }
@@ -2119,11 +2120,8 @@ body {
   line-height: 1.5;
 }
 .offline-tool {
-  max-width: none;
+  max-width: 860px;
   margin: 24px 0 0;
-  grid-template-columns: 1.2fr auto;
-  align-items: center;
-  column-gap: 40px;
   border-color: #47686f;
   background: linear-gradient(180deg, #14272a, #0f1719);
 }
@@ -2179,8 +2177,60 @@ body {
   color: #fff;
   border-bottom-color: var(--ice);
 }
+.tool-route {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: route;
+  display: grid;
+  gap: 14px;
+}
+.tool-route li {
+  counter-increment: route;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  column-gap: 14px;
+  row-gap: 2px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.tool-route li::before {
+  content: counter(route);
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #47686f;
+  border-radius: 50%;
+  font: 12px "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  color: #bfe6d9;
+}
+.tool-route b {
+  color: #eef2f1;
+  font-weight: 600;
+}
+.tool-route span {
+  color: #93a3a8;
+}
+.field input[type="file"] {
+  padding: 10px;
+  border-style: dashed;
+}
+.field input[type="file"]::file-selector-button {
+  margin-right: 12px;
+  padding: 8px 14px;
+  border: 1px solid #3e484b;
+  border-radius: 4px;
+  background: #151a1c;
+  color: #e4e9e6;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
 .tool-panel {
-  max-width: 720px;
+  max-width: 860px;
   margin: 24px 0 60px;
   display: grid;
   gap: 18px;
@@ -3866,3 +3916,16 @@ details.advanced .field {
 @media(max-width: 640px) { .brand img { width: 172px; } }
 .trusted-picks{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline;font-size:13px}
 .trusted-picks small{color:#839497}
+.trusted-address {
+  display: block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.not-trusted {
+  font-style: normal;
+  color: #e6c38a;
+}
+
+.door-plate dl > div {
+  min-width: 0;
+}

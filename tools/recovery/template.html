@@ -37,6 +37,21 @@ button.ghost{min-height:48px;padding:13px 22px;border:1px solid #3e484b;border-r
 .status.ok{color:#bfe6d9}.status.bad{color:#f0c4b7}
 code{font-size:13px;color:#d4e9eb;overflow-wrap:anywhere}
 small{color:#839497;font-size:12px}
+.step{display:grid;gap:16px;padding:22px 22px 24px;border:1px solid var(--line);border-radius:8px;background:#0e1416}
+.step-head{display:flex;align-items:center;gap:12px}
+.step-head h3,.done h3{margin:0;font-size:18px;font-weight:500;letter-spacing:-.015em;color:#fff}
+.num{flex:none;display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--ice);border-radius:50%;font:13px ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ice)}
+.lede{margin:0;font-size:14px;color:#a4aeb0}
+label small{font-weight:400}
+.hint{min-height:20px;font-size:13px;color:#93a3a8}
+.hint.ok{color:#bfe6d9}.hint.bad{color:#f0c4b7}
+.box.accept{border-style:solid;border-color:#47686f;background:#10202366}
+button.link{padding:0;border:0;background:none;color:var(--ice);font:inherit;font-size:14px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+input[type=file]{padding:10px;border:1px dashed #35454b;border-radius:5px;background:#0c1214}
+input[type=file]::file-selector-button{margin-right:12px;padding:8px 14px;border:1px solid #3e484b;border-radius:4px;background:#151a1c;color:#e4e9e6;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--ice);outline-offset:2px}
+.done{display:grid;gap:10px;padding:16px 18px;border:1px solid #47686f;border-radius:6px;background:#10202366}
+.done ol{margin:0;padding-left:20px;display:grid;gap:8px;font-size:14px;color:#c3ccce}
 .files{margin:0;padding:12px 16px 12px 34px;border:1px solid var(--line);border-radius:6px;font-size:14px}
 .files a{color:var(--ice);overflow-wrap:anywhere}
 [hidden]{display:none!important}
@@ -57,40 +72,71 @@ small{color:#839497;font-size:12px}
 </nav>
 <section id="panel-build">
 <h2>One kit, kept for good.</h2>
-<p>The recovery kit is created once and never changes. Whoever holds it and its password controls the Bunker.</p>
-<label>Network card (downloaded from the website)<input id="card" type="file" accept=".json,application/json"></label>
+<p>Five steps. At the end you will have three files: a recovery kit to put away, a day key to open your Bunker with, and a public request the website uses to build it.</p>
+
+<div class="step">
+<div class="step-head"><span class="num">1</span><h3>Which network</h3></div>
+<label>Network card <small>Download it from the website’s Recovery page and choose it here.</small><input id="card" type="file" accept=".json,application/json"></label>
 <div class="box" id="card-box" hidden>
 <code id="card-echo" style="white-space:pre-wrap"></code>
 <label class="check"><input id="card-ack" type="checkbox"><span>These match what the Bunker website shows under “Network”. A Bunker built for a different program is a different Bunker.</span></label>
 </div>
+</div>
+
+<div class="step">
+<div class="step-head"><span class="num">2</span><h3>Recovery password</h3></div>
+<p class="lede">Protects the recovery kit, the one file that can replace every key. Typed only into this tool, never into a website. There is no reset.</p>
 <label>Recovery password<input id="password" type="password" autocomplete="new-password" placeholder="At least 16 characters"></label>
-<label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="At least 16 characters"></label>
-<small>The recovery password is only ever typed into this tool. Never type it into a website. It is all that protects this file if someone copies it: use five or more unrelated words, not a phrase, a date or anything you use elsewhere. There is no reset.</small>
-<label>Day key password (a different one)<input id="day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
-<label>Confirm day key password<input id="day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
-<small>The day key password is the one you type on the Bunker website to open your Bunker.</small>
-<div class="box">
-<strong>Where your Bunker may send, and how fast.</strong>
-<small>Trusted addresses receive withdrawals at once. Everything else waits, and while it waits you can cancel it with this recovery kit. That wait is the only thing that stops someone who steals your day key.</small>
-<label>Trusted address 1 (optional)<input id="trusted-1" type="text" autocomplete="off" spellcheck="false" placeholder="A wallet you control"></label>
+<label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="Type it again"></label>
+<div class="hint" id="password-hint"></div>
+<small>Use five or more unrelated words. Not a phrase, a date, or anything you use elsewhere. Write it down and keep it with the kit’s backup, not on this device.</small>
+</div>
+
+<div class="step">
+<div class="step-head"><span class="num">3</span><h3>Day key password</h3></div>
+<p class="lede">Protects the day key, which you open on the Bunker website to withdraw. It must be different from the recovery password.</p>
+<label>Day key password<input id="day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<label>Confirm day key password<input id="day-repeat" type="password" autocomplete="new-password" placeholder="Type it again"></label>
+<div class="hint" id="day-hint"></div>
+<label class="check"><input id="show-passwords" type="checkbox" autocomplete="off"><span>Show what I typed in all four password boxes</span></label>
+</div>
+
+<div class="step">
+<div class="step-head"><span class="num">4</span><h3>Where your Bunker may send, and how fast</h3></div>
+<p class="lede">Trusted addresses receive withdrawals at once. Everything else waits, and while it waits you can cancel it with this recovery kit. That wait is the only thing that stops someone who steals your day key.</p>
+<label>Trusted address 1 (optional)<input id="trusted-1" type="text" autocomplete="off" spellcheck="false" placeholder="A wallet whose keys you hold"></label>
 <label>Trusted address 2 (optional)<input id="trusted-2" type="text" autocomplete="off" spellcheck="false"></label>
+<div id="more-trusted-fields" hidden>
 <label>Trusted address 3 (optional)<input id="trusted-3" type="text" autocomplete="off" spellcheck="false"></label>
-<label>Trusted address 4 (optional)<input id="trusted-4" type="text" autocomplete="off" spellcheck="false"></label>
+<label style="margin-top:16px">Trusted address 4 (optional)<input id="trusted-4" type="text" autocomplete="off" spellcheck="false"></label>
+</div>
+<div class="row"><button class="link" id="more-trusted" type="button">Add more trusted addresses</button></div>
 <small>Choose wallets whose keys you hold and that a thief on your everyday computer could not also empty: a hardware wallet is the right answer. Not the wallet you connect to websites. Be careful with an exchange deposit address: someone who steals your day key can send anything in this Bunker there at once, in any amount, and an exchange may not credit a token it does not list or an amount below its minimum. Check every character; these cannot be changed for this Bunker.</small>
 <label>Withdrawals to any other address wait
 <select id="delay" autocomplete="off"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option><option value="0">Not at all (no protection if your day key is stolen)</option></select></label>
-<label class="check" style="margin-top:6px"><input id="policy-ack" type="checkbox" autocomplete="off"><span id="policy-text"></span></label>
+<div class="box accept">
+<label class="check"><input id="policy-ack" type="checkbox" autocomplete="off"><span id="policy-text"></span></label>
 </div>
+</div>
+
+<div class="step">
+<div class="step-head"><span class="num">5</span><h3>Create the kit, then prove it saved</h3></div>
 <label class="check"><input id="kit-ack" type="checkbox"><span>I will keep the recovery kit off my everyday device, and I understand that losing both it and its password cannot be undone. Test assets only.</span></label>
 <div class="row"><button class="go" id="create">Create recovery kit</button></div>
 <div id="verify-step" hidden>
-<label>Re-open the saved recovery kit to prove it is saved<input id="verify" type="file" accept=".json,application/json"></label>
+<label>Now find the file your browser just saved and choose it here. <small>This proves the kit is really on disk and opens with your password before anything depends on it.</small><input id="verify" type="file" accept=".json,application/json"></label>
 </div>
 <div class="status" id="build-status" role="status"></div>
 <ul class="files" id="build-files" hidden></ul>
-<div id="built" hidden>
-<p>Bunker address: <code id="built-address"></code></p>
-<p>Three files were saved. <strong>Recovery kit</strong>: keep it here, away from your everyday device. <strong>Day key</strong>: what you open your Bunker with. <strong>Creation request</strong>: public, upload it on the website to build the Bunker.</p>
+<div id="built" hidden class="done">
+<h3>Your Bunker’s address</h3>
+<p><code id="built-address"></code></p>
+<ol>
+<li><strong>Recovery kit.</strong> Move it off this device: a USB stick in a drawer, and a second copy somewhere else. Never upload it anywhere.</li>
+<li><strong>Day key.</strong> This is what you open your Bunker with on the website.</li>
+<li><strong>Creation request.</strong> Public. Upload it on the website’s Recovery page to build the Bunker, then deposit.</li>
+</ol>
+</div>
 </div>
 </section>
 <section id="panel-recover" hidden>

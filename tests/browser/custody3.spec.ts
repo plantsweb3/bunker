@@ -137,13 +137,17 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await tool.locator("#day-repeat").fill(password);
     await tool.locator("#create").click();
     await expect(tool.locator("#build-status")).toContainText("different password");
+    await expect(tool.locator("#day-hint")).toContainText("needs a different one");
     await tool.locator("#day-password").fill(dayPassword);
     await tool.locator("#day-repeat").fill(dayPassword);
+    await expect(tool.locator("#day-hint")).toContainText("The two match");
     // The tool starts on a 24-hour wait for untrusted addresses, and nothing
     // is created until the statement describing the choice is accepted.
     await expect(tool.locator("#delay")).toHaveValue("86400");
     // Only an ordinary wallet can be trusted: the Bunker's own kind of
     // address, which a program controls, is refused, and named by its slot.
+    await expect(tool.locator("#trusted-3")).toBeHidden();
+    await tool.locator("#more-trusted").click();
     await tool.locator("#trusted-3").fill(PROGRAM_DERIVED);
     await expect(tool.locator("#policy-text")).toContainText("Trusted address 3 is controlled by a program");
     await tool.locator("#trusted-3").fill("");

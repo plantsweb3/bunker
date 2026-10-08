@@ -268,6 +268,37 @@ $("verify").addEventListener(
   }),
 );
 
+// ── Small helps while typing ─────────────────────────────────────────────
+/** Says, as the user types, what still stands between them and a usable
+ * password pair. Never blocks anything; the checks at creation are the rule. */
+function passwordHint(id: string, repeatId: string, hintId: string, kind: "archival" | "day-key") {
+  const update = () => {
+    const [p, r] = [value(id), value(repeatId)];
+    const problem = p ? passwordProblem(p, kind) : null;
+    const clash =
+      kind === "day-key" && p && p === value("password")
+        ? "This is the recovery password. The day key needs a different one."
+        : null;
+    const text = !p
+      ? ""
+      : (problem ?? clash ?? (!r ? "Now type it again." : p === r ? "Good. The two match." : "The two do not match yet."));
+    const el = $(hintId);
+    el.textContent = text;
+    el.className = `hint ${!p ? "" : problem || clash || (r && p !== r) ? "bad" : p === r ? "ok" : ""}`;
+  };
+  for (const field of [id, repeatId, "password"]) $(field).addEventListener("input", update);
+}
+passwordHint("password", "repeat", "password-hint", "archival");
+passwordHint("day-password", "day-repeat", "day-hint", "day-key");
+$("show-passwords").addEventListener("change", () => {
+  for (const id of ["password", "repeat", "day-password", "day-repeat"])
+    $<HTMLInputElement>(id).type = checked("show-passwords") ? "text" : "password";
+});
+$("more-trusted").addEventListener("click", () => {
+  $("more-trusted-fields").hidden = false;
+  $("more-trusted").hidden = true;
+});
+
 // ── Recover / re-issue ───────────────────────────────────────────────────
 async function openKit() {
   const kit = await decryptArchival(

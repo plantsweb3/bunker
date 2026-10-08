@@ -715,7 +715,7 @@ function App() {
                 <dt>Trusted addresses</dt>
                 <dd>
                   {vault.state.trusted.map((t) => (
-                    <code key={t.toBase58()} title={t.toBase58()} style={{ display: "block" }}>
+                    <code key={t.toBase58()} title={t.toBase58()} className="trusted-address">
                       {t.toBase58()}
                     </code>
                   ))}
@@ -758,7 +758,8 @@ function App() {
             <h2>Built, tested, and locked until it is reviewed.</h2>
             <p>
               One recovery kit that lasts for good, a day key you can
-              replace, and an optional waiting period you can cancel within.
+              replace, trusted addresses that are paid at once, and a wait you
+              can cancel within for everything else.
               It runs today only against an isolated test network.
             </p>
             <Link href="/verify">View release requirements</Link>
@@ -809,7 +810,12 @@ function App() {
                   </dd>
                 </div>
                 <div>
-                  <dt>{pending.kind === 0 ? "To" : "To the recipient’s token account"}</dt>
+                  <dt>
+                    {pending.kind === 0 ? "To" : "To the recipient’s token account"}
+                    {phase === "waiting" && vault.state.trusted.length > 0 && (
+                      <em className="not-trusted"> · not one of your trusted addresses</em>
+                    )}
+                  </dt>
                   <dd>
                     <code>{pending.destination.toBase58()}</code>
                     {pending.kind === 1 && (
@@ -901,7 +907,7 @@ function App() {
             </div>
           )}
           <div className="vault-grid">
-            <section className="panel balance-panel">
+            <section className="panel balance-panel is-open">
               <div className="panel-head">
                 <span className="eyebrow">INSIDE</span>
                 <BIcon name="vault" size={22} />
@@ -1343,7 +1349,7 @@ function App() {
                 <p>
                   {b.enabled
                     ? "Open your Bunker with its day key, or build a new one with the offline recovery tool."
-                    : "Deposits go in from any wallet. Withdrawals wait, and you can cancel them."}
+                    : "Deposits go in from any wallet. Withdrawals to your trusted addresses arrive at once; anything else waits, and you can cancel it."}
                 </p>
                 {b.enabled && passkeys.length > 0 && (
                   <label className="check-label">
@@ -1434,8 +1440,11 @@ function App() {
               <li>
                 <BIcon name="waiting-period" size={18} />
                 <div>
-                  <b>Wait, if you chose to</b>
-                  <span>An optional waiting period. Nothing moves during it.</span>
+                  <b>Wait, unless it is a trusted address</b>
+                  <span>
+                    Addresses you fixed when you built the Bunker are paid at once. Anything
+                    else waits, and nothing moves while it does.
+                  </span>
                 </div>
               </li>
               <li>
