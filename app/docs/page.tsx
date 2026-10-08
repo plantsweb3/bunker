@@ -38,7 +38,7 @@ export default function Page() {
           only runs from the copy you saved, never from the website. In it
           you choose two passwords, one for the recovery kit and a different
           one for the day key, your trusted addresses, and how long everything else waits. It saves
-          three files: the recovery kit, your first day key, and a creation
+          four files: the recovery kit, your first day key, a cancel file, and a creation
           request. Only the creation request, which holds public commitments
           and nothing secret, is uploaded to the site to create the vault
           on-chain. The recovery kit’s password is never typed into a
@@ -108,9 +108,19 @@ export default function Page() {
       <section>
         <h2>5. Cancel, or replace a key</h2>
         <p>
-          In the offline tool, open your recovery kit and enter your Bunker’s
-          current key generation. It saves a recovery packet and a new day
-          key. Upload the packet on the recovery page. It installs new keys,
+          <b>If a withdrawal you did not make is waiting,</b> upload your
+          cancel file on the recovery page. It cancels the withdrawal and
+          retires the day key that announced it, at once, and you do not need
+          your recovery kit to do it. Keep the cancel file where you can reach
+          it in minutes, and not beside the day key. It holds no secret and
+          cannot move anything; the worst anyone else can do with it is stop
+          your Bunker until you make a new day key from your recovery kit.
+        </p>
+        <p>
+          <b>To replace keys at any other time:</b> in
+          {" "}the offline tool, open your recovery kit and enter your Bunker’s
+          current key generation. It saves a recovery packet, a new day key
+          and that key’s cancel file. Upload the packet on the recovery page. It installs new keys,
           retires every earlier day key, and cancels a withdrawal that has not
           left. For a given Bunker and key generation the packet is always the
           same bytes, so making or submitting it twice is harmless.

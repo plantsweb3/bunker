@@ -71,7 +71,7 @@ const USAGE = `Bunker without the website. DRAFT: test networks only.
   clear     --rpc URL --day-key FILE --fee-wallet FILE
             Clear an announced withdrawal whose time to be released has passed.
   recover   --rpc URL --packet FILE --fee-wallet FILE
-            Submit a recovery packet made by the offline recovery tool.
+            Submit a cancel file or a recovery packet made by the offline recovery tool.
 
 URL is a Solana RPC endpoint. The day key's password is asked for, never
 passed on the command line. The fee wallet is an ordinary Solana keypair

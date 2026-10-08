@@ -72,7 +72,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 </nav>
 <section id="panel-build">
 <h2>One kit, kept for good.</h2>
-<p>Five steps. At the end you will have three files: a recovery kit to put away, a day key to open your Bunker with, and a public request the website uses to build it.</p>
+<p>Five steps. At the end you will have four files: a recovery kit to put away, a day key to open your Bunker with, a cancel file to keep within reach, and a public request the website uses to build it.</p>
 
 <div class="step">
 <div class="step-head"><span class="num">1</span><h3>Which network</h3></div>
@@ -135,20 +135,21 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid 
 <li><strong>Recovery kit.</strong> Move it off this device: a USB stick in a drawer, and a second copy somewhere else. Never upload it anywhere.</li>
 <li><strong>Day key.</strong> This is what you open your Bunker with on the website.</li>
 <li><strong>Creation request.</strong> Public. Upload it on the website’s Recovery page to build the Bunker, then deposit.</li>
+<li><strong>Cancel file.</strong> Your emergency stop. If a withdrawal you did not make is waiting, upload this file on the website’s Recovery page: it cancels the withdrawal and kills this day key, at once, without this kit. Keep it where you can reach it in minutes, somewhere other than beside the day key: your phone, your email to yourself. It holds no secret and cannot move anything. Anyone who has it can only do the same thing: stop your Bunker until you come back here with the kit to make a new day key.</li>
 </ol>
 </div>
 </div>
 </section>
 <section id="panel-recover" hidden>
 <h2>Install new keys.</h2>
-<p>A recovery packet replaces every key, kills every earlier day key and cancels a withdrawal that is still waiting. It never moves assets. Making the same packet twice gives the same file, so it is safe to repeat.</p>
+<p>A recovery packet replaces every key, kills every earlier day key and cancels a withdrawal that is still waiting. It never moves assets. Making the same packet twice gives the same file, so it is safe to repeat. If you already used your cancel file on the website, the keys have been replaced: enter the generation your Bunker shows now and re-issue its day key.</p>
 <label>Recovery kit<input id="kit" type="file" accept=".json,application/json"></label>
 <label>Recovery password<input id="kit-password" type="password" autocomplete="off" placeholder="At least 12 characters"></label>
 <div class="box" id="kit-box" hidden><code id="kit-echo" style="white-space:pre-wrap"></code></div>
 <label>Current key generation (shown on your Bunker page, or look it up by Bunker address on the website’s Recovery page)<input id="epoch" type="text" inputmode="numeric" placeholder="0"></label>
 <label>Password for the new day key (not the recovery password)<input id="new-day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <label>Confirm new day key password<input id="new-day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
-<div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key</button></div>
+<div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key and cancel file</button></div>
 <div class="box">
 <strong>Not recovering today?</strong>
 <small>A forgotten recovery password is the most likely way to lose a Bunker for good. Every few months, choose your kit above, type its password and press this. It only checks that the kit still opens; it creates nothing and changes nothing.</small>

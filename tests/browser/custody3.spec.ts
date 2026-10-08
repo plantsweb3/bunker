@@ -169,10 +169,12 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await tool.locator("#delay").selectOption(wait ? "86400" : "0");
     await tool.locator("#policy-ack").check();
     const kit = (await toolSaves(() => tool.locator("#create").click(), 1))("RECOVERY-KIT");
-    const made = await toolSaves(() => tool.locator("#verify").setInputFiles(kit), 2);
+    const made = await toolSaves(() => tool.locator("#verify").setInputFiles(kit), 3);
     await expect(tool.locator("#build-status")).toContainText("Verified.");
     const day0 = made("day-key");
     const request = made("creation-request");
+    const cancel0 = made("cancel-file");
+    expect(readFileSync(cancel0, "utf8")).not.toContain("master");
     // The file that goes to the website holds no secret.
     const masterHex = JSON.stringify(readFileSync(request, "utf8"));
     expect(masterHex).not.toContain("master");
@@ -189,7 +191,7 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await page.getByRole("button", { name: "Build Bunker on test network" }).click();
     await expect(page.getByText("Bunker built.", { exact: false })).toBeVisible({ timeout: 25000 });
     const vault = await page.locator(".vault-address code").innerText();
-    return { kit, day0, vault };
+    return { kit, day0, cancel0, vault };
   };
   /** Makes a recovery packet offline for `epoch` and returns it with the next day key. */
   const makePacket = async (kit: string, epoch: string) => {
@@ -207,9 +209,22 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await tool.locator("#epoch").fill(epoch);
     await tool.locator("#new-day-password").fill(dayPassword);
     await tool.locator("#new-day-repeat").fill(dayPassword);
-    const made = await toolSaves(() => tool.locator("#recover").click(), 2);
+    const made = await toolSaves(() => tool.locator("#recover").click(), 3);
     await page.bringToFront();
-    return { packet: made("recovery-packet"), nextDay: made("day-key") };
+    return { packet: made("recovery-packet"), nextDay: made("day-key"), nextCancel: made("cancel-file") };
+  };
+  /** Re-issues the day key and cancel file of `epoch` from the kit, offline. */
+  const reissue = async (kit: string, epoch: string) => {
+    await tool.bringToFront();
+    await tool.locator("#tab-recover").click();
+    await tool.locator("#kit").setInputFiles(kit);
+    await tool.locator("#kit-password").fill(password);
+    await tool.locator("#epoch").fill(epoch);
+    await tool.locator("#new-day-password").fill(dayPassword);
+    await tool.locator("#new-day-repeat").fill(dayPassword);
+    const made = await toolSaves(() => tool.locator("#reissue").click(), 2);
+    await page.bringToFront();
+    return { day: made("day-key"), cancel: made("cancel-file") };
   };
   const unseal = async (dayKey: string) => {
     await page.goto(`${origin}/vault`);
@@ -227,15 +242,15 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await page.getByRole("button", { name: "Review deposit in wallet" }).click();
     await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
   };
-  return { c, recipient, errors, payer, vaultState, build, unseal, deposit, makePacket, toolRequests, net };
+  return { c, recipient, errors, payer, vaultState, build, unseal, deposit, makePacket, reissue, toolRequests, net };
 }
 test("with a waiting period: announce, count down, cancel by recovery, continue with new keys", async ({
   page,
 }, info) => {
   test.setTimeout(120000);
-  const { c, recipient, errors, vaultState, build, unseal, deposit, makePacket, toolRequests }: Ctx = await setup(page, info);
+  const { c, recipient, errors, vaultState, build, unseal, deposit, makePacket, reissue, toolRequests }: Ctx = await setup(page, info);
   // 1. Build a Bunker WITH a 24-hour waiting period, opted into explicitly.
-  const { kit, day0, vault } = await build(true);
+  const { kit, day0, cancel0, vault } = await build(true);
   expect((await vaultState(vault)).delaySecs).toBe(86_400);
 
   // 2. Open it with the day key and deposit.
@@ -266,9 +281,10 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   expect(await c.getBalance(recipient.publicKey)).toBe(0);
   await page.screenshot({ path: info.outputPath("v3-waiting.png"), fullPage: true });
 
-  // 4. Cancel it: the packet is made offline, the site only submits it.
+  // 4. Cancel it with the cancel file saved when the Bunker was built. The
+  // recovery kit is not opened and the offline tool is not used.
   const stale = await makePacket(kit, "1");
-  const { packet, nextDay: day1 } = await makePacket(kit, "0");
+  const packet = cancel0;
   await page.goto("/recovery");
   await connect(page);
   await page.getByRole("tab", { name: "Recover or cancel" }).click();
@@ -277,18 +293,24 @@ test("with a waiting period: announce, count down, cancel by recovery, continue 
   await page.getByRole("button", { name: "Look up" }).click();
   await expect(page.getByText("A withdrawal is waiting.", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".micro", { hasText: "Key generation" }).locator("b")).toHaveText("0");
-  await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(stale.packet);
+  await page.getByLabel("Cancel file or recovery packet", { exact: true }).setInputFiles(stale.packet);
   await expect(page.getByText("Made for a later generation", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.getByRole("button", { name: /install new keys/i })).toBeDisabled();
-  await page.getByLabel("Recovery packet", { exact: true }).setInputFiles(packet);
+  await page.getByLabel("Cancel file or recovery packet", { exact: true }).setInputFiles(packet);
   await expect(page.getByText("Signature checked against", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText("Recovery cancels it if it lands before", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Cancel withdrawal and install new keys" }).click();
-  await expect(page.getByText("Recovered.", { exact: false })).toBeVisible({ timeout: 40000 });
+  await expect(page.getByText("If you used a cancel file", { exact: false })).toBeVisible({ timeout: 40000 });
   state = await vaultState(vault);
   expect([state.epoch, state.opIndex, state.pending]).toEqual([1n, 0n, null]);
   expect(await c.getBalance(new PublicKey(vault))).toBe(funded);
   expect(await c.getBalance(recipient.publicKey)).toBe(0);
+  // The cancel file is exactly the recovery packet the kit makes for that
+  // generation, and only now is the kit needed: for the next day key, which
+  // comes with the next cancel file.
+  expect(readFileSync(cancel0, "utf8")).toBe(readFileSync((await makePacket(kit, "0")).packet, "utf8"));
+  const { day: day1, cancel: cancel1 } = await reissue(kit, "1");
+  expect(readFileSync(cancel1, "utf8")).toBe(readFileSync(stale.packet, "utf8"));
 
   // 5. The old day key is dead; the new one works.
   await unseal(day0);

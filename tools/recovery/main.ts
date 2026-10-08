@@ -54,6 +54,45 @@ function dayKey(kit: ArchivalKit, epoch: bigint): DayKey {
   };
 }
 const publicJson = (o: object) => JSON.stringify(o, null, 2);
+/** The recovery packet for one key generation, as the public file the website
+ * submits. It is the one message that generation's recovery key ever signs. */
+function packetFor(kit: ArchivalKit, epoch: bigint): RecoveryFile {
+  const d = descriptorOf(kit);
+  const packet = recoveryPacket(unhex(kit.master), d, epoch);
+  // Built twice. If the two differ, something in this device computed wrongly
+  // and neither is released.
+  const again = recoveryPacket(unhex(kit.master), d, epoch);
+  if (hex(again.payload) !== hex(packet.payload) || hex(again.signature) !== hex(packet.signature))
+    throw new Error("Internal check failed. Nothing was saved.");
+  // Never hand out a packet this tool cannot itself verify.
+  const root = recoveryRoot(unhex(kit.master), d, epoch);
+  if (!verifies(signerOf(d, SIGNS_RECOVERY, epoch, 0n), packet.signature, packet.message, root))
+    throw new Error("Internal check failed. Nothing was saved.");
+  return {
+    version: 3,
+    kind: "recover",
+    network: kit.network,
+    genesis: kit.genesis,
+    program: kit.program,
+    vaultId: kit.vaultId,
+    vault: kit.vault,
+    epoch: epoch.toString(),
+    payload: hex(packet.payload),
+    signature: hex(packet.signature),
+  };
+}
+/** A cancel file is the recovery packet for a generation, made when that
+ * generation's day key is made and kept within reach. Submitting it cancels a
+ * waiting withdrawal and retires that day key, without the recovery kit having
+ * to be fetched first. It is public: whoever holds it can do that and nothing
+ * else. New keys come from the kit afterwards. */
+function offerCancelFile(listId: string, kit: ArchivalKit, epoch: bigint) {
+  offer(
+    listId,
+    `bunker-test-cancel-file-${kit.vault.slice(0, 8)}-generation-${epoch}.json`,
+    publicJson(packetFor(kit, epoch)),
+  );
+}
 /** Starts a download AND leaves a link on the page. A browser may block the
  * second of two automatic downloads, or lose one behind a prompt; the tool
  * cannot tell, so every file it makes stays available until the page closes. */
@@ -258,11 +297,12 @@ $("verify").addEventListener(
       `bunker-test-creation-request-${kit.vault.slice(0, 8)}.json`,
       publicJson(request),
     );
+    offerCancelFile("build-files", kit, 0n);
     $("built-address").textContent = kit.vault;
     $("built").hidden = false;
     say(
       "build-status",
-      "Verified. A day key and a creation request were created. Check that all three files listed below are saved (use the links if one is missing), then take the creation request to the website.",
+      "Verified. A day key, a creation request and a cancel file were created. Check that all four files listed below are saved (use the links if one is missing), then take the creation request to the website.",
       "ok",
     );
   }),
@@ -317,29 +357,7 @@ $("recover").addEventListener(
     const kit = await openKit();
     const epoch = epochOf("epoch");
     const password = newDayPassword();
-    const d = descriptorOf(kit);
-    const packet = recoveryPacket(unhex(kit.master), d, epoch);
-    // The one message this key may ever sign, built twice. If the two differ,
-    // something in this device computed wrongly and neither is released.
-    const again = recoveryPacket(unhex(kit.master), d, epoch);
-    if (hex(again.payload) !== hex(packet.payload) || hex(again.signature) !== hex(packet.signature))
-      throw new Error("Internal check failed. Nothing was saved.");
-    // Never hand out a packet this tool cannot itself verify.
-    const root = recoveryRoot(unhex(kit.master), d, epoch);
-    if (!verifies(signerOf(d, SIGNS_RECOVERY, epoch, 0n), packet.signature, packet.message, root))
-      throw new Error("Internal check failed. Nothing was saved.");
-    const out: RecoveryFile = {
-      version: 3,
-      kind: "recover",
-      network: kit.network,
-      genesis: kit.genesis,
-      program: kit.program,
-      vaultId: kit.vaultId,
-      vault: kit.vault,
-      epoch: epoch.toString(),
-      payload: hex(packet.payload),
-      signature: hex(packet.signature),
-    };
+    const out = packetFor(kit, epoch);
     const next = dayKey(kit, epoch + 1n);
     $("recover-files").replaceChildren();
     offer("recover-files", fileName(next), await encryptFile(next, password));
@@ -348,9 +366,10 @@ $("recover").addEventListener(
       `bunker-test-recovery-packet-${kit.vault.slice(0, 8)}-epoch-${epoch}.json`,
       publicJson(out),
     );
+    offerCancelFile("recover-files", kit, epoch + 1n);
     say(
       "recover-status",
-      `Created a recovery packet for key generation ${epoch} and the day key for generation ${epoch + 1n}. Check both files listed below are saved before you leave this page. Submit the packet on the website; the new day key works once it lands. If you ever lose that day key, come back here and re-issue it for generation ${epoch + 1n}.`,
+      `Created a recovery packet for key generation ${epoch}, and the day key and cancel file for generation ${epoch + 1n}. Check all three files listed below are saved before you leave this page. Submit the packet on the website; the new day key works once it lands. Keep the new cancel file where you can reach it quickly, and throw away the old one. If you ever lose that day key, come back here and re-issue it for generation ${epoch + 1n}.`,
       "ok",
     );
   }),
@@ -373,10 +392,16 @@ $("reissue").addEventListener(
   "click",
   run("recover-status", async () => {
     const kit = await openKit();
-    const day = dayKey(kit, epochOf("epoch"));
+    const epoch = epochOf("epoch");
+    const day = dayKey(kit, epoch);
     $("recover-files").replaceChildren();
     offer("recover-files", fileName(day), await encryptFile(day, newDayPassword()));
-    say("recover-status", `Created ${fileName(day)}. Check it is saved; the link below downloads it again.`, "ok");
+    offerCancelFile("recover-files", kit, epoch);
+    say(
+      "recover-status",
+      `Created ${fileName(day)} and this generation's cancel file. Check both are saved; the links below download them again.`,
+      "ok",
+    );
   }),
 );
 for (const tab of ["build", "recover"] as const)

@@ -163,7 +163,7 @@ function Page() {
     setPacket({ file, chain: after.state, status: recoveryFileStatus(file, after.state) });
     setRecovered(true);
     b.setNotice(
-      "Recovered. Every earlier day key is dead, and a withdrawal that was still waiting has been cancelled. Open your Bunker with the new day key the tool saved.",
+      "Done. Every earlier day key is dead, and a withdrawal that was still waiting has been cancelled. Open your Bunker with the new day key the tool saved. If you used a cancel file, you do not have one yet: open the offline tool with your recovery kit and re-issue the day key for the generation shown here.",
     );
   }
   const can = b.enabled && !!b.wallet.address && !b.busy;
@@ -291,8 +291,8 @@ function Page() {
               <h2>Submit a creation request.</h2>
               <p className="modal-copy">
                 In the offline tool, choose “Build a new Bunker”. It saves a
-                recovery kit, a day key and a creation request. Only the
-                creation request comes here; it holds your trusted addresses,
+                recovery kit, a day key, a cancel file and a creation request.
+                Only the creation request comes here; it holds your trusted addresses,
                 your waiting period and two public commitments, and nothing
                 secret.
               </p>
@@ -345,12 +345,15 @@ function Page() {
         </section>
       ) : (
         <section className="panel tool-panel">
-          <h2>{recovered ? "New keys installed." : "Submit a recovery packet."}</h2>
+          <h2>{recovered ? "New keys installed." : "Submit a cancel file or recovery packet."}</h2>
           <p className="modal-copy">
-            In the offline tool, open your recovery kit and enter your
-            Bunker’s current key generation. It saves a recovery packet and a
-            new day key. Only the packet comes here. Anyone holding a packet
-            can do exactly one thing with it: install the keys it names.
+            <b>To stop a withdrawal you did not make,</b> choose the cancel
+            file the tool saved with your day key. It works at once, without
+            your recovery kit. <b>To replace keys at any other time,</b> open
+            your recovery kit in the offline tool and enter your Bunker’s
+            current key generation; it saves a recovery packet and a new day
+            key, and only the packet comes here. Either file can do exactly
+            one thing: install the keys it names.
           </p>
           <div className="inline-form">
             <label className="field">
@@ -383,7 +386,7 @@ function Page() {
             )}
           </div>
           <FileField
-            label="Recovery packet"
+            label="Cancel file or recovery packet"
             disabled={!!b.busy}
             onFile={(f) => f && void b.task("Checking packet", () => loadPacket(f))}
           />

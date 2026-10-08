@@ -12,7 +12,7 @@ const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
 const record = (p: PendingView) =>
   `${p.kind === 0 ? sol(BigInt(p.amount)) : `${p.amount} base units of token ${name(p.mint)}`} to ${p.destination}`;
 const RECOVER =
-  "Not you? Open the offline recovery tool with your recovery kit, make a recovery packet, and submit it at bunkermode.io/recovery. That replaces your keys.";
+  "Not you? Upload your cancel file at bunkermode.io/recovery now. No cancel file? Open the offline recovery tool with your recovery kit, make a recovery packet, and submit that. Either one replaces your keys.";
 /** The text for one change in a watched vault. */
 export function eventText(
   vault: string,
