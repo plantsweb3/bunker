@@ -2,7 +2,11 @@
  *
  * Built from the transactions that reference the vault's address. A token sent
  * straight to one of the vault's token accounts by some other wallet does not
- * reference that address and will not appear here; its balance still shows. */
+ * reference that address and will not appear here; its balance still shows.
+ *
+ * A transaction is named after a Bunker instruction only when that
+ * instruction acts on THIS vault, whether it was sent directly or made by
+ * another program on the sender's behalf. */
 import { Connection, PublicKey } from "@solana/web3.js";
 export type ActivityKind =
   | "built"
@@ -32,11 +36,21 @@ export type FetchedTransaction = {
     postBalances: number[];
     preTokenBalances?: TokenBalance[] | null;
     postTokenBalances?: TokenBalance[] | null;
+    /** Instructions made by programs during the transaction; data is base58. */
+    innerInstructions?:
+      | { instructions: { programIdIndex: number; accounts: number[]; data: string }[] }[]
+      | null;
+    /** Accounts brought in through address lookup tables. */
+    loadedAddresses?: { writable: PublicKey[]; readonly: PublicKey[] } | null;
   } | null;
   transaction: {
     message: {
       staticAccountKeys: PublicKey[];
-      compiledInstructions: { programIdIndex: number; data: Uint8Array }[];
+      compiledInstructions: {
+        programIdIndex: number;
+        accountKeyIndexes: number[];
+        data: Uint8Array;
+      }[];
     };
   };
 };
@@ -47,17 +61,59 @@ type TokenBalance = {
   uiTokenAmount: { amount: string; decimals: number };
 };
 const OPCODE = { initialize: 0, announce: 2, execute: 3, expire: 4, recover: 5 } as const;
+/** Where each instruction names the vault it acts on. */
+const VAULT_ACCOUNT: Record<number, number> = { 0: 1, 2: 0, 3: 0, 4: 0, 5: 0 };
+const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+/** The first byte of base58-encoded data, or null if there is none. */
+function firstByte(encoded: string): number | null {
+  if (encoded.length === 0 || encoded.length > 2000) return null;
+  let n = 0n;
+  for (const ch of encoded) {
+    const digit = ALPHABET.indexOf(ch);
+    if (digit < 0) return null;
+    n = n * 58n + BigInt(digit);
+  }
+  // Leading '1's are leading zero bytes.
+  if (encoded[0] === "1") return 0;
+  let top = n;
+  while (top > 255n) top >>= 8n;
+  return Number(top);
+}
 export function describeTransaction(
   signature: string,
   tx: FetchedTransaction,
   program: PublicKey,
   vault: PublicKey,
 ): Activity {
-  const keys = tx.transaction.message.staticAccountKeys;
+  const loaded = tx.meta?.loadedAddresses;
+  const keys = [
+    ...tx.transaction.message.staticAccountKeys,
+    ...(loaded?.writable ?? []),
+    ...(loaded?.readonly ?? []),
+  ];
+  const instructions = [
+    ...tx.transaction.message.compiledInstructions.map((ix) => ({
+      program: ix.programIdIndex,
+      accounts: ix.accountKeyIndexes ?? [],
+      op: ix.data.length > 0 ? ix.data[0] : null,
+    })),
+    ...(tx.meta?.innerInstructions ?? []).flatMap((group) =>
+      group.instructions.map((ix) => ({
+        program: ix.programIdIndex,
+        accounts: ix.accounts,
+        op: firstByte(ix.data),
+      })),
+    ),
+  ];
   const ops = new Set(
-    tx.transaction.message.compiledInstructions
-      .filter((ix) => keys[ix.programIdIndex]?.equals(program) && ix.data.length > 0)
-      .map((ix) => ix.data[0]),
+    instructions
+      .filter(
+        (ix) =>
+          ix.op !== null &&
+          keys[ix.program]?.equals(program) &&
+          keys[ix.accounts[VAULT_ACCOUNT[ix.op]]]?.equals(vault),
+      )
+      .map((ix) => ix.op),
   );
   const at = keys.findIndex((k) => k.equals(vault));
   const meta = tx.meta;

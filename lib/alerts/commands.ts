@@ -1,6 +1,7 @@
 /** Handles one Telegram update. Only private chats, only three commands. */
 import { Connection, PublicKey } from "@solana/web3.js";
 import { fetchVault } from "@/sdk/v3/chain";
+import { snapshotOf } from "./watch";
 import { FOOTER, WELCOME } from "./messages";
 import { MAX_VAULTS_PER_CHAT, WatchStore } from "./store";
 type Update = {
@@ -30,15 +31,17 @@ export async function handleUpdate(
   if (!argument || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(argument))
     return reply("Open your Bunker at bunkermode.io and choose Telegram alerts to start watching it.");
   let vault: PublicKey;
+  let snapshot: string;
   try {
     vault = new PublicKey(argument);
-    // Only real Bunkers under this program can be watched.
-    await fetchVault(deps.connection, deps.program, vault);
+    // Only real Bunkers under this program can be watched. Watching starts
+    // from the state it is in right now.
+    const found = await fetchVault(deps.connection, deps.program, vault);
+    snapshot = JSON.stringify(snapshotOf(found.state, found.lamports));
   } catch {
     return reply(`That is not a Bunker on this network.\n\n${FOOTER}`);
   }
-  const latest = await deps.connection.getSignaturesForAddress(vault, { limit: 1 });
-  const ok = await deps.store.subscribe(chat, vault.toBase58(), latest[0]?.signature ?? null);
+  const ok = await deps.store.subscribe(chat, vault.toBase58(), snapshot);
   return reply(
     ok
       ? WELCOME(vault.toBase58())
