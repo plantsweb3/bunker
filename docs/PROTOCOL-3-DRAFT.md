@@ -48,7 +48,7 @@ The role byte makes the three derivations disjoint. 1,088 bytes is within HKDF-S
 | 104 | 8 | `op_index` |
 | 112 | 8 | `epoch` |
 | 120 | 32 | `rec_root` = `root(R[epoch])` |
-| 152 | 4 | `delay_secs`, immutable in this version; 86,400 ≤ value ≤ 604,800 |
+| 152 | 4 | `delay_secs`, immutable in this version; 0 ≤ value ≤ 604,800. Zero means no waiting period |
 | 156 | 1 | `pending`: 0 = none, 1 = present |
 | 157 | 1 | pending `kind`: 0 = SOL, 1 = classic SPL |
 | 158 | 32 | pending `mint` (zero for SOL) |
@@ -172,7 +172,7 @@ State is `(epoch e, op_index i, pending P)`. Every row not listed fails with no 
 
 Consequences to check against the implementation:
 
-1. **No transfer without a wait.** The only instruction that debits the vault is `execute`, which requires `now ≥ announced_at + delay_secs ≥ announced_at + 86,400`.
+1. **No transfer before the vault's own waiting period.** The only instruction that debits the vault is `execute`, which requires `now ≥ announced_at + delay_secs`. The waiting period is chosen when the vault is created and cannot change. **It may be zero**, in which case `announce` and `execute` can share one transaction and properties 4 and the cancel path below give no reaction time; see [The waiting period is optional](#the-waiting-period-is-optional).
 2. **At most one transfer per announcement.** `execute` zeroes the record in the same instruction as the transfer.
 3. **No field changes between announcement and execution.** `execute` takes no data; every transfer field comes from the record.
 4. **Recovery always wins over a pending withdrawal that has not executed.** It zeroes the record; a stale `execute` then fails on `pending == 0`.
@@ -181,6 +181,17 @@ Consequences to check against the implementation:
 7. **Expiry never strands the vault.** An announcement that is signed but not landed by `announce_by`, an execution that never succeeds, and a lost epoch seed all leave `recover` available while `M` exists.
 
 Races that chain ordering decides, and that the product must describe honestly: `execute` against `recover` after `opens_at` (if `execute` lands first, the transfer stands and recovery protects only the remainder); two devices submitting the same recovery packet (one succeeds, the other fails on `epoch`).
+
+## The waiting period is optional
+
+A vault is created with `delay_secs` anywhere from 0 to 7 days, and the reference interface defaults to 0 and requires an explicit, separately acknowledged choice to set one. This is a product decision: a mandatory 24-hour hold on every withdrawal was judged unacceptable as a default.
+
+What changes with `delay_secs = 0`:
+
+- **Unchanged:** a wallet key alone cannot withdraw; the announcement must be signed by the current one-time operational key; the signed fields fix the amount, asset and destination; the key rotates on use; retired roots are never reinstalled; a lost or exposed day key, an expired announcement and an interrupted signing are all recoverable with the archival kit.
+- **Lost:** the reaction window. Whoever holds a valid day key and its password can announce and execute in a single transaction. Recovery can still replace the keys, but only before a theft, not during one.
+
+A vault with a waiting period keeps every property in the table above. The interface states this difference at creation, and a vault's setting is visible on its page. Whether the first reviewed release should permit zero, and whether the choice should be changeable later through a delayed policy operation, are open questions 5 and 11.
 
 ## 6. `chain_tag`
 
@@ -226,7 +237,7 @@ Measured on that VM with the 1,400,000-unit limit: `announce` about 594,000 comp
 | Signing journal and key files: one signature per key, racing tabs, an orphaned reservation, chain advance, file confusion and tampering | `tests/journal-v3.test.ts` | 10 |
 | Browser, against a local validator running this program: build, deposit, announce (state and balances asserted on-chain), countdown, cancel by recovery, dead old day key, announce with the new key, seal | `tests/browser/custody3.spec.ts` | 1 × desktop and mobile |
 
-The browser test cannot let 24 hours pass, so releasing after the wait is exercised only by the VM suite.
+The browser suite has two cases: a vault with no waiting period, where a withdrawal arrives on the third approval, and a vault that opted into 24 hours. It cannot let 24 hours pass, so releasing after a wait is exercised only by the VM suite.
 
 The client and the Rust check share one author and one reading of this document; agreement between them shows consistency, not correctness of the design.
 
@@ -239,10 +250,11 @@ Each is a decision this draft made provisionally and wants challenged.
 1. **Deterministic recovery signature.** Is one fixed message per recovery key, re-emitted byte-identically, acceptable for this Winternitz construction, including after a crash between derivation and submission? If not, the recovery role needs a different, separately reviewed scheme.
 2. **`epoch` doubles as the recovery index.** It removes a counter and a class of mismatch. Is there a case that needs them to diverge?
 3. **`announce_by` at all.** Announcement rotates the operational root, so an unlanded announcement leaves the on-chain root unchanged and the off-chain key consumed; `recover` resolves that. Dropping the field would remove a time check but let an old signed announcement land at any later time.
-4. **Unix seconds rather than slots.** `Clock::unix_timestamp` is validator-reported and can drift. The 24-hour floor is large relative to plausible drift; the boundary tests in §8 should state the assumed bound.
+4. **Unix seconds rather than slots.** `Clock::unix_timestamp` is validator-reported and can drift. A waiting period of an hour or more is large relative to plausible drift; the boundary tests in §8 should state the assumed bound.
 5. **Immutable `delay_secs`.** Changing the delay is a policy operation with its own delay and is deferred. Is a fixed per-vault delay acceptable for a first release?
 6. **Fixed 7-day execution window** as a program constant rather than a signed field.
 7. **Permissionless `execute`.** It means the fee wallet is not needed at execution and alerts cannot be bypassed by withholding; it also means anyone can complete an announced transfer the moment it opens. The alternative binds execution to a signer and reintroduces a liveness dependency.
 8. **One spent-marker namespace for both roles**, and marking the displaced operational root on recovery even when it was never used.
 9. **No migration from protocol 2.** Vaults are created fresh under a new program id.
 10. **`chain_tag` is client-asserted.** Is a mismatch at initialization detectable in any stronger way worth its cost?
+11. **A zero waiting period is permitted and is the interface default.** It removes the reaction window for a stolen day key in exchange for withdrawals that complete at once. Should a reviewed release allow it, allow it only below a balance, or require a minimum?

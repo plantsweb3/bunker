@@ -1988,6 +1988,25 @@ body {
   color: #93a3a8;
   line-height: 1.5;
 }
+.wait-option {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px dashed #35454b;
+  border-radius: 6px;
+}
+.wait-option.on {
+  border-style: solid;
+  border-color: #6a5a34;
+  background: #1d1a12;
+}
+.wait-option strong {
+  font-weight: 500;
+  color: #eef2f1;
+}
+.wait-option .micro {
+  margin: 0;
+}
 .tool-tabs {
   display: flex;
   gap: 4px;

@@ -3,6 +3,8 @@
 use bunker3::state::*;
 
 const NOW: i64 = 1_800_000_000;
+/// The waiting period most tests opt into.
+const DAY: u32 = 86_400;
 fn root(tag: u8) -> [u8; 32] {
     [tag; 32]
 }
@@ -14,7 +16,7 @@ fn vault() -> Vault {
         op_index: 0,
         epoch: 0,
         rec_root: root(20),
-        delay_secs: MIN_DELAY_SECS,
+        delay_secs: DAY,
         pending: None,
         bump: 254,
     }
@@ -99,7 +101,7 @@ fn initialization_rules() {
     data.extend(root(2));
     data.extend(root(10));
     data.extend(root(20));
-    data.extend(MIN_DELAY_SECS.to_le_bytes());
+    data.extend(DAY.to_le_bytes());
     let v = new_vault(&data, 250).unwrap();
     assert_eq!((v.op_index, v.epoch, v.pending.clone(), v.bump), (0, 0, None, 250));
     let with = |range: std::ops::Range<usize>, bytes: &[u8]| {
@@ -110,7 +112,10 @@ fn initialization_rules() {
     assert!(with(64..96, &[0; 32]).is_err(), "zero operational root");
     assert!(with(96..128, &[0; 32]).is_err(), "zero recovery root");
     assert!(with(96..128, &root(10)).is_err(), "equal roots");
-    assert!(with(128..132, &(MIN_DELAY_SECS - 1).to_le_bytes()).is_err());
+    // The waiting period is optional: zero and anything up to the maximum.
+    for delay in [0u32, 1, 3_600, DAY - 1, DAY] {
+        assert_eq!(with(128..132, &delay.to_le_bytes()).unwrap().delay_secs, delay);
+    }
     assert!(with(128..132, &(MAX_DELAY_SECS + 1).to_le_bytes()).is_err());
     assert!(with(128..132, &MAX_DELAY_SECS.to_le_bytes()).is_ok());
     assert!(new_vault(&data[..131], 250).is_err());
@@ -174,7 +179,7 @@ fn announce_rotates_records_and_moves_nothing() {
     assert_eq!((v.epoch, v.op_index, v.op_root), (0, 1, root(11)));
     assert_eq!(v.rec_root, root(20));
     let p = v.pending.unwrap();
-    assert_eq!(p.opens_at, NOW + MIN_DELAY_SECS as i64);
+    assert_eq!(p.opens_at, NOW + DAY as i64);
     assert_eq!(p.deadline, p.opens_at + EXECUTE_WINDOW_SECS);
     assert_eq!((p.amount, p.destination, p.epoch, p.digest), (5_000_000, root(77), 0, root(99)));
 }
@@ -241,8 +246,25 @@ fn execute_only_inside_the_window() {
     assert_eq!(check_execute(&v, p.deadline).unwrap(), p, "deadline inclusive");
     assert!(check_execute(&v, p.deadline + 1).is_err(), "one second late");
     assert!(check_execute(&vault(), NOW).is_err(), "nothing pending");
-    // The shortest possible wait is the 24-hour floor.
-    assert!(p.opens_at - NOW >= 86_400);
+    // The wait is exactly the vault's own setting.
+    assert_eq!(p.opens_at - NOW, DAY as i64);
+}
+
+#[test]
+fn a_vault_without_a_waiting_period_can_execute_at_once() {
+    let mut v = vault();
+    v.delay_secs = 0;
+    let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
+    apply_announce(&mut v, &a, root(99), NOW).unwrap();
+    let p = v.pending.clone().unwrap();
+    assert_eq!((p.opens_at, p.deadline), (NOW, NOW + EXECUTE_WINDOW_SECS));
+    assert_eq!(check_execute(&v, NOW).unwrap(), p, "same second as the announcement");
+    assert!(check_execute(&v, NOW - 1).is_err());
+    // The authority still rotated and the record still clears on recovery.
+    assert_eq!((v.op_index, v.op_root), (1, root(11)));
+    let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
+    apply_recover(&mut v, &r).unwrap();
+    assert!(check_execute(&v, NOW).is_err());
 }
 
 #[test]
@@ -276,7 +298,7 @@ fn recover_installs_a_new_epoch_from_every_state() {
             (1, 0, root(21), root(12), None),
             "{label}"
         );
-        assert_eq!((v.vault_id, v.chain_tag, v.delay_secs, v.bump), (root(1), root(2), MIN_DELAY_SECS, 254));
+        assert_eq!((v.vault_id, v.chain_tag, v.delay_secs, v.bump), (root(1), root(2), DAY, 254));
         // A stale execute now finds nothing; the same packet cannot apply twice.
         assert!(check_execute(&v, NOW + 200_000).is_err());
         assert!(apply_recover(&mut v, &r).is_err(), "{label}: packet is bound to its epoch");
