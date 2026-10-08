@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Header, Footer } from "@/components/bunker/shell";
 import Story from "@/components/bunker/story";
-import { BIcon, BunkerIconName } from "@/components/bunker/icon";
+import { BIcon } from "@/components/bunker/icon";
 function Plate({
   src,
   alt,
@@ -191,29 +191,28 @@ export default function Home() {
               PREPARE. DON’T PANIC.
             </div>
             <h1>
-              One bad signature
+              One bad click
               <br />
               shouldn’t cost you
               <br />
               <em>everything.</em>
             </h1>
             <p>
-              Bunker is a separate vault for the Solana you can’t afford to
-              lose. Your wallet key can’t open it, so a drainer site or a
-              stolen seed phrase alone can’t empty it.
+              Bunker is a safe for your crypto. Your wallet can’t open it.
+              So a thief who tricks your wallet can’t empty it.
             </p>
             <div className="actions">
-              <Link href="/demo" className="button light">
+              <Link href="#how" className="button light">
                 <Play size={15} fill="currentColor" />
-                Watch a drain fail
+                Show me
               </Link>
-              <Link href="#how" className="button ghost">
-                How it works
+              <Link href="/demo" className="button ghost">
+                Try it yourself
               </Link>
             </div>
             <div className="hero-note">
               <BIcon name="bunker-key" size={15} />
-              Your wallet gets you in. A separate key gets you out.
+              Your wallet puts money in. A different key takes it out.
             </div>
             <div className="ca-line" aria-label="Contract address coming soon">
               <span className="ca-label">CA</span>
@@ -235,20 +234,69 @@ export default function Home() {
         </section>
         <section className="principles">
           <span>
-            <BIcon name="everyday-wallet" />A wallet signature can’t move it
+            <BIcon name="everyday-wallet" />A bad click can’t empty it
           </span>
           <span>
             <BIcon name="recovery-kit" />
-            Your seed phrase doesn’t open it
+            A stolen seed phrase can’t open it
           </span>
           <span>
             <BIcon name="lock-changed" />
-            Every withdrawal changes the lock
+            Every key works only once
           </span>
           <Link href="#limits">
             Where the protection stops
             <MoveUpRight size={16} />
           </Link>
+        </section>
+        <section className="intro section" id="how">
+          <div className="eyebrow">
+            <b>01 / SURFACE</b>WATCH. NO READING NEEDED.
+          </div>
+          <div className="split-title">
+            <h2>
+              Same mistake.
+              <br />
+              Two endings.
+            </h2>
+            <p>
+              Everyone clicks the wrong thing one day. Watch what happens
+              next, with a Bunker and without one.
+            </p>
+          </div>
+          <Story />
+          <div className="way-in">
+            <h3>Your way in. Three small steps.</h3>
+            <ol>
+              <li>
+                <Link href="/check">
+                  <span className="way-num">1</span>
+                  <BIcon name="everyday-wallet" size={34} />
+                  <b>Look</b>
+                  <span>See what one bad click could take from your wallet. Nothing to connect.</span>
+                  <em>Check my wallet</em>
+                </Link>
+              </li>
+              <li>
+                <Link href="/demo">
+                  <span className="way-num">2</span>
+                  <BIcon name="simulation" size={34} />
+                  <b>Practice</b>
+                  <span>Get robbed on purpose, with pretend money. See what a Bunker changes.</span>
+                  <em>Try the practice run</em>
+                </Link>
+              </li>
+              <li>
+                <Link href="/recovery">
+                  <span className="way-num">3</span>
+                  <BIcon name="vault" size={34} />
+                  <b>Build</b>
+                  <span>Make your own Bunker. Today it works with test money only.</span>
+                  <em>Build my Bunker</em>
+                </Link>
+              </li>
+            </ol>
+          </div>
         </section>
         <section className="check-teaser section surface" data-level="01">
           <Image
@@ -260,16 +308,16 @@ export default function Home() {
           />
           <div>
             <div className="eyebrow">
-              <b>01 / SURFACE</b>TEN SECONDS, NOTHING TO CONNECT
+              <b>01 / SURFACE</b>YOUR TURN. TEN SECONDS.
             </div>
             <h2>
-              What could one signature
+              What could one bad click
               <br />
-              take from your wallet?
+              take from you?
             </h2>
             <p>
-              Paste any Solana address. See everything a single approval could
-              move, and any token approvals that are already open.
+              Paste any Solana address. See everything one bad click could
+              take, and anything you already gave someone permission to move.
             </p>
           </div>
           <form className="check-form" action="/check" method="get">
@@ -289,51 +337,6 @@ export default function Home() {
               Read-only. Public chain data. Nothing is stored.
             </span>
           </form>
-        </section>
-        <section className="intro section" id="how">
-          <div className="eyebrow">
-            <b>01 / SURFACE</b>A SEPARATE LINE OF DEFENSE
-          </div>
-          <div className="split-title">
-            <h2>
-              Keep your wallet.
-              <br />
-              Rethink what it controls.
-            </h2>
-            <p>
-              Your everyday wallet is for moving. Bunker is for holding. What
-              you deposit can only leave with a second key that your wallet
-              never has and a website can’t ask it for.
-            </p>
-          </div>
-          <Story />
-          <div className="feature-grid">
-            {[
-              [
-                "vault",
-                "A drainer gets your wallet, not your vault",
-                "Approve the wrong thing and whatever sits in your wallet is exposed. What sits in your Bunker is not.",
-              ],
-              [
-                "bunker-key",
-                "A different key to the door",
-                "Withdrawals need your Bunker key, which your wallet never holds. Your connected wallet only pays the network fee.",
-              ],
-              [
-                "simulation",
-                "It does very little",
-                "Hold, withdraw, replace keys. No trading, no approvals, and no calls to any program except Solana’s own system and token programs. Less to get wrong.",
-              ],
-            ].map(([icon, title, body]) => {
-              return (
-                <article key={String(title)}>
-                  <BIcon name={icon as BunkerIconName} size={28} />
-                  <h3>{String(title)}</h3>
-                  <p>{String(body)}</p>
-                </article>
-              );
-            })}
-          </div>
         </section>
         <Plate
           tall

@@ -4401,3 +4401,89 @@ details.advanced .field {
     stroke-dashoffset: 62;
   }
 }
+
+/* ── The three steps in, under the story ── */
+.way-in {
+  margin-top: 64px;
+}
+.way-in h3 {
+  font-size: clamp(22px, 2.4vw, 30px);
+  color: #f5f7f6;
+}
+.way-in ol {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #2b3336;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.way-in li + li {
+  border-left: 1px solid #2b3336;
+}
+.way-in a {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  height: 100%;
+  padding: 30px 30px 28px;
+  background: #0d1112;
+  color: #f5f7f6;
+  text-decoration: none;
+  transition: background 0.25s;
+}
+.way-in a:hover {
+  background: #121a1b;
+}
+.way-in .way-num {
+  position: absolute;
+  right: 22px;
+  top: 12px;
+  font: 500 76px / 1 "Space Grotesk", "Inter", sans-serif;
+  color: rgba(125, 211, 199, 0.13);
+  transition: color 0.25s;
+}
+.way-in a:hover .way-num {
+  color: rgba(125, 211, 199, 0.32);
+}
+.way-in b {
+  font: 500 28px / 1.1 "Space Grotesk", "Inter", sans-serif;
+}
+.way-in a > span:not(.way-num) {
+  color: #a4aeb0;
+  font-size: 16px;
+  line-height: 1.55;
+}
+.way-in em {
+  align-self: end;
+  margin-top: 6px;
+  font-style: normal;
+  font-weight: 600;
+  color: var(--ice);
+}
+.way-in em::after {
+  content: " →";
+  display: inline-block;
+  transition: transform 0.25s;
+}
+.way-in a:hover em::after {
+  transform: translateX(5px);
+}
+@media (max-width: 760px) {
+  .way-in {
+    margin-top: 44px;
+  }
+  .way-in ol {
+    grid-template-columns: 1fr;
+  }
+  .way-in li + li {
+    border-left: 0;
+    border-top: 1px solid #2b3336;
+  }
+  .way-in a {
+    padding: 24px 20px 22px;
+  }
+}
