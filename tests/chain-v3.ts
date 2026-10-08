@@ -10,7 +10,7 @@ import {
   TransactionInstruction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { genesisAuthorities, recoveryPacket, signAnnouncement } from "../sdk/v3/authority";
+import { genesisVault, recoveryPacket, signAnnouncement } from "../sdk/v3/authority";
 import { Descriptor } from "../sdk/v3/derive";
 import { chainTime, fetchVault } from "../sdk/v3/chain";
 import {
@@ -53,21 +53,25 @@ const counts = { vaults: 0, instant: 0, waiting: 0, recoveries: 0, rejections: 0
 const started = Date.now();
 for (let n = 0; n < cycles; n++) {
   const master = crypto.getRandomValues(new Uint8Array(32));
-  const d: Descriptor = {
-    chainTag: new PublicKey(genesis).toBytes(),
-    programId: PROGRAM.toBytes(),
-    vaultId: crypto.getRandomValues(new Uint8Array(32)),
-  };
-  const vault = vaultAddress(PROGRAM, d.vaultId);
   const instant = n % 2 === 0;
-  const g = genesisAuthorities(master, d);
+  const g = genesisVault(
+    master,
+    {
+      chainTag: new PublicKey(genesis).toBytes(),
+      programId: PROGRAM.toBytes(),
+      salt: crypto.getRandomValues(new Uint8Array(32)),
+    },
+    instant ? 0 : 86_400,
+  );
+  const d: Descriptor = g.d;
+  const vault = vaultAddress(PROGRAM, d.vaultId);
   await send(
     initializeIx(PROGRAM, payer.publicKey, {
-      vaultId: d.vaultId,
+      salt: d.salt,
       chainTag: d.chainTag,
       opRoot: g.opRoot,
       recRoot: g.recRoot,
-      delaySecs: instant ? 0 : 86_400,
+      delaySecs: g.delaySecs,
     }),
     SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: vault, lamports: 2n * SOL }),
   );

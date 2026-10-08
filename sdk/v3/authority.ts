@@ -7,17 +7,18 @@
  *  - `signAnnouncement` takes an epoch seed, never the master. */
 import { PublicKey } from "@solana/web3.js";
 import { rootFromSecret, signOnce } from "../winternitz";
-import { Descriptor, epochSeed, operationalKey, recoveryKey } from "./derive";
+import { Descriptor, epochSeed, KeyContext, operationalKey, recoveryKey } from "./derive";
 import {
   Announce,
   announceMessage,
   encodeAnnounce,
   encodeRecover,
   recoverMessage,
+  vaultIdOf,
 } from "./protocol";
-const program = (d: Descriptor) => new PublicKey(d.programId);
+const program = (d: KeyContext) => new PublicKey(d.programId);
 /** The roots a new vault is created with, and the first epoch's seed. */
-export function genesisAuthorities(master: Uint8Array, d: Descriptor) {
+export function genesisAuthorities(master: Uint8Array, d: KeyContext) {
   const seed = epochSeed(master, d, 0n);
   return {
     opRoot: rootFromSecret(operationalKey(seed, d, 0n, 0n)),
@@ -25,9 +26,21 @@ export function genesisAuthorities(master: Uint8Array, d: Descriptor) {
     seed,
   };
 }
+/** Everything needed to create a vault from a master: its genesis roots and
+ * the descriptor whose `vaultId` commits to them and to the waiting period. */
+export function genesisVault(master: Uint8Array, k: KeyContext, delaySecs: number) {
+  const genesis = genesisAuthorities(master, k);
+  const d: Descriptor = {
+    chainTag: k.chainTag,
+    programId: k.programId,
+    salt: k.salt,
+    vaultId: vaultIdOf({ ...k, opRoot: genesis.opRoot, recRoot: genesis.recRoot, delaySecs }),
+  };
+  return { ...genesis, d, delaySecs };
+}
 export const operationalRoot = (
   seed: Uint8Array,
-  d: Descriptor,
+  d: KeyContext,
   epoch: bigint,
   opIndex: bigint,
 ) => rootFromSecret(operationalKey(seed, d, epoch, opIndex));

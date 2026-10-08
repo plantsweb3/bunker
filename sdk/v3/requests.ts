@@ -9,7 +9,7 @@ import { z } from "zod";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../bytes";
 import { verify } from "../winternitz";
-import { descriptorOf } from "./kit";
+import { identityOf } from "./kit";
 import {
   decodeRecover,
   MAX_DELAY_SECS,
@@ -17,6 +17,7 @@ import {
   recoverMessage,
   SIGNATURE_SIZE,
   VaultState,
+  vaultIdOf,
 } from "./protocol";
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const address = z.string().min(32).max(44);
@@ -42,6 +43,7 @@ export const creationRequestSchema = z
   .object({
     ...identity,
     kind: z.literal("create"),
+    salt: hex32,
     delaySecs: z.number().int().min(0).max(MAX_DELAY_SECS),
     opRoot: hex32,
     recRoot: hex32,
@@ -74,11 +76,21 @@ export function parseNetworkCard(raw: string): NetworkCard {
   new PublicKey(card.program);
   return card;
 }
+export const genesisOf = (r: CreationRequest) => ({
+  salt: unhex(r.salt, 32),
+  chainTag: new PublicKey(r.genesis).toBytes(),
+  opRoot: unhex(r.opRoot, 32),
+  recRoot: unhex(r.recRoot, 32),
+  delaySecs: r.delaySecs,
+});
 export function parseCreationRequest(raw: string): CreationRequest {
   const r = parse(creationRequestSchema, raw, "a Bunker creation request");
-  descriptorOf(r); // The vault address must be the PDA of its own id.
   if (r.opRoot === ZERO || r.recRoot === ZERO || r.opRoot === r.recRoot)
     throw new Error("Creation request has invalid commitments");
+  // The address must be the one these exact parameters create.
+  const d = identityOf(r);
+  if (hex(vaultIdOf(genesisOf(r))) !== hex(d.vaultId))
+    throw new Error("Creation request does not match its vault address");
   return r;
 }
 /** Checks the file is internally consistent AND that its signature verifies
@@ -89,7 +101,7 @@ export function parseRecoveryFile(raw: string): RecoveryFile & {
   signatureBytes: Uint8Array;
 } {
   const f = parse(recoveryFileSchema, raw, "a Bunker recovery packet");
-  const d = descriptorOf(f);
+  const d = identityOf(f);
   const payloadBytes = unhex(f.payload);
   const r = decodeRecover(payloadBytes);
   if (

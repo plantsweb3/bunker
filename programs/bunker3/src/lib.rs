@@ -31,9 +31,17 @@ fn owned(a: &AccountInfo, id: &Pubkey, len: usize, magic: &[u8; 8]) -> ProgramRe
     require(a.owner == id && a.data_len() == len)?;
     require(&a.try_borrow_data()?[..8] == magic)
 }
-/// The marker for `root` must not exist yet. Returns its bump.
-fn unspent(id: &Pubkey, account: &AccountInfo, root: &[u8; 32]) -> Result<u8, ProgramError> {
-    let (expected, bump) = Pubkey::find_program_address(&[SPENT_SEED, root], id);
+/// The marker for `root` in this vault must not exist yet. Returns its bump.
+/// Markers are scoped to one vault: nothing done to any other vault can create
+/// or occupy them.
+fn unspent(
+    id: &Pubkey,
+    vault: &Pubkey,
+    account: &AccountInfo,
+    root: &[u8; 32],
+) -> Result<u8, ProgramError> {
+    let (expected, bump) =
+        Pubkey::find_program_address(&[SPENT_SEED, vault.as_ref(), root], id);
     require(
         account.key == &expected
             && account.owner == &system_program::id()
@@ -77,22 +85,23 @@ fn create<'a>(
         &[seeds],
     )
 }
-/// Permanently marks `root` as used, in either role, for this program.
+/// Permanently marks `root` as used, in either role, for this vault.
 fn mark_spent<'a>(
     payer: &AccountInfo<'a>,
     marker: &AccountInfo<'a>,
     system: &AccountInfo<'a>,
     id: &Pubkey,
+    vault: &Pubkey,
     root: &[u8; 32],
 ) -> ProgramResult {
-    let bump = unspent(id, marker, root)?;
+    let bump = unspent(id, vault, marker, root)?;
     create(
         payer,
         marker,
         system,
         id,
         SPENT_MAGIC.len(),
-        &[SPENT_SEED, root, &[bump]],
+        &[SPENT_SEED, vault.as_ref(), root, &[bump]],
     )?;
     marker.try_borrow_mut_data()?.copy_from_slice(SPENT_MAGIC);
     Ok(())
@@ -149,18 +158,17 @@ pub fn process_instruction(id: &Pubkey, accounts: &[AccountInfo], input: &[u8]) 
 }
 
 fn initialize(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
-    require(accounts.len() == 5 && data.len() == INIT_LEN)?;
+    require(accounts.len() == 3 && data.len() == INIT_LEN)?;
     let it = &mut accounts.iter();
     let payer = next_account_info(it)?;
     let vault = next_account_info(it)?;
     let system = next_account_info(it)?;
-    let op_marker = next_account_info(it)?;
-    let rec_marker = next_account_info(it)?;
-    let (expected, bump) = Pubkey::find_program_address(&[VAULT_SEED, &data[..32]], id);
+    // The address commits to every creation parameter, so whoever creates the
+    // account first can only create exactly the vault its owner derived.
+    let vault_id = hashv(&[VAULT_ID_DOMAIN, data]).to_bytes();
+    let (expected, bump) = Pubkey::find_program_address(&[VAULT_SEED, &vault_id], id);
     require(vault.key == &expected)?;
-    let v = new_vault(data, bump)?;
-    unspent(id, op_marker, &v.op_root)?;
-    unspent(id, rec_marker, &v.rec_root)?;
+    let v = new_vault(vault_id, data, bump)?;
     create(
         payer,
         vault,
@@ -233,13 +241,13 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
     for reserved in [vault.key, proof.key, spent.key, next_spent.key] {
         require(a.destination != reserved.to_bytes())?;
     }
-    unspent(id, next_spent, &a.next_op_root)?;
+    unspent(id, vault.key, next_spent, &a.next_op_root)?;
     let message: &[&[u8]] = &[ANNOUNCE_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
     let digest = hashv(message).to_bytes();
     // Cheap state checks first; `displaced` is the root the signature must match.
     let displaced = apply_announce(&mut v, &a, digest, Clock::get()?.unix_timestamp)?;
     verify_proof(id, proof, message, &digest, &displaced)?;
-    mark_spent(payer, spent, system, id, &displaced)?;
+    mark_spent(payer, spent, system, id, vault.key, &displaced)?;
     store_vault(vault, &v)
 }
 
@@ -345,16 +353,16 @@ fn recover(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     let next_op_spent = next_account_info(it)?;
     let system = next_account_info(it)?;
     let mut v = load_vault(id, vault)?;
-    unspent(id, next_rec_spent, &r.next_rec_root)?;
-    unspent(id, next_op_spent, &r.next_op_root)?;
+    unspent(id, vault.key, next_rec_spent, &r.next_rec_root)?;
+    unspent(id, vault.key, next_op_spent, &r.next_op_root)?;
     let message: &[&[u8]] = &[RECOVER_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
     let digest = hashv(message).to_bytes();
     let (old_rec, old_op) = apply_recover(&mut v, &r)?;
     verify_proof(id, proof, message, &digest, &old_rec)?;
-    mark_spent(payer, rec_spent, system, id, &old_rec)?;
+    mark_spent(payer, rec_spent, system, id, vault.key, &old_rec)?;
     // An offline signature under the displaced operational root may exist even
     // if it was never announced, so that root is retired too.
-    mark_spent(payer, op_spent, system, id, &old_op)?;
+    mark_spent(payer, op_spent, system, id, vault.key, &old_op)?;
     store_vault(vault, &v)
 }
 
@@ -378,5 +386,9 @@ fn close_proof(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramRes
     **payer.try_borrow_mut_lamports()? = total;
     **proof.try_borrow_mut_lamports()? = 0;
     proof.try_borrow_mut_data()?.fill(0);
+    // Hand the address back to the system program so it can be staged again
+    // even if something refunds it within this transaction.
+    proof.resize(0)?;
+    proof.assign(&system_program::id());
     Ok(())
 }

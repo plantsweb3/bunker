@@ -102,12 +102,12 @@ fn initialization_rules() {
     data.extend(root(10));
     data.extend(root(20));
     data.extend(DAY.to_le_bytes());
-    let v = new_vault(&data, 250).unwrap();
+    let v = new_vault(root(1), &data, 250).unwrap();
     assert_eq!((v.op_index, v.epoch, v.pending.clone(), v.bump), (0, 0, None, 250));
     let with = |range: std::ops::Range<usize>, bytes: &[u8]| {
         let mut d = data.clone();
         d[range].copy_from_slice(bytes);
-        new_vault(&d, 250)
+        new_vault(root(1), &d, 250)
     };
     assert!(with(64..96, &[0; 32]).is_err(), "zero operational root");
     assert!(with(96..128, &[0; 32]).is_err(), "zero recovery root");
@@ -118,7 +118,7 @@ fn initialization_rules() {
     }
     assert!(with(128..132, &(MAX_DELAY_SECS + 1).to_le_bytes()).is_err());
     assert!(with(128..132, &MAX_DELAY_SECS.to_le_bytes()).is_ok());
-    assert!(new_vault(&data[..131], 250).is_err());
+    assert!(new_vault(root(1), &data[..131], 250).is_err());
 }
 
 #[test]
@@ -200,6 +200,10 @@ fn announce_guards() {
     };
     assert!(try_with(&|_| {}, NOW + 3600, &base).is_ok(), "inclusive announce_by");
     assert!(try_with(&|_| {}, NOW + 3601, &base).is_err(), "after announce_by");
+    // A deadline further ahead than the protocol allows is refused.
+    let far = |ahead: i64| move |d: &mut Vec<u8>| d[155..163].copy_from_slice(&(NOW + ahead).to_le_bytes());
+    assert!(try_with(&far(MAX_ANNOUNCE_AHEAD_SECS), NOW, &base).is_ok(), "furthest allowed deadline");
+    assert!(try_with(&far(MAX_ANNOUNCE_AHEAD_SECS + 1), NOW, &base).is_err(), "deadline too far ahead");
     assert!(try_with(&|d| d[2] ^= 1, NOW, &base).is_err(), "vault id");
     assert!(try_with(&|d| d[34] ^= 1, NOW, &base).is_err(), "chain tag");
     assert!(try_with(&|d| d[66] = 1, NOW, &base).is_err(), "epoch");

@@ -4,9 +4,11 @@
  * can produce (the WebAuthn PRF extension, behind Face ID / fingerprint / PIN).
  * The ciphertext sits in this browser's storage; on its own it is useless.
  *
- * Scope: this protects the DAY key on one device. It is a convenience over the
- * file and password, not a backup: if the device or passkey is gone, the day
- * key is re-issued from the recovery kit. The archival master is never stored. */
+ * Scope: this protects the DAY key in one browser. It is a convenience over
+ * the file and password, not a backup: if the browser's storage or the passkey
+ * is gone, the day key is re-issued from the recovery kit. The archival master
+ * is never stored. A password manager may sync the passkey itself to other
+ * devices; the encrypted day key stays in this browser's storage. */
 import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { z } from "zod";
@@ -26,7 +28,10 @@ const record = z
   .strict();
 export type PasskeyRecord = z.infer<typeof record>;
 type Scope = { genesis: string; program: string };
-const slot = (s: Scope) => `bunker3-passkey:${s.genesis}:${s.program}`;
+type VaultScope = Scope & { vault: string };
+const prefix = (s: Scope) => `bunker3-passkey:${s.genesis}:${s.program}`;
+/** One slot per vault: saving a passkey for one Bunker never replaces another's. */
+const slot = (s: VaultScope) => `${prefix(s)}:${s.vault}`;
 type Prf = { prf?: { enabled?: boolean; results?: { first?: BufferSource } } };
 const bytes = (b: BufferSource) =>
   b instanceof ArrayBuffer ? new Uint8Array(b) : new Uint8Array(b.buffer, b.byteOffset, b.byteLength);
@@ -42,16 +47,39 @@ export async function passkeyAvailable(): Promise<boolean> {
     return false;
   }
 }
-export function storedPasskey(s: Scope): PasskeyRecord | null {
+/** Every passkey record saved in this browser for this network and program. */
+export function storedPasskeys(s: Scope): PasskeyRecord[] {
+  const found: PasskeyRecord[] = [];
   try {
-    const raw = localStorage.getItem(slot(s));
-    return raw === null ? null : record.parse(JSON.parse(raw));
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith(`${prefix(s)}:`)) continue;
+      const r = record.safeParse(JSON.parse(localStorage.getItem(key) ?? "null"));
+      if (r.success && key === slot({ ...s, vault: r.data.vault })) found.push(r.data);
+    }
   } catch {
-    return null;
+    return [];
   }
+  return found.sort((a, b) => a.vault.localeCompare(b.vault));
 }
-export function forgetPasskey(s: Scope) {
-  localStorage.removeItem(slot(s));
+/** Removes the encrypted day key from this browser and, where the browser
+ * supports it, tells the passkey manager the credential is no longer valid. */
+export function forgetPasskey(s: Scope, r: PasskeyRecord) {
+  localStorage.removeItem(slot({ ...s, vault: r.vault }));
+  const signal = (
+    globalThis.PublicKeyCredential as unknown as {
+      signalUnknownCredential?: (o: { rpId: string; credentialId: string }) => Promise<void>;
+    }
+  )?.signalUnknownCredential;
+  if (signal) {
+    const b64 = btoa(String.fromCharCode(...unhex(r.credentialId)))
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+    void signal
+      .call(PublicKeyCredential, { rpId: location.hostname, credentialId: b64 })
+      .catch(() => undefined);
+  }
 }
 async function aesKey(prfOutput: Uint8Array) {
   if (prfOutput.length !== 32) throw new Error("Unexpected passkey output");
@@ -133,9 +161,7 @@ export async function savePasskey(day: DayKey): Promise<PasskeyRecord> {
   }
 }
 /** Asks the authenticator to unlock the stored day key. */
-export async function openPasskey(s: Scope): Promise<DayKey> {
-  const r = storedPasskey(s);
-  if (!r) throw new Error("No passkey is saved for a Bunker on this device");
+export async function openPasskey(s: Scope, r: PasskeyRecord): Promise<DayKey> {
   const output = await assertion(unhex(r.credentialId));
   try {
     const plain = await crypto.subtle.decrypt(

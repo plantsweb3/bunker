@@ -1,7 +1,7 @@
 /** Protocol 3 chain reads (DRAFT). Uses only RPC methods already on the
  * read allowlist. */
 import { Connection, PublicKey, SYSVAR_CLOCK_PUBKEY } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "../classic-token";
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from "../classic-token";
 import type { Asset } from "../client";
 import { parseVault, vaultAddress, VAULT_SIZE, VaultState } from "./protocol";
 /** Consensus time, the clock the program enforces delays against. */
@@ -37,9 +37,18 @@ export async function vaultTokens(connection: Connection, vault: PublicKey): Pro
   const accounts = await connection.getParsedTokenAccountsByOwner(vault, {
     programId: TOKEN_PROGRAM_ID,
   });
-  return accounts.value.flatMap((t) => {
+  // Only the vault's associated token account for each mint: it is the one
+  // account withdrawals are made from, and nobody else can choose its address.
+  const own = await Promise.all(
+    accounts.value.map(async (t) => {
+      const mint = t.account.data.parsed?.info?.mint;
+      if (typeof mint !== "string") return false;
+      return (await getAssociatedTokenAddress(new PublicKey(mint), vault, true)).equals(t.pubkey);
+    }),
+  );
+  return accounts.value.flatMap((t, i) => {
     const p = t.account.data.parsed?.info;
-    if (!p || p.tokenAmount.decimals > 18) return [];
+    if (!own[i] || !p || p.tokenAmount.decimals > 18) return [];
     return [
       {
         key: p.mint as string,

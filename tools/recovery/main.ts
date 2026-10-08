@@ -4,8 +4,9 @@
  * user carries to the website. */
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../../sdk/bytes";
-import { genesisAuthorities, recoveryPacket } from "../../sdk/v3/authority";
-import { epochSeed } from "../../sdk/v3/derive";
+import { genesisVault, recoveryPacket } from "../../sdk/v3/authority";
+import { epochSeed, recoveryKey } from "../../sdk/v3/derive";
+import { rootFromSecret, verify } from "../../sdk/winternitz";
 import {
   ArchivalKit,
   DayKey,
@@ -14,6 +15,7 @@ import {
   download,
   encryptFile,
   fileName,
+  passwordProblem,
   validateArchival,
 } from "../../sdk/v3/kit";
 import { vaultAddress } from "../../sdk/v3/protocol";
@@ -44,6 +46,7 @@ function dayKey(kit: ArchivalKit, epoch: bigint): DayKey {
     network: kit.network,
     genesis: kit.genesis,
     program: kit.program,
+    salt: kit.salt,
     vaultId: kit.vaultId,
     vault: kit.vault,
     epoch: epoch.toString(),
@@ -64,6 +67,28 @@ function epochOf(id: string): bigint {
   return BigInt(raw);
 }
 
+/** The day key is typed into a website; the recovery kit never is. They must
+ * not share a password, or the site learns the one that opens the kit. */
+function dayPassword(id: string, repeatId: string, kitPassword: string) {
+  const password = value(id);
+  if (password !== value(repeatId)) throw new Error("Day key passwords do not match");
+  const problem = passwordProblem(password);
+  if (problem) throw new Error(`Day key password: ${problem}`);
+  if (password === kitPassword)
+    throw new Error("The day key needs a different password from the recovery kit");
+  return password;
+}
+const describe = (k: { network: string; genesis: string; program: string }) =>
+  `Network: ${k.network}\nGenesis: ${k.genesis}\nProgram: ${k.program}`;
+$("card").addEventListener("change", () => {
+  read(file("card"), "the network card")
+    .then((raw) => {
+      $("card-echo").textContent = describe(parseNetworkCard(raw));
+      $("card-box").hidden = false;
+    })
+    .catch(() => ($("card-box").hidden = true));
+});
+
 // ── Build ────────────────────────────────────────────────────────────────
 let draft: { kit: ArchivalKit; encrypted: string } | null = null;
 $("wait").addEventListener("change", () => {
@@ -80,21 +105,33 @@ $("create").addEventListener(
     const card: NetworkCard = parseNetworkCard(await read(file("card"), "the network card"));
     const password = value("password");
     if (password !== value("repeat")) throw new Error("Passwords do not match");
+    dayPassword("day-password", "day-repeat", password);
+    if (!checked("card-ack"))
+      throw new Error("Confirm the network and program match the website");
     if (!checked("kit-ack")) throw new Error("Acknowledge what the recovery kit is");
     if (checked("wait") && !checked("wait-ack"))
       throw new Error("Acknowledge the waiting period, or turn it off");
     const program = new PublicKey(card.program);
-    const vaultId = crypto.getRandomValues(new Uint8Array(32));
+    const salt = crypto.getRandomValues(new Uint8Array(32));
     const master = crypto.getRandomValues(new Uint8Array(32));
+    const delaySecs = checked("wait") ? Number(value("delay")) : 0;
+    // The address is a hash of the keys and the waiting period, so nobody
+    // else can create this Bunker with different ones.
+    const { d } = genesisVault(
+      master,
+      { chainTag: new PublicKey(card.genesis).toBytes(), programId: program.toBytes(), salt },
+      delaySecs,
+    );
     const kit = validateArchival({
       version: 3,
       kind: "archival",
       network: card.network,
       genesis: card.genesis,
       program: card.program,
-      vaultId: hex(vaultId),
-      vault: vaultAddress(program, vaultId).toBase58(),
-      delaySecs: checked("wait") ? Number(value("delay")) : 0,
+      salt: hex(salt),
+      vaultId: hex(d.vaultId),
+      vault: vaultAddress(program, d.vaultId).toBase58(),
+      delaySecs,
       master: hex(master),
     });
     master.fill(0);
@@ -112,13 +149,14 @@ $("verify").addEventListener(
     if (JSON.stringify(reopened) !== JSON.stringify(draft.kit))
       throw new Error("That is not the recovery kit that was just saved");
     const { kit } = draft;
-    const g = genesisAuthorities(unhex(kit.master), descriptorOf(kit));
+    const g = genesisVault(unhex(kit.master), descriptorOf(kit), kit.delaySecs);
     const request: CreationRequest = {
       version: 3,
       kind: "create",
       network: kit.network,
       genesis: kit.genesis,
       program: kit.program,
+      salt: kit.salt,
       vaultId: kit.vaultId,
       vault: kit.vault,
       delaySecs: kit.delaySecs,
@@ -126,7 +164,10 @@ $("verify").addEventListener(
       recRoot: hex(g.recRoot),
     };
     const day = dayKey(kit, 0n);
-    download(fileName(day), await encryptFile(day, value("password")));
+    download(
+      fileName(day),
+      await encryptFile(day, dayPassword("day-password", "day-repeat", value("password"))),
+    );
     download(`bunker-test-creation-request-${kit.vault.slice(0, 8)}.json`, publicJson(request));
     $("built-address").textContent = kit.vault;
     $("built").hidden = false;
@@ -140,14 +181,28 @@ $("verify").addEventListener(
 
 // ── Recover / re-issue ───────────────────────────────────────────────────
 async function openKit() {
-  return decryptArchival(await read(file("kit"), "your recovery kit"), value("kit-password"));
+  const kit = await decryptArchival(
+    await read(file("kit"), "your recovery kit"),
+    value("kit-password"),
+  );
+  $("kit-echo").textContent = `${describe(kit)}\nBunker: ${kit.vault}`;
+  $("kit-box").hidden = false;
+  return kit;
 }
+const newDayPassword = () =>
+  dayPassword("new-day-password", "new-day-repeat", value("kit-password"));
 $("recover").addEventListener(
   "click",
   run("recover-status", async () => {
     const kit = await openKit();
     const epoch = epochOf("epoch");
-    const packet = recoveryPacket(unhex(kit.master), descriptorOf(kit), epoch);
+    const password = newDayPassword();
+    const d = descriptorOf(kit);
+    const packet = recoveryPacket(unhex(kit.master), d, epoch);
+    // Never hand out a packet this tool cannot itself verify.
+    const root = rootFromSecret(recoveryKey(unhex(kit.master), d, epoch));
+    if (!verify(packet.signature, packet.message, root))
+      throw new Error("Internal check failed. Nothing was saved.");
     const out: RecoveryFile = {
       version: 3,
       kind: "recover",
@@ -161,7 +216,7 @@ $("recover").addEventListener(
       signature: hex(packet.signature),
     };
     const next = dayKey(kit, epoch + 1n);
-    download(fileName(next), await encryptFile(next, value("kit-password")));
+    download(fileName(next), await encryptFile(next, password));
     download(
       `bunker-test-recovery-packet-${kit.vault.slice(0, 8)}-epoch-${epoch}.json`,
       publicJson(out),
@@ -178,7 +233,7 @@ $("reissue").addEventListener(
   run("recover-status", async () => {
     const kit = await openKit();
     const day = dayKey(kit, epochOf("epoch"));
-    download(fileName(day), await encryptFile(day, value("kit-password")));
+    download(fileName(day), await encryptFile(day, newDayPassword()));
     say("recover-status", `Saved ${fileName(day)}.`, "ok");
   }),
 );
@@ -189,6 +244,12 @@ for (const tab of ["build", "recover"] as const)
       $(`tab-${t}`).setAttribute("aria-selected", String(t === tab));
     }
   });
+// Served from a website this page could be swapped or observed. It only runs
+// as a file the user saved and opened.
+if (location.protocol !== "file:") {
+  $("served").hidden = false;
+  $("tool").hidden = true;
+}
 $("online").hidden = !navigator.onLine;
 window.addEventListener("online", () => ($("online").hidden = false));
 window.addEventListener("offline", () => ($("online").hidden = true));

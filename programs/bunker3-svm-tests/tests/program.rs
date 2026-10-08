@@ -41,6 +41,8 @@ struct Env {
     svm: LiteSVM,
     program: Pubkey,
     payer: Keypair,
+    salt: [u8; 32],
+    /// `sha256("BUNKER3_VAULT_ID" || salt || chain || op || rec || delay)`.
     id: [u8; 32],
     chain: [u8; 32],
     vault: Pubkey,
@@ -65,9 +67,8 @@ impl Env {
             .expect("build bunker3.so first (see the header of this file)");
         let payer = Keypair::new();
         svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
-        let id = [7u8; 32];
-        let vault = Pubkey::find_program_address(&[b"bunker3", &id], &program).0;
-        let mut env = Self { svm, program, payer, id, chain: [9u8; 32], vault };
+        let mut env = Self { svm, program, payer, salt: [7u8; 32], id: [0; 32], chain: [9u8; 32], vault: Pubkey::default() };
+        env.adopt(root(1), root(100), DAY as u32);
         env.set_time(T0);
         env
     }
@@ -98,7 +99,33 @@ impl Env {
         self.send_as(&payer, ixs)
     }
     fn marker(&self, root: &[u8; 32]) -> Pubkey {
-        Pubkey::find_program_address(&[b"spent-v3", root], &self.program).0
+        self.marker_in(&self.vault, root)
+    }
+    fn marker_in(&self, vault: &Pubkey, root: &[u8; 32]) -> Pubkey {
+        Pubkey::find_program_address(&[b"spent-v3", vault.as_ref(), root], &self.program).0
+    }
+    fn init_data(&self, salt: &[u8; 32], op: [u8; 32], rec: [u8; 32], delay: u32) -> Vec<u8> {
+        [salt.to_vec(), self.chain.to_vec(), op.to_vec(), rec.to_vec(), delay.to_le_bytes().to_vec()].concat()
+    }
+    /// The identity and address the program will derive for these parameters.
+    fn derive(&self, salt: &[u8; 32], op: [u8; 32], rec: [u8; 32], delay: u32) -> ([u8; 32], Pubkey) {
+        let id = hashv(&[b"BUNKER3_VAULT_ID", &self.init_data(salt, op, rec, delay)]).to_bytes();
+        (id, Pubkey::find_program_address(&[b"bunker3", &id], &self.program).0)
+    }
+    /// Points the harness at the vault these parameters create.
+    fn adopt(&mut self, op: [u8; 32], rec: [u8; 32], delay: u32) {
+        (self.id, self.vault) = self.derive(&self.salt, op, rec, delay);
+    }
+    fn init_ix_at(&self, vault: Pubkey, salt: &[u8; 32], op: [u8; 32], rec: [u8; 32], delay: u32) -> Instruction {
+        Instruction {
+            program_id: self.program,
+            accounts: vec![
+                AccountMeta::new(self.payer.pubkey(), true),
+                AccountMeta::new(vault, false),
+                AccountMeta::new_readonly(system(), false),
+            ],
+            data: [vec![0u8], self.init_data(salt, op, rec, delay)].concat(),
+        }
     }
     fn spent(&self, root: &[u8; 32]) -> bool {
         self.svm
@@ -124,27 +151,10 @@ impl Env {
         self.vault_data()[72..104].try_into().unwrap()
     }
 
-    fn init_ix(&self, op: [u8; 32], rec: [u8; 32], delay: u32) -> Instruction {
-        let data = [
-            vec![0u8],
-            self.id.to_vec(),
-            self.chain.to_vec(),
-            op.to_vec(),
-            rec.to_vec(),
-            delay.to_le_bytes().to_vec(),
-        ]
-        .concat();
-        Instruction {
-            program_id: self.program,
-            accounts: vec![
-                AccountMeta::new(self.payer.pubkey(), true),
-                AccountMeta::new(self.vault, false),
-                AccountMeta::new_readonly(system(), false),
-                AccountMeta::new_readonly(self.marker(&op), false),
-                AccountMeta::new_readonly(self.marker(&rec), false),
-            ],
-            data,
-        }
+    /// Creates the vault for these parameters and makes it the harness's vault.
+    fn init_ix(&mut self, op: [u8; 32], rec: [u8; 32], delay: u32) -> Instruction {
+        self.adopt(op, rec, delay);
+        self.init_ix_at(self.vault, &self.salt, op, rec, delay)
     }
     /// Operational key `tag 1`, recovery key `tag 100`, funded with 10 SOL.
     fn init(&mut self) {
@@ -316,7 +326,7 @@ fn initialize_writes_the_specified_layout_and_cannot_be_repeated() {
     assert_eq!(e.svm.get_account(&e.vault).unwrap().owner, e.program);
     // Neither initial root is marked spent by creation.
     assert!(!e.spent(&root(1)) && !e.spent(&root(100)));
-    let again = e.init_ix(root(2), root(101), DAY as u32);
+    let again = e.init_ix_at(e.vault, &e.salt, root(1), root(100), DAY as u32);
     assert!(e.send(&[again]).is_err(), "an existing vault cannot be re-initialized");
     assert_eq!(&e.vault_data()[72..104], &root(1));
 }
@@ -615,22 +625,6 @@ fn a_retired_root_can_never_be_installed_again() {
     assert!(e.recover(100, 0, 101, 1).is_err());
     assert!(e.recover(100, 0, 1, 10).is_err());
     assert_eq!(e.epoch(), 0);
-    // And a second vault cannot be created under it.
-    let id2 = [8u8; 32];
-    let vault2 = Pubkey::find_program_address(&[b"bunker3", &id2], &e.program).0;
-    let data = [vec![0u8], id2.to_vec(), e.chain.to_vec(), root(1).to_vec(), root(200).to_vec(), (DAY as u32).to_le_bytes().to_vec()].concat();
-    let ix = Instruction {
-        program_id: e.program,
-        accounts: vec![
-            AccountMeta::new(e.payer.pubkey(), true),
-            AccountMeta::new(vault2, false),
-            AccountMeta::new_readonly(system(), false),
-            AccountMeta::new_readonly(e.marker(&root(1)), false),
-            AccountMeta::new_readonly(e.marker(&root(200)), false),
-        ],
-        data,
-    };
-    assert!(e.send(&[ix]).is_err());
 }
 
 #[test]

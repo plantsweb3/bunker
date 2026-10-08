@@ -13,7 +13,7 @@ import {
 import { handleUpdate } from "../lib/alerts/commands";
 import { MemoryStore } from "../lib/alerts/store";
 import { runWatch } from "../lib/alerts/watch";
-import { genesisAuthorities, recoveryPacket, signAnnouncement } from "../sdk/v3/authority";
+import { genesisVault, recoveryPacket, signAnnouncement } from "../sdk/v3/authority";
 import { chainTime, fetchVault } from "../sdk/v3/chain";
 import { Descriptor } from "../sdk/v3/derive";
 import {
@@ -59,13 +59,17 @@ const none = (texts: string[], when: string) => {
 };
 async function vaultWith(delaySecs: number) {
   const master = crypto.getRandomValues(new Uint8Array(32));
-  const d: Descriptor = {
-    chainTag: new PublicKey(genesis).toBytes(),
-    programId: PROGRAM.toBytes(),
-    vaultId: crypto.getRandomValues(new Uint8Array(32)),
-  };
-  const g = genesisAuthorities(master, d);
-  await send(initializeIx(PROGRAM, payer.publicKey, { vaultId: d.vaultId, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }));
+  const g = genesisVault(
+    master,
+    {
+      chainTag: new PublicKey(genesis).toBytes(),
+      programId: PROGRAM.toBytes(),
+      salt: crypto.getRandomValues(new Uint8Array(32)),
+    },
+    delaySecs,
+  );
+  const d: Descriptor = g.d;
+  await send(initializeIx(PROGRAM, payer.publicKey, { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }));
   return { master, d, g, vault: vaultAddress(PROGRAM, d.vaultId) };
 }
 const start = (vault: PublicKey) =>
