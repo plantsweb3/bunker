@@ -3,7 +3,7 @@
  * Policy forbids every connection, and everything it produces is a file the
  * user carries to the website. */
 import { hex, unhex } from "../../sdk/bytes";
-import { address, base58, vaultAddressBytes } from "../../sdk/v3/core";
+import { address, base58, isWalletAddress, vaultAddressBytes } from "../../sdk/v3/core";
 import { genesisVault, recoveryPacket } from "../../sdk/v3/master";
 import { epochSeed, recoveryKey } from "../../sdk/v3/derive";
 import { rootFromSecret, verify } from "../../sdk/winternitz";
@@ -115,15 +115,26 @@ $("card").addEventListener("change", () => {
 let draft: { kit: ArchivalKit; encrypted: string } | null = null;
 /** The trusted addresses as typed, in order, each checked to be an address. */
 function trustedAddresses(): string[] {
-  const typed = [1, 2, 3, 4].map((n) => value(`trusted-${n}`).trim()).filter(Boolean);
-  typed.forEach((a, i) => {
+  const typed: string[] = [];
+  for (const n of [1, 2, 3, 4]) {
+    const a = value(`trusted-${n}`).trim();
+    if (!a) continue;
+    let bytes: Uint8Array;
     try {
-      address(a);
+      bytes = address(a);
     } catch {
-      throw new Error(`Trusted address ${i + 1} is not a Solana address`);
+      throw new Error(`Trusted address ${n} is not a Solana address`);
     }
-    if (typed.indexOf(a) !== i) throw new Error("A trusted address is listed twice");
-  });
+    // The site and the command-line client only send to wallets. An address
+    // controlled by a program (a multisig vault, a token account) could be
+    // listed and then never paid, and the list cannot be changed.
+    if (!isWalletAddress(bytes))
+      throw new Error(
+        `Trusted address ${n} is controlled by a program, not a wallet key. Only ordinary wallet addresses can be trusted.`,
+      );
+    if (typed.includes(a)) throw new Error(`Trusted address ${n} is already listed`);
+    typed.push(a);
+  }
   return typed;
 }
 /** Says in one sentence what the chosen settings mean, for the user to accept. */
@@ -143,10 +154,16 @@ function policyText(): string {
     return `I understand that every withdrawal from this Bunker will take ${period} to arrive, with no way to speed one up, because I have listed no trusted address.${fixed}`;
   return `I understand that withdrawals to my ${trusted.length === 1 ? "trusted address arrive" : `${trusted.length} trusted addresses arrive`} at once, that withdrawals to any other address take ${period}, and that I have checked every character of ${trusted.length === 1 ? "that address" : "those addresses"}.${fixed}`;
 }
+/** The exact sentence that was on screen when the box was ticked. */
+let accepted = "";
 function refreshPolicy() {
   $("policy-text").textContent = policyText();
   $<HTMLInputElement>("policy-ack").checked = false;
+  accepted = "";
 }
+$("policy-ack").addEventListener("change", () => {
+  accepted = checked("policy-ack") ? policyText() : "";
+});
 for (const id of ["trusted-1", "trusted-2", "trusted-3", "trusted-4", "delay"])
   $(id).addEventListener("input", refreshPolicy);
 refreshPolicy();
@@ -165,7 +182,9 @@ $("create").addEventListener(
       throw new Error("Confirm the network and program match the website");
     if (!checked("kit-ack")) throw new Error("Acknowledge what the recovery kit is");
     const trusted = trustedAddresses();
-    if (!checked("policy-ack"))
+    // The statement accepted must be the one that describes what is about to
+    // be built, not one a browser restored from an earlier visit.
+    if (!checked("policy-ack") || accepted !== policyText())
       throw new Error("Read and tick the statement about where this Bunker may send");
     const program = address(card.program);
     const salt = crypto.getRandomValues(new Uint8Array(32));

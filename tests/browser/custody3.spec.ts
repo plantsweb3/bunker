@@ -10,6 +10,8 @@ import { createMint, getAccount, getOrCreateAssociatedTokenAccount, mintTo } fro
 // The 24-hour wait cannot elapse here; release after the wait is covered by the
 // in-process VM suite in programs/bunker3-svm-tests.
 const PROGRAM = "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn";
+/** A program-derived address: no private key exists for it. */
+const PROGRAM_DERIVED = PublicKey.findProgramAddressSync([Buffer.from("bunker3"), Buffer.alloc(32, 7)], new PublicKey(PROGRAM))[0].toBase58();
 type Ctx = Awaited<ReturnType<typeof setup>>;
 async function setup(page: Page, info: TestInfo, origin = "") {
   test.setTimeout(120000);
@@ -140,6 +142,11 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     // The tool starts on a 24-hour wait for untrusted addresses, and nothing
     // is created until the statement describing the choice is accepted.
     await expect(tool.locator("#delay")).toHaveValue("86400");
+    // Only an ordinary wallet can be trusted: the Bunker's own kind of
+    // address, which a program controls, is refused, and named by its slot.
+    await tool.locator("#trusted-3").fill(PROGRAM_DERIVED);
+    await expect(tool.locator("#policy-text")).toContainText("Trusted address 3 is controlled by a program");
+    await tool.locator("#trusted-3").fill("");
     for (const [i, address] of trusted.entries()) await tool.locator(`#trusted-${i + 1}`).fill(address);
     if (!wait) await tool.locator("#delay").selectOption("0");
     await expect(tool.locator("#policy-text")).toContainText(

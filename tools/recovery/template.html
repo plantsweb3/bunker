@@ -76,10 +76,10 @@ small{color:#839497;font-size:12px}
 <label>Trusted address 2 (optional)<input id="trusted-2" type="text" autocomplete="off" spellcheck="false"></label>
 <label>Trusted address 3 (optional)<input id="trusted-3" type="text" autocomplete="off" spellcheck="false"></label>
 <label>Trusted address 4 (optional)<input id="trusted-4" type="text" autocomplete="off" spellcheck="false"></label>
-<small>Choose wallets a thief on your everyday computer could not also empty: a hardware wallet, or your own deposit address at an exchange. Not the wallet you connect to websites. Check every character; these cannot be changed for this Bunker.</small>
+<small>Choose wallets whose keys you hold and that a thief on your everyday computer could not also empty: a hardware wallet is the right answer. Not the wallet you connect to websites. Be careful with an exchange deposit address: someone who steals your day key can send anything in this Bunker there at once, in any amount, and an exchange may not credit a token it does not list or an amount below its minimum. Check every character; these cannot be changed for this Bunker.</small>
 <label>Withdrawals to any other address wait
-<select id="delay"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option><option value="0">Not at all (no protection if your day key is stolen)</option></select></label>
-<label class="check" style="margin-top:6px"><input id="policy-ack" type="checkbox"><span id="policy-text"></span></label>
+<select id="delay" autocomplete="off"><option value="3600">1 hour</option><option value="86400" selected>24 hours</option><option value="259200">3 days</option><option value="604800">7 days</option><option value="0">Not at all (no protection if your day key is stolen)</option></select></label>
+<label class="check" style="margin-top:6px"><input id="policy-ack" type="checkbox" autocomplete="off"><span id="policy-text"></span></label>
 </div>
 <label class="check"><input id="kit-ack" type="checkbox"><span>I will keep the recovery kit off my everyday device, and I understand that losing both it and its password cannot be undone. Test assets only.</span></label>
 <div class="row"><button class="go" id="create">Create recovery kit</button></div>

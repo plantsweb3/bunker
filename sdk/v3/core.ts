@@ -66,6 +66,9 @@ function onCurve(point: Uint8Array): boolean {
     return false;
   }
 }
+/** Whether these 32 bytes can be a wallet's address: a point on the curve,
+ * for which a private key can exist. A program-derived address is not. */
+export const isWalletAddress = (bytes: Uint8Array) => bytes.length === 32 && onCurve(bytes);
 /** Solana's rule: the first bump from 255 downwards whose hash is not a point
  * on the curve, so that no private key can exist for the address. */
 export function programAddress(seeds: Uint8Array[], programId: Uint8Array): Uint8Array {

@@ -171,10 +171,17 @@ function admit(day: DayKey, state: VaultState) {
     throw new Error(`This day key is for key generation ${day.epoch}; the Bunker is on ${state.epoch}. Submit the recovery packet first.`);
   if (BigInt(day.epoch) !== state.epoch)
     throw new Error(`This day key (generation ${day.epoch}) has been replaced. The Bunker is on generation ${state.epoch}.`);
-  if (day.trusted.length !== state.trusted.length || day.trusted.some((t, i) => t !== state.trusted[i].toBase58()))
-    throw new Error("The network reports different trusted addresses from the ones this Bunker was built with. Nothing was done.");
-  if (day.delaySecs !== state.delaySecs)
-    throw new Error("The network reports a different waiting period from the one this Bunker was built with. Nothing was done.");
+  sameTerms(day, state);
+}
+/** The trusted addresses and waiting period are fixed and are in the day key.
+ * A connection that reports others is not believed. */
+function sameTerms(day: DayKey, state: VaultState) {
+  if (
+    day.trusted.length !== state.trusted.length ||
+    day.trusted.some((t, i) => t !== state.trusted[i].toBase58()) ||
+    day.delaySecs !== state.delaySecs
+  )
+    throw new Error("The network reports different trusted addresses or a different waiting period from the ones this Bunker was built with. Nothing was done.");
 }
 
 // ── Withdrawing ─────────────────────────────────────────────────────────────
@@ -258,6 +265,8 @@ async function publish(s: Session, day: DayKey, signed: SignedAnnouncement): Pro
   const outcome = (v: VaultState) =>
     v.pending ? "Announced. Nothing has moved; release it when the waiting period ends." : "Sent. It reached its destination.";
   const { state } = await fetchVault(s.connection, s.program, vault);
+  // Held to the day key on every read: see `admit`.
+  sameTerms(day, state);
   if (landed(state)) return outcome(state);
   if (state.epoch !== a.epoch || state.opIndex !== a.opIndex || state.pending)
     throw new Error("The Bunker's keys were replaced after this withdrawal was signed. It can no longer be announced. Nothing moved.");

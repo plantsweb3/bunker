@@ -95,4 +95,20 @@ describe("Addresses without a Solana library", () => {
     expect(hex(recoverMessageBytes(program.toBytes(), payload))).toBe(fixture.recover.message);
     expect(hex(recoverMessage(program, payload))).toBe(fixture.recover.message);
   });
+  it("tells a wallet address from one a program controls", async () => {
+    const { isWalletAddress } = await import("../sdk/v3/core");
+    let wallets = 0;
+    for (let i = 0; i < 300; i++) {
+      const bytes = random32();
+      // The Solana library's own test for "a key can exist for this address".
+      expect(isWalletAddress(bytes)).toBe(PublicKey.isOnCurve(bytes));
+      if (isWalletAddress(bytes)) wallets++;
+    }
+    expect(wallets).toBeGreaterThan(50);
+    // Every program-derived address is, by construction, not a wallet.
+    const program = new PublicKey(fixture.program);
+    for (let i = 0; i < 50; i++)
+      expect(isWalletAddress(vaultAddressBytes(program.toBytes(), random32()))).toBe(false);
+    expect(isWalletAddress(new Uint8Array(31))).toBe(false);
+  });
 });
