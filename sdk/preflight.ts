@@ -62,6 +62,26 @@ export function withdrawalBlocker(f: PreflightFacts): string | null {
     return `Your connected wallet needs about ${sol(needed)} to pay for this withdrawal (network fees and temporary account deposits) and holds ${sol(f.payerLamports)}. Add SOL to it first. Nothing was signed.`;
   return null;
 }
+/** What the fee wallet must hold to upload a signature and land the
+ * instruction that uses it: the upload account's deposit (returned when it is
+ * closed), one spent marker (not returned), and fees. */
+export function feeShortfall(payerLamports: bigint, rent: { proof: bigint; marker: bigint }) {
+  const needed = rent.proof + rent.marker + FEE_BUFFER_LAMPORTS;
+  return payerLamports < needed
+    ? `Your connected wallet needs about ${sol(needed)} for this (network fees and a temporary deposit that comes back) and holds ${sol(payerLamports)}. Add SOL to it first. Nothing was sent.`
+    : null;
+}
+/** Stops a multi-approval flow before its first approval if the fee wallet
+ * cannot finish it. */
+export async function feePreflight(connection: Connection, payer: PublicKey): Promise<void> {
+  const [lamports, proof, marker] = await Promise.all([
+    connection.getBalance(payer),
+    connection.getMinimumBalanceForRentExemption(PROOF_ACCOUNT_SIZE),
+    connection.getMinimumBalanceForRentExemption(SPENT_MARKER_SIZE),
+  ]);
+  const problem = feeShortfall(BigInt(lamports), { proof: BigInt(proof), marker: BigInt(marker) });
+  if (problem) throw new Error(problem);
+}
 export async function withdrawalPreflight(
   connection: Connection,
   payer: PublicKey,

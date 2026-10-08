@@ -114,9 +114,10 @@ const faq: [string, React.ReactNode][] = [
       <a href={REPO} target="_blank" rel="noreferrer">
         public
       </a>
-      . The recovery tool is a file you keep and runs without this site.
-      Withdrawing without this site is not possible yet; it is a requirement
-      before real funds are accepted.
+      . The recovery tool is a file you keep and runs without this site, and
+      the public source includes a command-line program that withdraws and
+      recovers with nothing but your key files and a Solana connection. It is
+      a draft for technical users today.
     </>,
   ],
   [

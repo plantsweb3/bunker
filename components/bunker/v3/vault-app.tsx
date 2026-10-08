@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { formatAmount, parseAmount, unhex } from "@/sdk/bytes";
+import { formatAmount, hex, parseAmount, unhex } from "@/sdk/bytes";
 import {
   Asset,
   assets,
@@ -18,10 +18,15 @@ import {
   getAssociatedTokenAddress,
 } from "@/sdk/classic-token";
 import { mintLabel } from "@/sdk/known-mints";
-import { withdrawalPreflight } from "@/sdk/preflight";
+import { feePreflight, withdrawalPreflight } from "@/sdk/preflight";
 import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
 import { Activity, ACTIVITY_LABEL, fetchHistory } from "@/sdk/v3/history";
-import { authorizeAnnouncement, safeJournalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
+import {
+  authorizeAnnouncement,
+  readJournal,
+  safeJournalStatus,
+  SignedAnnouncement,
+} from "@/sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "@/sdk/v3/kit";
 import {
   forgetPasskey,
@@ -290,7 +295,20 @@ function App() {
       throw new Error(
         "Confirm that this day key has not started a withdrawal on another device.",
       );
-    await admit(await openPasskey(scope, r));
+    try {
+      await admit(await openPasskey(scope, r));
+    } catch (e) {
+      // A day key that recovery has replaced will never open again: stop
+      // offering it.
+      if (e instanceof Error && e.message.includes("has been replaced")) {
+        forgetPasskey(scope, r);
+        setPasskeys(storedPasskeys(scope));
+        throw new Error(
+          `${e.message} The passkey copy saved in this browser was for the old key and has been removed. Open your Bunker with the new day key file; you can save a passkey for it afterwards.`,
+        );
+      }
+      throw e;
+    }
     b.setNotice("Unsealed with your passkey. The day key is in this tab until you seal it.");
   }
   async function rememberWithPasskey() {
@@ -441,6 +459,8 @@ function App() {
       throw new Error(
         "Your Bunker’s keys were replaced after this withdrawal was signed, so it can no longer be announced. Nothing moved.",
       );
+    // Three approvals follow. Do not start if the wallet cannot finish them.
+    await feePreflight(b.connection, payer);
     const instant = state.delaySecs === 0;
     const vaultKey = new PublicKey(day.vault);
     // For a token, make sure the recipient's token account exists (now, so it
@@ -538,10 +558,41 @@ function App() {
     await publish(signed);
   }
   async function release() {
-    const { program } = b.live();
+    const { program, payer } = b.live();
     if (!day || !pending) throw new Error("Nothing to release");
     const vaultKey = new PublicKey(day.vault);
+    const setup: ReturnType<typeof createAssociatedTokenAccountIdempotentInstruction>[] = [];
+    if (pending.kind === 1) {
+      // The recipient's token account was created when this was announced. If
+      // it has since been closed, the release would fail with no explanation.
+      const there = await b.connection.getAccountInfo(pending.destination);
+      if (!there) {
+        // This browser knows whose account it was only if it signed the withdrawal.
+        const recipient = (() => {
+          try {
+            return readJournal(day).entries.find(
+              (e) => e.payload && hex(decodeAnnounce(unhex(e.payload)).destination.toBytes()) === hex(pending.destination.toBytes()),
+            )?.recipient;
+          } catch {
+            return undefined;
+          }
+        })();
+        if (!recipient)
+          throw new Error(
+            "The recipient’s token account for this withdrawal no longer exists, so it cannot be released yet. The recipient can recreate it by receiving any amount of this token, after which Release will work; or cancel the withdrawal with your recovery kit. Nothing has left your Bunker.",
+          );
+        setup.push(
+          createAssociatedTokenAccountIdempotentInstruction(
+            payer,
+            pending.destination,
+            new PublicKey(recipient),
+            pending.mint,
+          ),
+        );
+      }
+    }
     await b.transmit("Releasing", [
+      ...setup,
       executeIx(
         program,
         vaultKey,
@@ -1003,6 +1054,20 @@ function App() {
                         <dt>Token mint</dt>
                         <dd>
                           <code>{intent.mint.toBase58()}</code>
+                        </dd>
+                      </div>
+                    )}
+                    {intent.kind === 1 && (
+                      <div>
+                        <dt>Exactly what is signed</dt>
+                        <dd>
+                          <code>{intent.amount.toString()}</code> of the token’s smallest unit
+                          <small>
+                            {" "}
+                            The amount above assumes this token has {intent.decimals} decimal
+                            places, which is read from the network. If that looks wrong for
+                            this token, stop.
+                          </small>
                         </dd>
                       </div>
                     )}

@@ -68,9 +68,14 @@ cargo test --workspace --locked
 npm run program:build
 (cd programs/bunker3-svm-tests && cargo test --locked)
 npm run test:chain          # needs the local validator
+npm run test:cli            # the command-line client, on the local validator
 npm run test:e2e            # needs the app running; custody cases need the validator
 npm run audit:dependencies
 ```
+
+## Without the website
+
+`tools/cli/bunker.ts` reads a Bunker, withdraws, finishes an interrupted withdrawal, releases, clears and submits a recovery packet, using a day key file, an ordinary Solana keypair file to pay fees, and an RPC address. It shares the site's signing code and keeps its signing journal in a file beside the day key. It never opens a recovery kit, and like the site it refuses mainnet in this release. Usage is at the top of the file.
 
 [Testing](docs/TESTING.md) says what each covers, what CI does not run, and the known gaps.
 

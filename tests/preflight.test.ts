@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  feeShortfall,
   withdrawalBlocker,
   PreflightFacts,
   FEE_BUFFER_LAMPORTS,
@@ -100,5 +101,13 @@ describe("Withdrawal preflight", () => {
     expect(withdrawalBlocker({ ...token, tokenDestination: null })).toMatch(
       /could not be checked/,
     );
+  });
+});
+describe("Fee wallet check before a multi-approval flow", () => {
+  it("stops before the first approval when the wallet cannot finish", () => {
+    const rent = { proof: 8_978_400n, marker: 946_560n };
+    expect(feeShortfall(10_024_959n, rent)).toContain("Add SOL");
+    expect(feeShortfall(10_024_960n, rent)).toBeNull();
+    expect(feeShortfall(0n, rent)).toContain("Nothing was sent");
   });
 });
