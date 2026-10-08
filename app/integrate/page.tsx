@@ -56,9 +56,11 @@ export default function Page() {
           </li>
           <li>
             <strong>Getting money back out is deliberate.</strong> A
-            withdrawal needs your recovery kit, and the next protocol version
-            adds a waiting period of at least 24 hours. A Bunker is for what
-            you are holding, not for what you need in the next trade.
+            withdrawal needs your Bunker key, never the trading wallet’s. The
+            next protocol version also lets you add an optional waiting
+            period, off by default, for holdings you want time to defend. A
+            Bunker is for what you are holding, not for what you need in the
+            next trade.
           </li>
         </ul>
       </section>

@@ -31,11 +31,13 @@ import { BIcon } from "../icon";
 import { WalletButton, WalletProvider } from "../wallet";
 import { FileField, Messages, NetworkPill, PasswordField, readKeyFile, useBunker } from "./shared";
 const DELAYS = [
+  [3_600, "1 hour"],
   [86_400, "24 hours"],
-  [172_800, "48 hours"],
   [259_200, "3 days"],
   [604_800, "7 days"],
 ] as const;
+const delayLabel = (secs: number) =>
+  DELAYS.find(([s]) => s === secs)?.[1] ?? formatDuration(BigInt(secs));
 function dayKeyFor(kit: ArchivalKit, epoch: bigint): DayKey {
   const { delaySecs: _delay, master, kind: _kind, ...identity } = kit;
   void _delay;
@@ -53,7 +55,10 @@ function Tool() {
   // create
   const [password, setPassword] = useState("");
   const [repeat, setRepeat] = useState("");
+  // Off unless the user turns it on and acknowledges what it means.
+  const [wait, setWait] = useState(false);
   const [delay, setDelay] = useState<number>(86_400);
+  const [waitAck, setWaitAck] = useState(false);
   const [ack, setAck] = useState(false);
   const [draft, setDraft] = useState<{ kit: ArchivalKit; encrypted: string } | null>(null);
   const [verified, setVerified] = useState("");
@@ -67,6 +72,8 @@ function Tool() {
     setPassword("");
     setRepeat("");
     setAck(false);
+    setWait(false);
+    setWaitAck(false);
     setDraft(null);
     setVerified("");
     setCreated(null);
@@ -84,6 +91,8 @@ function Tool() {
     const { c, program } = b.live();
     if (password !== repeat) throw new Error("Passwords do not match");
     if (!ack) throw new Error("Acknowledge what the recovery kit is");
+    if (wait && !waitAck)
+      throw new Error("Acknowledge the waiting period, or turn it off");
     const vaultId = crypto.getRandomValues(new Uint8Array(32));
     const master = crypto.getRandomValues(new Uint8Array(32));
     // Canonical field order, so the re-opened file compares equal.
@@ -95,7 +104,7 @@ function Tool() {
       program: program.toBase58(),
       vaultId: hex(vaultId),
       vault: vaultAddress(program, vaultId).toBase58(),
-      delaySecs: delay,
+      delaySecs: wait ? delay : 0,
       master: hex(master),
     });
     master.fill(0);
@@ -293,28 +302,71 @@ function Tool() {
                 cancel any withdrawal and replace any day key, so whoever holds
                 it and its password controls the Bunker.
               </p>
-              <label className="field">
-                <span>Waiting period before any withdrawal leaves</span>
-                <select
-                  aria-label="Waiting period"
-                  value={delay}
-                  onChange={(e) => setDelay(Number(e.target.value))}
-                >
-                  {DELAYS.map(([secs, label]) => (
-                    <option key={secs} value={secs}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-                <small>
-                  Fixed when the Bunker is built. Longer gives you more time to
-                  cancel a withdrawal you did not make.
-                </small>
-              </label>
               <PasswordField label="Recovery password" value={password} onChange={setPassword} />
               <PasswordField label="Confirm recovery password" value={repeat} onChange={setRepeat} />
+              <div className={`wait-option ${wait ? "on" : ""}`}>
+                <label className="check-label">
+                  <Checkbox
+                    aria-label="Add a waiting period"
+                    checked={wait}
+                    onCheckedChange={(v) => {
+                      setWait(v === true);
+                      setWaitAck(false);
+                    }}
+                  />
+                  <span>
+                    <strong>Add a waiting period</strong> (optional). Off by
+                    default: withdrawals leave as soon as you approve them.
+                  </span>
+                </label>
+                {wait ? (
+                  <>
+                    <label className="field">
+                      <span>Every withdrawal waits this long before it leaves</span>
+                      <select
+                        aria-label="Waiting period"
+                        value={delay}
+                        onChange={(e) => {
+                          setDelay(Number(e.target.value));
+                          setWaitAck(false);
+                        }}
+                      >
+                        {DELAYS.map(([secs, label]) => (
+                          <option key={secs} value={secs}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="check-label">
+                      <Checkbox
+                        aria-label="Acknowledge the waiting period"
+                        checked={waitAck}
+                        onCheckedChange={(v) => setWaitAck(v === true)}
+                      />
+                      <span>
+                        I understand that every withdrawal from this Bunker
+                        will take {delayLabel(delay)} to arrive, with no way to
+                        speed one up, and that this cannot be shortened or
+                        turned off for this Bunker later. I am choosing it so
+                        I have time to cancel a withdrawal I did not make.
+                      </span>
+                    </label>
+                  </>
+                ) : (
+                  <p className="micro">
+                    What it is for: without one, anyone who gets your day key
+                    and its password can withdraw immediately. With one, you
+                    get that long to cancel with your recovery kit.
+                  </p>
+                )}
+              </div>
               <label className="check-label">
-                <Checkbox checked={ack} onCheckedChange={(v) => setAck(v === true)} />
+                <Checkbox
+                  aria-label="Acknowledge the recovery kit"
+                  checked={ack}
+                  onCheckedChange={(v) => setAck(v === true)}
+                />
                 <span>
                   I will keep the recovery kit off this device, and I
                   understand that losing both it and its password cannot be
@@ -323,7 +375,14 @@ function Tool() {
               </label>
               <button
                 className="button light"
-                disabled={!b.enabled || !b.wallet.address || !!b.busy || !ack || password.length < 12}
+                disabled={
+                  !b.enabled ||
+                  !b.wallet.address ||
+                  !!b.busy ||
+                  !ack ||
+                  (wait && !waitAck) ||
+                  password.length < 12
+                }
                 onClick={() => b.task("Preparing recovery kit", makeKit)}
               >
                 Create recovery kit
@@ -337,8 +396,8 @@ function Tool() {
             <>
               <h2>Open your recovery kit.</h2>
               <p className="modal-copy">
-                Recovering installs brand-new keys. It cancels any withdrawal
-                that has not left yet, kills every earlier day key, and never
+                Recovering installs brand-new keys. It kills every earlier day
+                key, cancels any withdrawal that is still waiting, and never
                 moves your assets.
               </p>
               <FileField label="Recovery kit" onFile={setFile} disabled={!!b.busy} />
@@ -375,7 +434,11 @@ function Tool() {
                 </div>
                 <div>
                   <dt>Waiting period</dt>
-                  <dd>{formatDuration(BigInt(opened.chain.delaySecs))}</dd>
+                  <dd>
+                    {opened.chain.delaySecs
+                      ? formatDuration(BigInt(opened.chain.delaySecs))
+                      : "None"}
+                  </dd>
                 </div>
               </dl>
               {recovered === null && (

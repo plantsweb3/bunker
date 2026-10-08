@@ -17,7 +17,8 @@ export const RECOVER_SIZE = 138;
 export const PROOF_SIZE = 1162;
 export const SIGNATURE_SIZE = 1088;
 export const PROTOCOL_VERSION = 3;
-export const MIN_DELAY_SECS = 86_400;
+/** 0 means no waiting period: a withdrawal may execute as soon as it is announced. */
+export const MIN_DELAY_SECS = 0;
 export const MAX_DELAY_SECS = 604_800;
 export const EXECUTE_WINDOW_SECS = 604_800n;
 const ROLE_OPERATIONAL = 1;
@@ -343,7 +344,7 @@ export function announceIx(
 export function executeIx(
   program: PublicKey,
   vault: PublicKey,
-  pending: Pending,
+  pending: Pick<Pending, "kind" | "mint" | "destination">,
   sourceToken?: PublicKey,
 ) {
   const keys = [meta(vault, true), meta(pending.destination, true)];

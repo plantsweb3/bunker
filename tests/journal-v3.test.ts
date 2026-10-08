@@ -146,7 +146,9 @@ describe("Protocol 3 key files", () => {
   it("rejects a file whose vault address does not match its identity", async () => {
     const other = vaultAddress(program, new Uint8Array(32).fill(8)).toBase58();
     await expect(encryptFile({ ...day, vault: other }, password)).rejects.toThrow("does not match");
-    await expect(encryptFile({ ...archival, delaySecs: 60 }, password)).rejects.toThrow();
+    await expect(encryptFile({ ...archival, delaySecs: 604_801 }, password)).rejects.toThrow();
+    await expect(encryptFile({ ...archival, delaySecs: -1 }, password)).rejects.toThrow();
+    expect(await decryptArchival(await encryptFile({ ...archival, delaySecs: 0 }, password), password)).toMatchObject({ delaySecs: 0 });
   });
   it("detects tampering with the envelope", async () => {
     const e = JSON.parse(await encryptFile(day, password));

@@ -68,6 +68,13 @@ function App() {
       ? journalStatus(day, vault.state)
       : ({ state: "unused" } as const);
   const unfinished = journal.state === "signed" ? journal.announcement : null;
+  // What is not already promised to a pending withdrawal.
+  const available =
+    vault && pending
+      ? vault.spendable > pending.amount
+        ? vault.spendable - pending.amount
+        : 0n
+      : (vault?.spendable ?? 0n);
   function close() {
     setStep("idle");
     setFile(null);
@@ -122,6 +129,7 @@ function App() {
     const lamports = parseAmount(amount, 9);
     if (lamports <= 0n || lamports > vault.spendable)
       throw new Error(`Enter an amount up to ${sol(vault.spendable)}`);
+    if (pending) throw new Error("Finish or cancel the pending withdrawal first");
     const to = new PublicKey(recipient);
     if (!PublicKey.isOnCurve(to.toBytes()) || to.toBase58() === day.vault)
       throw new Error("Use a normal wallet address outside this Bunker");
@@ -130,18 +138,38 @@ function App() {
   async function publish(signed: SignedAnnouncement) {
     const { program, payer } = b.live();
     if (!day || !vault) throw new Error("Open your Bunker first");
+    const instant = vault.state.delaySecs === 0;
+    const a = decodeAnnounce(signed.payload);
     const stages = stageIxs(program, payer, signed.message, signed.signature);
     for (let i = 0; i < stages.length; i++)
       await b.transmit(`Approval ${i + 1} of 3 · publishing your authorization`, [stages[i]]);
-    await b.transmit("Approval 3 of 3 · announcing the withdrawal", [
-      computeIx(),
-      announceIx(program, payer, signed.payload, vault.state.opRoot),
-      closeProofIx(program, payer, signed.message),
-    ]);
+    await b.transmit(
+      instant
+        ? "Approval 3 of 3 · sending the withdrawal"
+        : "Approval 3 of 3 · announcing the withdrawal",
+      [
+        computeIx(),
+        announceIx(program, payer, signed.payload, vault.state.opRoot),
+        // With no waiting period the withdrawal is released in the same
+        // transaction; either both happen or neither does.
+        ...(instant
+          ? [
+              executeIx(program, new PublicKey(day.vault), {
+                kind: a.kind,
+                mint: a.mint,
+                destination: a.destination,
+              }),
+            ]
+          : []),
+        closeProofIx(program, payer, signed.message),
+      ],
+    );
     close();
     await load(day);
     b.setNotice(
-      "Withdrawal announced. Nothing has moved. It can be released when the waiting period ends.",
+      instant
+        ? "Withdrawal sent. It reached its destination and the key was replaced."
+        : "Withdrawal announced. Nothing has moved. It can be released when the waiting period ends.",
     );
   }
   async function announce() {
@@ -240,7 +268,13 @@ function App() {
           <dl>
             <div>
               <dt>Waiting period</dt>
-              <dd>{vault ? formatDuration(BigInt(vault.state.delaySecs)) : "—"}</dd>
+              <dd>
+                {!vault
+                  ? "—"
+                  : vault.state.delaySecs
+                    ? formatDuration(BigInt(vault.state.delaySecs))
+                    : "None"}
+              </dd>
             </div>
             <div>
               <dt>Key generation</dt>
@@ -411,7 +445,7 @@ function App() {
               </div>
               <span className="balance-label">Available · rent reserve excluded</span>
               <div className="vault-balance">
-                {formatAmount(vault.spendable, 9)}
+                {formatAmount(available, 9)}
                 <span>SOL</span>
               </div>
               <div className="vault-address">
@@ -489,19 +523,32 @@ function App() {
                         <code>{recipient}</code>
                       </dd>
                     </div>
-                    <div>
-                      <dt>It can leave after</dt>
-                      <dd>
-                        {formatDuration(BigInt(vault.state.delaySecs))} of
-                        waiting, then within 7 days
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Until then</dt>
-                      <dd>
-                        Nothing moves, and your recovery kit can cancel it.
-                      </dd>
-                    </div>
+                    {vault.state.delaySecs ? (
+                      <>
+                        <div>
+                          <dt>It can leave after</dt>
+                          <dd>
+                            {formatDuration(BigInt(vault.state.delaySecs))} of
+                            waiting, then within 7 days
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Until then</dt>
+                          <dd>
+                            Nothing moves, and your recovery kit can cancel it.
+                          </dd>
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <dt>When it leaves</dt>
+                        <dd>
+                          Immediately, on the third approval. This Bunker has
+                          no waiting period, so it cannot be cancelled once
+                          sent.
+                        </dd>
+                      </div>
+                    )}
                   </dl>
                   <label className="check-label">
                     <Checkbox checked={ack} onCheckedChange={(v) => setAck(v === true)} />
@@ -516,7 +563,7 @@ function App() {
                       disabled={!can || !ack}
                       onClick={() => b.task("Signing", announce)}
                     >
-                      Sign and announce
+                      {vault.state.delaySecs ? "Sign and announce" : "Sign and send"}
                     </button>
                     <button className="button ghost" onClick={() => setStep("withdraw")}>
                       Back
@@ -667,15 +714,15 @@ function App() {
               <li>
                 <BIcon name="waiting-period" size={18} />
                 <div>
-                  <b>Wait</b>
-                  <span>At least 24 hours. Nothing moves.</span>
+                  <b>Wait, if you chose to</b>
+                  <span>An optional waiting period. Nothing moves during it.</span>
                 </div>
               </li>
               <li>
                 <BIcon name="alert" size={18} />
                 <div>
                   <b>Cancel if it wasn’t you</b>
-                  <span>Your recovery kit installs new keys.</span>
+                  <span>During a wait, your recovery kit installs new keys.</span>
                 </div>
               </li>
               <li>

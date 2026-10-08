@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, Page, TestInfo } from "@playwright/test";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { parseVault } from "../../sdk/v3/protocol";
 import { connect, installLocalWallet } from "./local-wallet";
@@ -6,9 +6,8 @@ import { connect, installLocalWallet } from "./local-wallet";
 // The 24-hour wait cannot elapse here; release after the wait is covered by the
 // in-process VM suite in programs/bunker3-svm-tests.
 const PROGRAM = "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn";
-test("build, deposit, announce, cancel by recovery, and continue with new keys", async ({
-  page,
-}, info) => {
+type Ctx = Awaited<ReturnType<typeof setup>>;
+async function setup(page: Page, info: TestInfo) {
   test.setTimeout(120000);
   const rpc = "http://127.0.0.1:19099";
   const c = new Connection(rpc, "confirmed");
@@ -18,7 +17,7 @@ test("build, deposit, announce, cancel by recovery, and continue with new keys",
     if (!(await c.getAccountInfo(new PublicKey(PROGRAM)))?.executable) throw new Error();
   } catch {
     test.skip(true, "Start the local validator with the protocol 3 draft program built");
-    return;
+    throw new Error("skipped");
   }
   if (
     [
@@ -70,27 +69,34 @@ test("build, deposit, announce, cancel by recovery, and continue with new keys",
   const vaultState = async (address: string) =>
     parseVault((await c.getAccountInfo(new PublicKey(address)))!.data);
 
-  // 1. Build a Bunker in the recovery tool.
-  await page.goto("/recovery");
-  await connect(page);
-  await page.getByLabel("Recovery password", { exact: true }).fill(password);
-  await page.getByLabel("Confirm recovery password", { exact: true }).fill(password);
-  await page.getByRole("checkbox").check();
-  const kit = await save(
-    () => page.getByRole("button", { name: "Create recovery kit" }).click(),
-    "recovery-kit.json",
-  );
-  await page.getByLabel("Re-open the saved recovery kit").setInputFiles(kit);
-  await expect(page.getByText("Verified:", { exact: false })).toBeVisible();
-  const day0 = await save(
-    () => page.getByRole("button", { name: "Build Bunker on test network" }).click(),
-    "day-key-0.json",
-  );
-  await expect(page.getByText("Bunker built.", { exact: false })).toBeVisible({ timeout: 25000 });
-  const vault = await page.locator(".vault-address code").innerText();
-  expect((await vaultState(vault)).delaySecs).toBe(86_400);
 
-  // 2. Open it with the day key and deposit.
+  /** Builds a Bunker in the recovery tool. `wait` opts into a 24-hour waiting period. */
+  const build = async (wait: boolean) => {
+    await page.goto("/recovery");
+    await connect(page);
+    await page.getByLabel("Recovery password", { exact: true }).fill(password);
+    await page.getByLabel("Confirm recovery password", { exact: true }).fill(password);
+    await page.getByLabel("Acknowledge the recovery kit").check();
+    const create = page.getByRole("button", { name: "Create recovery kit" });
+    // The waiting period is off unless turned on AND acknowledged.
+    await expect(page.getByLabel("Add a waiting period")).not.toBeChecked();
+    if (wait) {
+      await page.getByLabel("Add a waiting period").check();
+      await expect(create).toBeDisabled();
+      await expect(page.getByLabel("Waiting period", { exact: true })).toHaveValue("86400");
+      await page.getByLabel("Acknowledge the waiting period").check();
+    }
+    const kit = await save(() => create.click(), "recovery-kit.json");
+    await page.getByLabel("Re-open the saved recovery kit").setInputFiles(kit);
+    await expect(page.getByText("Verified:", { exact: false })).toBeVisible();
+    const day0 = await save(
+      () => page.getByRole("button", { name: "Build Bunker on test network" }).click(),
+      "day-key-0.json",
+    );
+    await expect(page.getByText("Bunker built.", { exact: false })).toBeVisible({ timeout: 25000 });
+    const vault = await page.locator(".vault-address code").innerText();
+    return { kit, day0, vault };
+  };
   const unseal = async (dayKey: string) => {
     await page.goto("/vault");
     await connect(page);
@@ -101,12 +107,27 @@ test("build, deposit, announce, cancel by recovery, and continue with new keys",
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Unseal Bunker" }).click();
   };
+  const deposit = async (amount: string) => {
+    await page.getByRole("button", { name: "Deposit", exact: true }).click();
+    await page.getByLabel("Amount", { exact: true }).fill(amount);
+    await page.getByRole("button", { name: "Review deposit in wallet" }).click();
+    await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
+  };
+  return { c, recipient, errors, password, save, vaultState, build, unseal, deposit };
+}
+test("with a waiting period: announce, count down, cancel by recovery, continue with new keys", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  const { c, recipient, errors, password, save, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  // 1. Build a Bunker WITH a 24-hour waiting period, opted into explicitly.
+  const { kit, day0, vault } = await build(true);
+  expect((await vaultState(vault)).delaySecs).toBe(86_400);
+
+  // 2. Open it with the day key and deposit.
   await unseal(day0);
   await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
-  await page.getByRole("button", { name: "Deposit", exact: true }).click();
-  await page.getByLabel("Amount", { exact: true }).fill("1");
-  await page.getByRole("button", { name: "Review deposit in wallet" }).click();
-  await expect(page.getByText("Deposit confirmed.", { exact: true })).toBeVisible({ timeout: 25000 });
+  await deposit("1");
   await expect(page.locator(".vault-balance")).toContainText("1");
   const funded = await c.getBalance(new PublicKey(vault));
 
@@ -169,5 +190,41 @@ test("build, deposit, announce, cancel by recovery, and continue with new keys",
   await page.getByRole("button", { name: "Seal Bunker" }).click();
   await expect(page.getByText("Bunker sealed.", { exact: false })).toBeVisible();
   await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("default, no waiting period: a withdrawal arrives on the third approval", async ({
+  page,
+}, info) => {
+  test.setTimeout(120000);
+  const { c, recipient, errors, vaultState, build, unseal, deposit }: Ctx = await setup(page, info);
+  const { day0, vault } = await build(false);
+  expect((await vaultState(vault)).delaySecs).toBe(0);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  await deposit("1");
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.4");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await expect(page.getByText("Immediately, on the third approval.", { exact: false })).toBeVisible();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(recipient.publicKey)).toBe(400_000_000);
+  const state = await vaultState(vault);
+  expect([state.epoch, state.opIndex, state.pending]).toEqual([0n, 1n, null]);
+  await expect(page.getByText("LEAVES IN", { exact: true })).toHaveCount(0);
+  await expect(page.locator(".vault-balance")).toContainText("0.6");
+  // The next withdrawal uses the next key, with no recovery file to juggle.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("0.1");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(recipient.publicKey)).toBe(500_000_000);
+  expect((await vaultState(vault)).opIndex).toBe(2n);
   expect(errors).toEqual([]);
 });
