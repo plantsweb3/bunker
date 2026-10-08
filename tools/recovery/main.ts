@@ -49,6 +49,7 @@ function dayKey(kit: ArchivalKit, epoch: bigint): DayKey {
     salt: kit.salt,
     vaultId: kit.vaultId,
     vault: kit.vault,
+    delaySecs: kit.delaySecs,
     epoch: epoch.toString(),
     seed: hex(epochSeed(unhex(kit.master), descriptorOf(kit), epoch)),
   };

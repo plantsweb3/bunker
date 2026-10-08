@@ -203,10 +203,43 @@ describe("Reading changes from two snapshots", () => {
     expect(kinds(snap({ opIndex: "1", pending: p("aa") }), snap({ opIndex: "2", pending: p("bb") }))).toEqual(["left", "announced"]);
     // Recovery, with and without a withdrawal to cancel, and with activity after it.
     expect(diff(snap({ opIndex: "4", pending: p("aa") }), snap({ epoch: "1" }), NOW)).toEqual([
-      { kind: "recovered", cancelled: p("aa") },
+      { kind: "recovered", cancelled: p("aa"), unresolved: null },
     ]);
     expect(kinds(snap(), snap({ epoch: "1", opIndex: "1", pending: p("cc") }))).toEqual(["recovered", "announced"]);
     expect(kinds(snap(), snap({ epoch: "2", opIndex: "2" }))).toEqual(["recovered", "left"]);
+  });
+  it("does not call a withdrawal cancelled when the balance says it left", () => {
+    const waiting = snap({ opIndex: "1", lamports: "9000000", pending: p("aa") }); // 500 lamports to go
+    // Released, then the owner recovered, all between two passes.
+    expect(diff(waiting, snap({ epoch: "1", lamports: "8999500" }), NOW)).toEqual([
+      { kind: "left", count: 1, record: p("aa"), lamports: 0n },
+      { kind: "recovered", cancelled: null, unresolved: null },
+    ]);
+    // A token record cannot be settled from the SOL balance: say so.
+    const token = { ...p("aa"), kind: 1 as const };
+    expect(diff(snap({ opIndex: "1", pending: token }), snap({ epoch: "1" }), NOW)).toEqual([
+      { kind: "recovered", cancelled: null, unresolved: token },
+    ]);
+  });
+  it("reports money that left under the old keys before a recovery", () => {
+    // No waiting period: announced and sent, then recovered, between two passes.
+    expect(diff(snap(), snap({ epoch: "1", lamports: "2000000" }), NOW)).toEqual([
+      { kind: "recovered", cancelled: null, unresolved: null },
+      { kind: "fell", lamports: 7_000_000n },
+    ]);
+  });
+  it("attributes what left to the record it knows and only the rest to others", () => {
+    // A waiting 500 was released and a further instant withdrawal took 700.
+    const events = diff(snap({ opIndex: "1", pending: p("aa") }), snap({ opIndex: "2", lamports: "8998800" }), NOW);
+    expect(events).toEqual([
+      { kind: "left", count: 1, record: p("aa"), lamports: 0n },
+      { kind: "left", count: 1, record: null, lamports: 700n },
+    ]);
+    // A deposit larger than an instant withdrawal hides the amount, not the event,
+    // and the wording does not guess that it was a token.
+    const masked = diff(snap(), snap({ opIndex: "1", lamports: "9500000" }), NOW);
+    expect(masked).toEqual([{ kind: "left", count: 1, record: null, lamports: 0n }]);
+    expect(eventText(vault.toBase58(), masked[0], NOW, null)).not.toMatch(/token/i);
   });
   it("reports SOL arriving, but not dust and not alongside something that matters more", () => {
     expect(diff(snap(), snap({ lamports: "10000000" }), NOW)).toEqual([{ kind: "deposit", lamports: 1_000_000n }]);
@@ -224,8 +257,10 @@ describe("Alert wording", () => {
     { kind: "left", count: 2, record: null, lamports: 7n },
     { kind: "left", count: 1, record: null, lamports: 0n },
     { kind: "ended", record: pending },
-    { kind: "recovered", cancelled: pending },
-    { kind: "recovered", cancelled: null },
+    { kind: "recovered", cancelled: pending, unresolved: null },
+    { kind: "recovered", cancelled: null, unresolved: pending },
+    { kind: "recovered", cancelled: null, unresolved: null },
+    { kind: "fell", lamports: 9n },
   ];
   it("always ends with the anti-phishing line and tells the user what to do", () => {
     for (const e of events) {
@@ -237,6 +272,9 @@ describe("Alert wording", () => {
     expect(eventText(vault.toBase58(), events[1], 0n, null)).toContain("42 base units of token");
     expect(eventText(vault.toBase58(), events[3], 0n, null)).toContain("2 withdrawals left");
     expect(eventText(vault.toBase58(), events[6], 0n, null)).toContain("Withdraw everything");
+    expect(eventText(vault.toBase58(), events[6], 0n, null)).toContain("was cancelled");
+    expect(eventText(vault.toBase58(), events[7], 0n, null)).not.toContain("was cancelled.");
+    expect(eventText(vault.toBase58(), events[7], 0n, null)).toContain("either cancelled by this, or released");
   });
 });
 describe("Bot commands", () => {

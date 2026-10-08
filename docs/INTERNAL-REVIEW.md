@@ -57,6 +57,26 @@ Severity is the project's own judgement. "Test" names the regression test that r
 | W-8 | Low | A pull request from a fork could upload a CI artifact named like the official recovery tool. The Rust toolchain floated. A malformed program id was accepted as configuration. | Upload restricted to `main`; toolchain pinned; program id validated. CI now also builds the program and runs the VM suites. | `release.test.ts` |
 | W-9 | Housekeeping | Compiler output of the VM test crate had been committed. | Removed from the tree. It remains in history. | — |
 
+## Second round: a review of the fixes
+
+Two further reviewers, with no knowledge of the first round's conclusions, were given the corrected code and asked to break it.
+
+| ID | Severity | Finding | Resolution | Test |
+|---|---|---|---|---|
+| P-8 | High | **A day key plus sight of the recovery packet could block recovery for good.** `recover` required the packet's next roots to differ from the current `op_root`, and `announce` lets the operational signer install any 32 bytes as that root. A thief announced a withdrawal to themselves with `next_op_root` set to a root the packet names; the one valid packet then failed forever and the withdrawal executed after the wait. The packet is a public file. | `recover` no longer compares the packet with the operational root. A root planted there is installed, not retired. | `isolation.rs`: `a_day_key_cannot_block_recovery_by_planting_the_packets_roots`; `state.rs`: `an_operational_key_cannot_make_the_recovery_packet_fail` |
+| P-9 | Low | A `recover` transaction names the current operational root's marker account, so an announcement landing first makes that transaction fail. | Not a protocol failure after P-8: the rebuilt transaction succeeds. Stated in PROTOCOL.md §5. The site re-reads the vault immediately before sending. | — |
+| P-10 | Informational | Compute figures in the specification were single measurements; cost varies with the message digest. Worst case measured and extrapolated to stay inside the limit. | PROTOCOL.md now gives the range. | — |
+| K-12 | Medium | **A journal that is gone is read as "never signed".** Clearing site data, closing a private window or storage eviction between signing and landing lets the same key sign again. | Cannot be fully closed in a browser. The page requests persistent storage; the statement required to open a day key now covers it; documented as a limit. | — |
+| K-13 | Low | The key was reserved before the message was known to be valid, and a network clock in the past produced a dead signature. Either used a key up for nothing. | The message is validated, and its deadline required to be in the future by the device clock, before the key is reserved. | `journal-v3.test.ts` |
+| K-14 | Low | The website would decrypt a recovery kit handed to it before reporting that it was the wrong file. | The file kind is in the authenticated header; the wrong kind is refused before the password is used. | `journal-v3.test.ts` |
+| K-15 | Low | The waiting period shown came only from the network. | The day key carries it; a different on-chain value is refused. | — |
+| W-10 | Medium | **An alert said "cancelled" when the money had left**, if a release and a recovery fell between two passes; and withdrawals made just before a recovery produced no alert of their own. | A withdrawal is called cancelled only when the balance shows it did not leave; otherwise the alert says which it cannot tell. A lower balance not otherwise explained is reported. | `alerts.test.ts` |
+| W-11 | Low | Amounts in alerts could be wrong when several things happened between passes; a withdrawal masked by a deposit was described as a token. | Known amounts are attributed first; nothing is guessed. | `alerts.test.ts` |
+| K-16 | Open | Token decimals shown before signing come from the network. | Open question 14. | — |
+| K-17 | Open | The offline tool's policy does not prevent a malicious replacement of the tool from navigating to an address carrying a secret. | Stated in the threat model. The defence is checking the tool's hash; distribution independent of the site remains a release requirement. | — |
+
+The second round found no way to obtain two signatures under one key while the journal exists, no way for a party without keys to affect a vault, and no way to obtain a vault that differs from its address.
+
 ## What was tried and held
 
 Enabling mainnet writes through environment or forged configuration; reaching a non-allowlisted RPC method through the proxy; script injection through `/check?a=`, the not-found page and SVG assets; substituting instructions between simulation and wallet signing; an RPC redirecting a withdrawal's destination; crafted key files and public files; secrets in published files; and, in the program, type confusion between account kinds, account aliasing, cross-role proof substitution, replay, double execution, and redirecting a token transfer.

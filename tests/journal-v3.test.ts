@@ -173,6 +173,15 @@ describe("Protocol 3 signing journal", () => {
         announceBy: withdrawal.announceBy + 90_000n,
       }),
     ).rejects.toThrow("clock");
+    // A network clock in the past would yield a signature that is already
+    // dead, or an invalid message: refused before the key is reserved.
+    for (const announceBy of [withdrawal.announceBy - 7200n, 0n, -5n])
+      await expect(
+        authorizeAnnouncement(identity, g.seed, d, chain(), { ...withdrawal, announceBy }),
+      ).rejects.toThrow("clock");
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, chain(), { ...withdrawal, amount: 0n }),
+    ).rejects.toThrow("Invalid announcement");
     expect(b.storage.size).toBe(0);
   });
   it("reads the earlier single-entry format and refuses an unreadable journal", async () => {
@@ -213,7 +222,7 @@ describe("Protocol 3 signing journal", () => {
 describe("Protocol 3 key files", () => {
   const password = "public testing password";
   const archival: ArchivalKit = { ...base, kind: "archival", delaySecs: 86_400, master: hex(master) };
-  const day: DayKey = { ...base, kind: "day-key", epoch: "0", seed: hex(g.seed) };
+  const day: DayKey = { ...base, kind: "day-key", delaySecs: 86_400, epoch: "0", seed: hex(g.seed) };
   it("round-trips both files and keeps them from being mistaken for each other", async () => {
     const a = await encryptFile(archival, password);
     const k = await encryptFile(day, password);
@@ -236,6 +245,16 @@ describe("Protocol 3 key files", () => {
     await expect(encryptFile(day, "short")).rejects.toThrow("at least 12");
     await expect(encryptFile({ ...archival, delaySecs: 604_801 }, password)).rejects.toThrow();
     await expect(encryptFile({ ...archival, delaySecs: -1 }, password)).rejects.toThrow();
+  });
+  it("refuses the wrong kind of file before the password is used", async () => {
+    const a = await encryptFile(archival, password);
+    // Even the right password for a recovery kit opens nothing where a day
+    // key is expected, and the answer does not depend on the password.
+    await expect(decryptDayKey(a, password)).rejects.toThrow("not a day key");
+    await expect(decryptDayKey(a, "some other password!")).rejects.toThrow("not a day key");
+    // Relabelling the file does not help: the label is authenticated.
+    const relabelled = JSON.stringify({ ...JSON.parse(a), kind: "day-key" });
+    await expect(decryptDayKey(relabelled, password)).rejects.toThrow("Incorrect password or damaged");
   });
   it("detects tampering with the envelope", async () => {
     const e = JSON.parse(await encryptFile(day, password));
