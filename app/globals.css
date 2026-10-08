@@ -3941,3 +3941,463 @@ details.advanced .field {
   color: #bfe6d9;
 }
 
+
+/* ── The landing page's animated explainer (components/bunker/story.tsx) ── */
+.story {
+  margin: 56px 0 0;
+  border: 1px solid #2b3336;
+  border-radius: 6px;
+  background: #0a0c0d;
+  overflow: hidden;
+}
+.story-lanes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.story-lane {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  background:
+    radial-gradient(70% 60% at 50% 100%, rgba(125, 211, 199, 0.05), transparent 70%),
+    #0d1112;
+  overflow: hidden;
+}
+.story-lane.with {
+  border-left: 1px solid #2b3336;
+}
+.story-lane.without {
+  background:
+    radial-gradient(70% 60% at 50% 100%, rgba(243, 150, 135, 0.05), transparent 70%),
+    #0d1112;
+}
+.story-tag {
+  position: absolute;
+  left: 5%;
+  top: 6%;
+  font: 600 clamp(9px, 1.05vw, 12px) / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.16em;
+  color: #f39687;
+}
+.story-tag.ice {
+  color: var(--ice);
+}
+.story-wallet,
+.story-bunker {
+  position: absolute;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.story-wallet b,
+.story-bunker b {
+  font: 600 clamp(8px, 0.9vw, 11px) / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.18em;
+  color: #7f8b8e;
+}
+.story-wallet {
+  left: 7%;
+  top: 54%;
+  width: 31%;
+  height: 36%;
+  border: 2px solid #56646a;
+  border-radius: 9px;
+  background: #12181a;
+  transition: border-color 0.5s, box-shadow 0.5s;
+}
+.story-wallet b {
+  position: absolute;
+  bottom: -19%;
+}
+.story-wallet i {
+  position: absolute;
+  right: -2px;
+  top: 34%;
+  width: 22%;
+  height: 32%;
+  border: 2px solid #56646a;
+  border-radius: 7px 0 0 7px;
+  background: #0d1112;
+}
+.story-wallet.small {
+  left: 6%;
+  top: 62%;
+  width: 19%;
+  height: 27%;
+}
+.story-wallet.small b {
+  bottom: -26%;
+}
+.story-bunker {
+  left: 38%;
+  top: 40%;
+  width: 30%;
+  height: 52%;
+  padding-top: 7%;
+  border: 3px solid var(--ice);
+  border-bottom-width: 5px;
+  border-radius: 46% 46% 5px 5px / 34% 34% 5px 5px;
+  background: linear-gradient(180deg, rgba(125, 211, 199, 0.13), rgba(125, 211, 199, 0.03));
+  box-shadow: 0 0 36px rgba(125, 211, 199, 0.12), inset 0 0 26px rgba(125, 211, 199, 0.08);
+  transition: box-shadow 0.6s;
+}
+.story-bunker b {
+  color: var(--ice);
+}
+.story-coin {
+  position: absolute;
+  z-index: 3;
+  width: 4.3%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff3c4, #e2bb55 55%, #a9832a);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  transition:
+    left 0.85s cubic-bezier(0.5, 0, 0.2, 1),
+    top 0.85s cubic-bezier(0.5, 0, 0.2, 1);
+}
+.story-coin.safe {
+  box-shadow: 0 0 0 2px rgba(125, 211, 199, 0.55);
+}
+.story-thief {
+  position: absolute;
+  z-index: 2;
+  left: 70%;
+  top: 8%;
+  width: 21%;
+  opacity: 0;
+  transform: translateY(-30%);
+  transition: opacity 0.5s, transform 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.story-thief svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.story:not([data-beat="0"]) .story-thief {
+  opacity: 1;
+  transform: none;
+}
+/* The reach: from the thief to the wallet, when the wallet signs. */
+.story-hook {
+  position: absolute;
+  z-index: 1;
+  left: 23%;
+  top: 60%;
+  width: 54%;
+  height: 0;
+  border-top: 2px dashed #f39687;
+  transform-origin: left center;
+  transform: rotate(-25deg) scaleX(0);
+  transition: transform 0.6s 0.3s ease-out, opacity 0.4s;
+  opacity: 0;
+}
+.story-lane.with .story-hook {
+  left: 16%;
+  top: 72%;
+  width: 65%;
+  transform: rotate(-31deg) scaleX(0);
+}
+.story[data-beat="1"] .story-hook,
+.story[data-beat="2"] .story-hook {
+  opacity: 1;
+  transform: rotate(-25deg) scaleX(1);
+}
+.story[data-beat="1"] .story-lane.with .story-hook,
+.story[data-beat="2"] .story-lane.with .story-hook {
+  transform: rotate(-31deg) scaleX(1);
+}
+.story-signed,
+.story-denied,
+.story-cancelled {
+  position: absolute;
+  z-index: 4;
+  padding: 0.5em 0.7em 0.42em;
+  border-radius: 3px;
+  font: 700 clamp(8px, 1vw, 12px) / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.14em;
+  opacity: 0;
+  transform: scale(0.7) rotate(-6deg);
+  transition: opacity 0.3s, transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1);
+}
+.story-signed {
+  left: 11%;
+  top: 44%;
+  border: 1.5px solid #f39687;
+  background: #2a1512;
+  color: #f39687;
+}
+.story-lane.with .story-signed {
+  left: 5%;
+  top: 51%;
+}
+.story[data-beat="1"] .story-signed,
+.story[data-beat="2"] .story-signed {
+  opacity: 1;
+  transform: rotate(-6deg);
+  transition-delay: 0.7s;
+}
+.story[data-beat="1"] .story-wallet,
+.story[data-beat="2"] .story-wallet {
+  border-color: #f39687;
+  box-shadow: 0 0 24px rgba(243, 150, 135, 0.18);
+}
+.story-count {
+  position: absolute;
+  right: 6%;
+  bottom: 6%;
+  font: 500 clamp(26px, 5vw, 62px) / 1 "Space Grotesk", "Inter", sans-serif;
+  color: #f39687;
+  opacity: 0;
+  transition: opacity 0.5s;
+}
+.story[data-beat="5"] .story-count {
+  opacity: 1;
+}
+.story-lane.with .story-count {
+  color: var(--ice);
+}
+.story-thief::after {
+  content: "THIEF";
+  display: block;
+  margin-top: 6%;
+  text-align: center;
+  font: 600 clamp(8px, 0.9vw, 11px) / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.18em;
+  color: #f39687;
+}
+/* The thief at the Bunker door. */
+.story[data-beat="3"] .story-lane.with .story-thief,
+.story[data-beat="4"] .story-lane.with .story-thief {
+  transform: translate(-22%, 44%);
+}
+.story[data-beat="3"] .story-bunker {
+  animation: story-knock 0.5s 0.7s 2;
+}
+@keyframes story-knock {
+  25% { transform: translateX(-1.6%); }
+  75% { transform: translateX(1.6%); }
+}
+.story-denied {
+  left: 40%;
+  top: 27%;
+  border: 1.5px solid var(--ice);
+  background: #10201f;
+  color: var(--ice);
+}
+.story[data-beat="3"] .story-denied {
+  opacity: 1;
+  transform: rotate(-4deg);
+  transition-delay: 1s;
+}
+.story-timer {
+  position: absolute;
+  z-index: 4;
+  left: 72%;
+  top: 60%;
+  width: 17%;
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.story-timer svg {
+  display: block;
+  width: 100%;
+  transform: rotate(-90deg);
+}
+.story-timer circle {
+  fill: #0d1112;
+  stroke: #2f3a3d;
+  stroke-width: 4;
+}
+.story-timer .run {
+  fill: none;
+  stroke: var(--ice);
+  stroke-dasharray: 113.1;
+  stroke-dashoffset: 113.1;
+}
+.story-timer span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font: 600 clamp(9px, 1.15vw, 14px) / 1 "SFMono-Regular", Consolas, monospace;
+  color: var(--ice);
+}
+.story[data-beat="4"] .story-timer {
+  opacity: 1;
+}
+.story[data-beat="4"] .story-timer .run {
+  animation: story-run 1.5s 0.4s linear forwards;
+}
+@keyframes story-run {
+  to { stroke-dashoffset: 62; }
+}
+.story-cancelled {
+  left: 41%;
+  top: 27%;
+  border: 2px solid var(--ice);
+  background: var(--ice);
+  color: #06100f;
+  font-size: clamp(9px, 1.25vw, 15px);
+}
+.story[data-beat="4"] .story-cancelled {
+  opacity: 1;
+  transform: rotate(-7deg);
+  transition-delay: 2s;
+}
+.story[data-beat="5"] .story-cancelled {
+  opacity: 1;
+  transform: rotate(-7deg);
+}
+.story[data-beat="5"] .story-lane.with .story-thief {
+  opacity: 0.25;
+}
+.story[data-beat="5"] .story-bunker {
+  box-shadow: 0 0 60px rgba(125, 211, 199, 0.3), inset 0 0 30px rgba(125, 211, 199, 0.14);
+}
+.story-words {
+  padding: 26px 28px 8px;
+  border-top: 1px solid #2b3336;
+}
+.story-words h3 {
+  font-size: clamp(22px, 2.6vw, 34px);
+  line-height: 1.15;
+  color: #f5f7f6;
+  min-height: 1.2em;
+}
+.story-words > div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  margin-top: 16px;
+}
+.story-words p {
+  min-height: 3.4em;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #c3cccd;
+}
+.story-words p span {
+  display: block;
+  margin-bottom: 5px;
+  font: 600 11px / 1 "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #f39687;
+}
+.story-words p.ice span {
+  color: var(--ice);
+}
+.story-controls {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 28px 22px;
+}
+.story-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  border: 1px solid #3a474b;
+  background: #141a1c;
+  color: #f5f7f6;
+  font-size: 14px;
+  cursor: pointer;
+}
+.story-play:hover {
+  border-color: var(--ice);
+}
+.story-dots {
+  display: flex;
+  gap: 7px;
+}
+.story-dots button {
+  width: 30px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.story-dots button::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 9px;
+  height: 4px;
+  border-radius: 2px;
+  background: #2f3a3d;
+  transition: background 0.3s;
+}
+.story-dots button.done::after {
+  background: #58696c;
+}
+.story-dots button.on::after {
+  background: var(--ice);
+}
+.story-note {
+  margin-left: auto;
+  font: 500 11px / 1.3 "SFMono-Regular", Consolas, monospace;
+  letter-spacing: 0.06em;
+  color: #6f7b7e;
+}
+@media (max-width: 760px) {
+  .story {
+    margin-top: 36px;
+  }
+  .story-lanes {
+    grid-template-columns: 1fr;
+  }
+  .story-lane.with {
+    border-left: 0;
+    border-top: 1px solid #2b3336;
+  }
+  .story-tag {
+    font-size: 10px;
+  }
+  .story-wallet b,
+  .story-bunker b {
+    font-size: 9px;
+  }
+  .story-signed,
+  .story-denied {
+    font-size: 10px;
+  }
+  .story-cancelled {
+    font-size: 12px;
+  }
+  .story-timer span {
+    font-size: 11px;
+  }
+  .story-words {
+    padding: 20px 18px 6px;
+  }
+  .story-words > div {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .story-words p {
+    min-height: 0;
+  }
+  .story-controls {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 18px 18px;
+  }
+  .story-note {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .story *,
+  .story *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+  .story[data-beat="4"] .story-timer .run {
+    stroke-dashoffset: 62;
+  }
+}
