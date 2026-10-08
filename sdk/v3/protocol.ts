@@ -11,28 +11,45 @@ import {
 import { sha256 } from "@noble/hashes/sha256";
 import { TOKEN_PROGRAM_ID } from "../classic-token";
 import { concat, readU64, u64 } from "../bytes";
+import {
+  decodeRecover,
+  encodeRecover,
+  Genesis,
+  genesisData,
+  MAX_DELAY_SECS,
+  MIN_DELAY_SECS,
+  PROTOCOL_VERSION,
+  Recover,
+  RECOVER_DOMAIN,
+  RECOVER_SIZE,
+  VAULT_ID_DOMAIN,
+  vaultIdOf,
+} from "./core";
+export {
+  decodeRecover,
+  encodeRecover,
+  genesisData,
+  MAX_DELAY_SECS,
+  MIN_DELAY_SECS,
+  PROTOCOL_VERSION,
+  RECOVER_DOMAIN,
+  RECOVER_SIZE,
+  VAULT_ID_DOMAIN,
+  vaultIdOf,
+};
+export type { Genesis, Recover };
 export const VAULT_SIZE = 287;
 export const ANNOUNCE_SIZE = 195;
-export const RECOVER_SIZE = 138;
 export const PROOF_SIZE = 1162;
 export const SIGNATURE_SIZE = 1088;
-export const PROTOCOL_VERSION = 3;
-/** 0 means no waiting period: a withdrawal may execute as soon as it is announced. */
-export const MIN_DELAY_SECS = 0;
-export const MAX_DELAY_SECS = 604_800;
 export const EXECUTE_WINDOW_SECS = 604_800n;
 const ROLE_OPERATIONAL = 1;
-const ROLE_RECOVERY = 2;
 const text = (s: string) => new TextEncoder().encode(s);
 export const ANNOUNCE_DOMAIN = text("BUNKER3_ANNOUNCE");
-export const RECOVER_DOMAIN = text("BUNKER3_RECOVER_");
-export const VAULT_ID_DOMAIN = text("BUNKER3_VAULT_ID");
 /** How far ahead of the chain clock an announcement's deadline may be. */
 export const MAX_ANNOUNCE_AHEAD_SECS = 86_400n;
 const ZERO = new Uint8Array(32);
 const isZero = (b: Uint8Array) => b.every((x) => x === 0);
-const same = (a: Uint8Array, b: Uint8Array) =>
-  a.length === b.length && a.every((x, i) => x === b[i]);
 const i64 = (n: bigint) => {
   if (n < -(1n << 63n) || n >= 1n << 63n) throw new Error("Time out of range");
   const b = new Uint8Array(8);
@@ -46,39 +63,6 @@ const root32 = (b: Uint8Array, what: string) => {
   return b;
 };
 
-export type Genesis = {
-  salt: Uint8Array;
-  chainTag: Uint8Array;
-  opRoot: Uint8Array;
-  recRoot: Uint8Array;
-  delaySecs: number;
-};
-/** `salt || chain_tag || op_root || rec_root || delay_secs`: the data of
- * `initialize`, and the preimage of the vault identity. */
-export function genesisData(g: Genesis): Uint8Array {
-  if (
-    !Number.isInteger(g.delaySecs) ||
-    g.delaySecs < MIN_DELAY_SECS ||
-    g.delaySecs > MAX_DELAY_SECS ||
-    isZero(root32(g.opRoot, "Operational root")) ||
-    isZero(root32(g.recRoot, "Recovery root")) ||
-    same(g.opRoot, g.recRoot)
-  )
-    throw new Error("Invalid vault parameters");
-  const delay = new Uint8Array(4);
-  new DataView(delay.buffer).setUint32(0, g.delaySecs, true);
-  return concat(
-    root32(g.salt, "Salt"),
-    root32(g.chainTag, "Chain tag"),
-    g.opRoot,
-    g.recRoot,
-    delay,
-  );
-}
-/** The vault identity: a hash of everything the vault is created with. The
- * program computes the same value, so a vault's address fixes its creation
- * parameters no matter who sends `initialize`. */
-export const vaultIdOf = (g: Genesis) => sha256(concat(VAULT_ID_DOMAIN, genesisData(g)));
 export const vaultAddress = (program: PublicKey, vaultId: Uint8Array) =>
   PublicKey.findProgramAddressSync([Buffer.from("bunker3"), vaultId], program)[0];
 export const proofAddress = (
@@ -158,47 +142,6 @@ export function decodeAnnounce(b: Uint8Array): Announce {
   };
   encodeAnnounce(a); // One validation path.
   return a;
-}
-export type Recover = {
-  vaultId: Uint8Array;
-  chainTag: Uint8Array;
-  /** The epoch being left. */
-  epoch: bigint;
-  nextRecRoot: Uint8Array;
-  nextOpRoot: Uint8Array;
-};
-export function encodeRecover(r: Recover): Uint8Array {
-  if (
-    isZero(root32(r.nextRecRoot, "Next recovery root")) ||
-    isZero(root32(r.nextOpRoot, "Next operational root")) ||
-    same(r.nextRecRoot, r.nextOpRoot)
-  )
-    throw new Error("Invalid recovery packet");
-  return concat(
-    new Uint8Array([PROTOCOL_VERSION, ROLE_RECOVERY]),
-    root32(r.vaultId, "Vault id"),
-    root32(r.chainTag, "Chain tag"),
-    u64(r.epoch),
-    r.nextRecRoot,
-    r.nextOpRoot,
-  );
-}
-export function decodeRecover(b: Uint8Array): Recover {
-  if (
-    b.length !== RECOVER_SIZE ||
-    b[0] !== PROTOCOL_VERSION ||
-    b[1] !== ROLE_RECOVERY
-  )
-    throw new Error("Invalid recovery encoding");
-  const r: Recover = {
-    vaultId: b.slice(2, 34),
-    chainTag: b.slice(34, 66),
-    epoch: readU64(b, 66),
-    nextRecRoot: b.slice(74, 106),
-    nextOpRoot: b.slice(106, 138),
-  };
-  encodeRecover(r);
-  return r;
 }
 /** `domain || program || vault || payload`: the bytes that are signed. */
 function signedMessage(
