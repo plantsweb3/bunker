@@ -93,7 +93,7 @@ export default function Page() {
         <p>
           Open your Bunker with the day key. Enter the asset, amount and
           recipient, review them, and approve three transactions: two upload a
-          1,088-byte one-time signature, and the third verifies it. The
+          1,124-byte one-time signature, and the third verifies it. The
           signature fixes the exact asset, amount and destination, and names
           the next one-time key, so the key you used is retired in the same
           step and the same signature can never be used again.

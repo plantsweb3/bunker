@@ -6,15 +6,15 @@ This repository is a pre-release research and engineering artifact. Assume no ex
 
 1. [THREAT-MODEL.md](THREAT-MODEL.md) — what each secret can do, and what is not defended.
 2. [PROTOCOL.md](PROTOCOL.md) — derivation, layouts, signed bytes, instructions, the transition table, and seventeen questions put to reviewers. **The open questions are where design feedback is most useful.**
-3. [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) — the vendored primitive, what is signed, file encryption, the journal.
+3. [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) — the signature scheme and how its use relates to RFC 8554, what is signed, file encryption, the journal.
 4. [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md) — what the project's own adversarial review found and changed, so you do not spend time rediscovering it. It is not an audit.
-5. `programs/bunker3/src/state.rs` (about 300 lines, pure) then `src/lib.rs` (about 390 lines).
-6. `sdk/v3/` — `derive.ts`, `protocol.ts`, `authority.ts`, then `kit.ts`, `journal.ts`, `requests.ts`, `passkey.ts`.
+5. `crates/bunker-lmots/src/lib.rs` (the verifier), then `programs/bunker3/src/state.rs` (pure) and `src/lib.rs`.
+6. `sdk/lmots.ts`, then `sdk/v3/` — `derive.ts`, `onetime.ts`, `protocol.ts`, `authority.ts`, then `kit.ts`, `journal.ts`, `requests.ts`, `passkey.ts`.
 7. `tools/recovery/` and `scripts/build-recovery-tool.mjs`.
 
 ## Things to check
 
-- Compare `sdk/winternitz.ts` with the unchanged upstream source in `crates/winterwallet-core/src`. `vendor/winterwallet-revision.json` pins the upstream files. A shared bug can survive a port-to-port comparison; add independent vectors.
+- Read `crates/bunker-lmots/src/lib.rs` (the verifier the program runs, about a hundred lines) and `sdk/lmots.ts` beside RFC 8554 section 4. Both are tested against the RFC's Appendix F vectors (`fixtures/rfc8554-test-case-1.json` for verification, `-2.json` for signing), but they share an author: check them against another LM-OTS implementation. Then read `identifier` and `verify_proof` in `programs/bunker3/src/lib.rs` and `sdk/v3/onetime.ts` for how a key is bound to its vault, role, generation and index.
 - Trace every account in each instruction: owner, PDA derivation, writability, signer, aliasing between vault, proof, markers and destination.
 - Regenerate `fixtures/bunker-v3.json` with `npx tsx scripts/v3-vectors.ts` and compare. The Rust check in `programs/bunker3-svm-tests/tests/client_vectors.rs` re-derives it with a different HKDF implementation.
 - The claim that re-emitting the fixed recovery signature is safe (PROTOCOL.md open question 1).

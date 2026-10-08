@@ -523,9 +523,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "bunker-lmots"
+version = "0.1.0"
+dependencies = [
+ "solana-sha256-hasher",
+]
+
+[[package]]
 name = "bunker3-svm-tests"
 version = "0.1.0"
 dependencies = [
+ "bunker-lmots",
  "hkdf",
  "litesvm",
  "serde_json",
@@ -539,7 +547,6 @@ dependencies = [
  "solana-signer",
  "solana-system-interface",
  "solana-transaction",
- "winterwallet-core",
 ]
 
 [[package]]
@@ -1608,16 +1615,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "83a0692ec44e4cf1ef28ca317f14f8f07da2d95ec3fa01f86e4467b725e60917"
 dependencies = [
  "digest 0.10.7",
-]
-
-[[package]]
-name = "pbkdf2"
-version = "0.12.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f8ed6a7761f76e3b9f92dfb0a60a6a6477c61024b775147ff0973a02653abaf2"
-dependencies = [
- "digest 0.10.7",
- "hmac",
 ]
 
 [[package]]
@@ -2936,7 +2933,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dc905b200a95f2ea9146e43f2a7181e3aeb55de6bc12afb36462d00a3c7310de"
 dependencies = [
  "hmac",
- "pbkdf2 0.11.0",
+ "pbkdf2",
  "sha2 0.10.9",
 ]
 
@@ -3738,17 +3735,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
-]
-
-[[package]]
-name = "winterwallet-core"
-version = "0.1.0"
-dependencies = [
- "hmac",
- "pbkdf2 0.12.2",
- "sha2 0.10.9",
- "solana-sha256-hasher",
- "zeroize",
 ]
 
 [[package]]

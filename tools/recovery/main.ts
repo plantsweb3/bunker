@@ -4,9 +4,9 @@
  * user carries to the website. */
 import { hex, unhex } from "../../sdk/bytes";
 import { address, base58, isWalletAddress, vaultAddressBytes } from "../../sdk/v3/core";
-import { genesisVault, recoveryPacket } from "../../sdk/v3/master";
-import { epochSeed, recoveryKey } from "../../sdk/v3/derive";
-import { rootFromSecret, verify } from "../../sdk/winternitz";
+import { genesisVault, recoveryPacket, recoveryRoot } from "../../sdk/v3/master";
+import { epochSeed } from "../../sdk/v3/derive";
+import { signerOf, SIGNS_RECOVERY, verifies } from "../../sdk/v3/onetime";
 import {
   ArchivalKit,
   DayKey,
@@ -325,8 +325,8 @@ $("recover").addEventListener(
     if (hex(again.payload) !== hex(packet.payload) || hex(again.signature) !== hex(packet.signature))
       throw new Error("Internal check failed. Nothing was saved.");
     // Never hand out a packet this tool cannot itself verify.
-    const root = rootFromSecret(recoveryKey(unhex(kit.master), d, epoch));
-    if (!verify(packet.signature, packet.message, root))
+    const root = recoveryRoot(unhex(kit.master), d, epoch);
+    if (!verifies(signerOf(d, SIGNS_RECOVERY, epoch, 0n), packet.signature, packet.message, root))
       throw new Error("Internal check failed. Nothing was saved.");
     const out: RecoveryFile = {
       version: 3,

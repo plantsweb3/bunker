@@ -30,7 +30,7 @@ export default function Page() {
         <h2>The intended security boundary</h2>
         <p>
           A connected Solana wallet funds a program-derived vault. To withdraw,
-          the program verifies a separate Winternitz one-time signature over
+          the program verifies a separate hash-based one-time signature over
           the exact asset, amount and destination, and replaces the key in the
           same step. Possession of the wallet’s signing key alone does not
           satisfy that check.
@@ -66,25 +66,29 @@ export default function Page() {
         </ul>
       </section>
       <section>
-        <h2>Documented prior art. Unreviewed integration.</h2>
+        <h2>A published construction. An unreviewed integration.</h2>
         <p>
-          The Rust verifier is vendored from{" "}
+          The one-time signature is LM-OTS as specified in{" "}
           <a
-            href="https://github.com/blueshift-gg/winterwallet/tree/672fc6789b1532ee680f24842d235e0be8737b61"
+            href="https://www.rfc-editor.org/rfc/rfc8554#section-4"
             target="_blank"
             rel="noreferrer"
           >
-            Blueshift’s Winterwallet
+            RFC 8554, section 4
           </a>
-          , which explicitly states that it is not formally audited. Bunker uses
-          its full 32-byte message digest, 34 SHA-256 chains, checksum, and
-          tagged Merkle commitment. A browser port is checked against upstream
-          Rust vectors.
+          : 34 SHA-256 hash chains, a checksum, and a 1,124-byte signature.
+          The verifier in the program and the signer in the browser were
+          written from that text and are tested against the test vectors the
+          RFC publishes: its signatures must verify, and signing with its
+          private key must reproduce its signature.
         </p>
         <p>
-          This construction is not WOTS+, XMSS, LMS, or a NIST-approved Bunker
-          scheme. We do not equate use of SHA-256 with review of the whole
-          signature construction.
+          Bunker uses that one-time scheme on its own, with each signature
+          naming the key that replaces it, not inside the LMS system the RFC
+          mainly describes. That use, and two choices it involves, have not
+          been examined by an outside cryptographer. Its security rests on SHA-256;
+          the system as a whole is not quantum-resistant, because everything
+          else on Solana still uses ordinary signatures.
         </p>
       </section>
       <section>

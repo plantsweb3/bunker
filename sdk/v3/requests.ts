@@ -7,7 +7,7 @@
  *  recovery packet   tool -> site   the one signed recovery message for an epoch */
 import { z } from "zod";
 import { hex, unhex } from "../bytes";
-import { verify } from "../winternitz";
+import { SIGNATURE_BYTES } from "../lmots";
 import { identityOf } from "./kit";
 import {
   address as addressBytes,
@@ -18,8 +18,9 @@ import {
   TRUSTED_SLOTS,
   vaultIdOf,
 } from "./core";
+import { signerOf, SIGNS_RECOVERY, verifies } from "./onetime";
 import type { VaultState } from "./protocol";
-const SIGNATURE_SIZE = 1088;
+const SIGNATURE_SIZE = SIGNATURE_BYTES;
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const address = z.string().min(32).max(44);
 const network = z.enum(["devnet", "localnet"]);
@@ -96,8 +97,9 @@ export function parseCreationRequest(raw: string): CreationRequest {
     throw new Error("Creation request does not match its vault address");
   return r;
 }
-/** Checks the file is internally consistent AND that its signature verifies
- * for the message the program will reconstruct. */
+/** Checks the file is internally consistent and rebuilds the message the
+ * program will reconstruct. Whether the signature verifies is decided against
+ * the vault on-chain, by `recoveryFileStatus`. */
 export function parseRecoveryFile(raw: string): RecoveryFile & {
   payloadBytes: Uint8Array;
   message: Uint8Array;
@@ -128,5 +130,12 @@ export function recoveryFileStatus(
   const epoch = BigInt(f.epoch);
   if (epoch < chain.epoch) return "already-applied";
   if (epoch > chain.epoch) return "wrong-epoch";
-  return verify(f.signatureBytes, f.message, chain.recRoot) ? "ready" : "bad-signature";
+  // The signer is named from the vault account, as the program names it.
+  const signer = signerOf(
+    { programId: addressBytes(f.program), chainTag: chain.chainTag, salt: chain.salt },
+    SIGNS_RECOVERY,
+    epoch,
+    0n,
+  );
+  return verifies(signer, f.signatureBytes, f.message, chain.recRoot) ? "ready" : "bad-signature";
 }

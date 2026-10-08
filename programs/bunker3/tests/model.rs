@@ -75,6 +75,7 @@ fn random_interleavings_keep_every_invariant() {
             pending: None,
             bump: 255,
             trusted: [[0; 32]; TRUSTED_SLOTS],
+            salt: [5; 32],
         };
         let mut now: i64 = 1_800_000_000;
         // The spent markers the program keeps for this vault, and every announcement that paid out.

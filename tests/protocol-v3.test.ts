@@ -4,7 +4,7 @@ import { hkdf } from "@noble/hashes/hkdf";
 import { sha256 } from "@noble/hashes/sha256";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../sdk/bytes";
-import { rootFromSecret, verify } from "../sdk/winternitz";
+import { signerOf, SIGNS_ANNOUNCEMENTS, SIGNS_RECOVERY, verifies } from "../sdk/v3/onetime";
 import {
   context,
   Descriptor,
@@ -69,7 +69,7 @@ describe("Protocol 3 derivation", () => {
   it("builds the 109-byte context in the specified order", () => {
     const c = context(d);
     expect(c.length).toBe(241);
-    expect(new TextDecoder().decode(c.slice(0, 12))).toBe("BUNKER-KDF-3");
+    expect(new TextDecoder().decode(c.slice(0, 12))).toBe("BUNKER-KDF-4");
     expect(c[12]).toBe(0);
     expect(hex(c.slice(13, 45))).toBe(fixture.chainTag);
     expect(hex(c.slice(45, 77))).toBe(fixture.programBytes);
@@ -112,7 +112,9 @@ describe("Protocol 3 derivation", () => {
     const otherTrusted = { ...d, trusted: [new Uint8Array(32).fill(0xaa)] };
     add(recoveryKey(master, otherTrusted, 0n));
     add(epochSeed(master, otherTrusted, 0n));
-    expect(recoveryKey(master, d, 0n).length).toBe(1088);
+    // 34 chain starts and a 32-byte seed for the signature's randomizer.
+    expect(recoveryKey(master, d, 0n).length).toBe(1120);
+    expect(operationalKey(seed0, d, 0n, 0n).length).toBe(1120);
     expect(seed0.length).toBe(32);
   });
   it("rejects wrong-length key material and out-of-range indices", () => {
@@ -200,7 +202,9 @@ describe("Protocol 3 encodings", () => {
     data.set(unhex(fixture.epoch0.recRoot), 120);
     new DataView(data.buffer).setUint32(152, 86_400, true);
     data[286] = 254;
+    data.set(d.salt, 415);
     const idle = parseVault(data);
+    expect(hex(idle.salt)).toBe(fixture.salt);
     expect([idle.epoch, idle.opIndex, idle.delaySecs, idle.pending, idle.bump]).toEqual([0n, 0n, 86_400, null, 254]);
     expect(pendingPhase(idle, 5n)).toBe("none");
     const stale = data.slice();
@@ -228,16 +232,31 @@ describe("Protocol 3 authorities", () => {
     const g = genesisAuthorities(master, d);
     expect(hex(g.opRoot)).toBe(fixture.epoch0.opRoot);
     expect(hex(g.recRoot)).toBe(fixture.epoch0.recRoot);
-    expect(hex(g.opRoot)).toBe(hex(rootFromSecret(operationalKey(g.seed, d, 0n, 0n))));
-    expect(
-      verify(unhex(fixture.announce.signature), unhex(fixture.announce.message), g.opRoot),
-    ).toBe(true);
-    expect(
-      verify(unhex(fixture.recover.signature), unhex(fixture.recover.message), g.recRoot),
-    ).toBe(true);
-    // Neither signature verifies under the other role's root.
-    expect(verify(unhex(fixture.announce.signature), unhex(fixture.announce.message), g.recRoot)).toBe(false);
-    expect(verify(unhex(fixture.recover.signature), unhex(fixture.recover.message), g.opRoot)).toBe(false);
+    const operational = signerOf(d, SIGNS_ANNOUNCEMENTS, 0n, 0n);
+    const recovery = signerOf(d, SIGNS_RECOVERY, 0n, 0n);
+    const announce = [unhex(fixture.announce.signature), unhex(fixture.announce.message)] as const;
+    const recover = [unhex(fixture.recover.signature), unhex(fixture.recover.message)] as const;
+    expect(verifies(operational, ...announce, g.opRoot)).toBe(true);
+    expect(verifies(recovery, ...recover, g.recRoot)).toBe(true);
+    // Neither signature verifies under the other role's root or signer.
+    expect(verifies(operational, ...announce, g.recRoot)).toBe(false);
+    expect(verifies(recovery, ...announce, g.opRoot)).toBe(false);
+    expect(verifies(recovery, ...recover, g.opRoot)).toBe(false);
+    expect(verifies(operational, ...recover, g.recRoot)).toBe(false);
+    // Nor under another index, generation, salt, chain or program.
+    for (const other of [
+      signerOf(d, SIGNS_ANNOUNCEMENTS, 0n, 1n),
+      signerOf(d, SIGNS_ANNOUNCEMENTS, 1n, 0n),
+      signerOf({ ...d, salt: new Uint8Array(32).fill(8) }, SIGNS_ANNOUNCEMENTS, 0n, 0n),
+      signerOf({ ...d, chainTag: new Uint8Array(32).fill(8) }, SIGNS_ANNOUNCEMENTS, 0n, 0n),
+      signerOf({ ...d, programId: new Uint8Array(32).fill(8) }, SIGNS_ANNOUNCEMENTS, 0n, 0n),
+    ])
+      expect(verifies(other, ...announce, g.opRoot)).toBe(false);
+    // The index is 64 bits; q is always zero.
+    expect(signerOf(d, SIGNS_ANNOUNCEMENTS, 0n, 1n << 40n).q).toBe(0);
+    expect(() => signerOf(d, SIGNS_ANNOUNCEMENTS, 0n, 1n << 64n)).toThrow();
+    expect(verifies({ ...operational, q: 1 }, ...announce, g.opRoot)).toBe(false);
+    expect(() => signerOf(d, SIGNS_RECOVERY, 0n, 1n)).toThrow("no index");
   });
   it("the recovery packet is a pure function of master, vault and epoch", () => {
     const a = recoveryPacket(master, d, 0n);
@@ -271,7 +290,7 @@ describe("Protocol 3 authorities", () => {
     expect(() => initializeIx(program, payer, { ...genesis, delaySecs: 604_801 })).toThrow();
     expect(() => initializeIx(program, payer, { ...genesis, recRoot: g.opRoot })).toThrow();
     const stage = stageIxs(program, payer, unhex(fixture.announce.message), unhex(fixture.announce.signature));
-    expect(stage.map((s) => s.data.length)).toEqual([1 + 32 + 2 + 600, 1 + 32 + 2 + 488]);
+    expect(stage.map((s) => s.data.length)).toEqual([1 + 32 + 2 + 600, 1 + 32 + 2 + 524]);
     const announce = announceIx(program, payer, unhex(fixture.announce.payload), g.opRoot);
     expect([announce.data[0], announce.keys.length]).toEqual([2, 6]);
     expect(announce.keys[3].pubkey.equals(spentAddress(program, vault, g.opRoot))).toBe(true);

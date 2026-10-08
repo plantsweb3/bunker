@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { PublicKey } from "@solana/web3.js";
 import { hex } from "../sdk/bytes";
-import { verify } from "../sdk/winternitz";
+import { signerOf, SIGNS_ANNOUNCEMENTS, verifies } from "../sdk/v3/onetime";
 import { genesisVault, operationalRoot } from "../sdk/v3/authority";
 import {
   authorizeAnnouncement,
@@ -53,6 +53,7 @@ const chain = (over: Partial<VaultState> = {}): VaultState => ({
   pending: null,
   bump: 255,
   trusted: [],
+  salt,
   ...over,
 });
 const withdrawal = {
@@ -75,7 +76,7 @@ describe("Protocol 3 signing journal", () => {
   it("signs once, saves the exact bytes, and refuses a second signature", async () => {
     browser();
     const signed = await authorizeAnnouncement(identity, g.seed, d, chain(), withdrawal);
-    expect(verify(signed.signature, signed.message, g.opRoot)).toBe(true);
+    expect(verifies(signerOf(d, SIGNS_ANNOUNCEMENTS, 0n, 0n), signed.signature, signed.message, g.opRoot)).toBe(true);
     expect(decodeAnnounce(signed.payload).amount).toBe(5n);
     const status = journalStatus(identity, chain());
     expect(status.state).toBe("signed");

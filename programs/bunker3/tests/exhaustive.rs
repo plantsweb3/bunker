@@ -232,6 +232,7 @@ fn every_reachable_state_keeps_every_invariant() {
                 pending: None,
                 bump: 255,
                 trusted: [root(77), [0; 32], [0; 32], [0; 32]],
+                salt: [5; 32],
             },
             marked: BTreeSet::new(),
             now: START,

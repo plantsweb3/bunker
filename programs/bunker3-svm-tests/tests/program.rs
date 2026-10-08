@@ -13,10 +13,9 @@ use solana_signer::Signer;
 use solana_system_interface::instruction as system_instruction;
 use solana_transaction::Transaction;
 use std::str::FromStr;
-use winterwallet_core::WinternitzKeypair;
+mod common;
+use common::{identifier, root, sign_in, sign_under, PROOF_LEN, SIGNATURE_LEN, STEP_LIMIT, VAULT_LEN};
 
-const PHRASE: &str =
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const T0: i64 = 1_800_000_000;
 const DAY: i64 = 86_400;
 /// The execution window of a vault with a one-day waiting period.
@@ -24,21 +23,15 @@ const WINDOW: i64 = 86_400;
 const MAX_DELAY: u32 = 604_800;
 /// Decimal places of every test mint.
 const TOKEN_DECIMALS: u8 = 6;
-const VAULT_LEN: usize = 415;
 const SOL: u64 = 1_000_000_000;
+/// What the reference client requests (`computeIx` in sdk/v3/protocol.ts).
+const COMPUTE_LIMIT: u32 = 800_000;
 
 fn system() -> Pubkey {
     Pubkey::default()
 }
 fn token_program() -> Pubkey {
     Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap()
-}
-/// A distinct public-test one-time key per tag.
-fn key(tag: u32) -> WinternitzKeypair {
-    WinternitzKeypair::from_mnemonic_at(PHRASE, 0, 0, tag).unwrap()
-}
-fn root(tag: u32) -> [u8; 32] {
-    *key(tag).derive::<32>().to_pubkey().merklize().as_bytes()
 }
 
 struct Env {
@@ -67,13 +60,13 @@ struct Withdrawal {
 impl Env {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
-        let program = Pubkey::new_unique();
+        let program = Pubkey::new_from_array(common::PROGRAM);
         let so = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/bunker3.so");
         svm.add_program_from_file(program, so)
             .expect("build bunker3.so first (see the header of this file)");
         let payer = Keypair::new();
         svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
-        let mut env = Self { svm, program, payer, salt: [7u8; 32], id: [0; 32], chain: [9u8; 32], vault: Pubkey::default(), trusted: [[0; 32]; 4] };
+        let mut env = Self { svm, program, payer, salt: common::SALT, id: [0; 32], chain: common::CHAIN, vault: Pubkey::default(), trusted: [[0; 32]; 4] };
         env.adopt(root(1), root(100), DAY as u32);
         env.set_time(T0);
         env
@@ -89,7 +82,7 @@ impl Env {
         let budget = Instruction {
             program_id: Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap(),
             accounts: vec![],
-            data: [vec![2u8], 1_400_000u32.to_le_bytes().to_vec()].concat(),
+            data: [vec![2u8], COMPUTE_LIMIT.to_le_bytes().to_vec()].concat(),
         };
         let all = [vec![budget], ixs.to_vec()].concat();
         let tx = Transaction::new_signed_with_payer(
@@ -202,8 +195,11 @@ impl Env {
     }
     /// Signs `message` with one-time key `tag` and uploads the signature in two chunks.
     fn stage(&mut self, tag: u32, message: &[u8]) -> Pubkey {
-        let signature = key(tag).derive::<32>().sign(&[message]);
-        let bytes = signature.as_bytes().to_vec();
+        let bytes = sign_in(&self.salt, tag, message);
+        self.stage_bytes(&bytes, message)
+    }
+    /// Uploads an arbitrary signature for `message`.
+    fn stage_bytes(&mut self, bytes: &[u8], message: &[u8]) -> Pubkey {
         let digest = hashv(&[message]).to_bytes();
         let proof = self.proof(&digest);
         // A proof address is fixed by (payer, message). If an earlier attempt left a
@@ -334,7 +330,8 @@ fn initialize_writes_the_specified_layout_and_cannot_be_repeated() {
     assert_eq!(&d[120..152], &root(100));
     assert_eq!(u32::from_le_bytes(d[152..156].try_into().unwrap()), DAY as u32);
     assert!(d[104..120].iter().all(|b| *b == 0) && d[156..286].iter().all(|b| *b == 0));
-    assert!(d[287..].iter().all(|b| *b == 0), "no trusted wallets");
+    assert!(d[287..415].iter().all(|b| *b == 0), "no trusted wallets");
+    assert_eq!(&d[415..447], &e.salt, "the salt, which names the signer");
     assert_eq!(e.svm.get_account(&e.vault).unwrap().owner, e.program);
     // Neither initial root is marked spent by creation.
     assert!(!e.spent(&root(1)) && !e.spent(&root(100)));
@@ -714,8 +711,8 @@ fn proof_staging_is_append_only_and_only_its_payer_can_close_it() {
     let message = e.message(b"BUNKER3_ANNOUNCE", &e.announce_payload(&w));
     let proof = e.stage(1, &message);
     let stored = e.svm.get_account(&proof).unwrap();
-    assert_eq!((stored.data.len(), &stored.data[..8]), (1162, &b"BKPROOF3"[..]));
-    assert_eq!(u16::from_le_bytes(stored.data[72..74].try_into().unwrap()), 1088);
+    assert_eq!((stored.data.len(), &stored.data[..8]), (PROOF_LEN, &b"BKPROOF3"[..]));
+    assert_eq!(u16::from_le_bytes(stored.data[72..74].try_into().unwrap()) as usize, SIGNATURE_LEN);
     let digest: [u8; 32] = stored.data[40..72].try_into().unwrap();
     let chunk = |offset: u16, bytes: &[u8]| Instruction {
         program_id: e.program,
@@ -729,7 +726,7 @@ fn proof_staging_is_append_only_and_only_its_payer_can_close_it() {
     // Re-sending identical bytes is a safe retry; different bytes are refused.
     let same = chunk(0, &stored.data[74..174]);
     let different = chunk(0, &[0xAA; 100]);
-    let overflow = chunk(1088, &[1]);
+    let overflow = chunk(SIGNATURE_LEN as u16, &[1]);
     e.send(&[same]).unwrap();
     assert!(e.send(&[different]).is_err());
     assert!(e.send(&[overflow]).is_err());
@@ -1125,4 +1122,203 @@ fn the_program_says_why_it_refused() {
     e.set_time(T0 + 3 * DAY + WINDOW);
     let r = e.execute(destination);
     refused(r, 124, "below the rent reserve");
+}
+
+/// The identifier a signature is checked under comes from the vault, not
+/// from the signer: the right key at any other position is refused.
+#[test]
+fn a_signature_is_bound_to_the_role_generation_and_index_of_its_key() {
+    let mut e = Env::new();
+    e.init();
+    let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let (chain, salt) = (e.chain, e.salt);
+    let id = |role, epoch, index| identifier(&common::PROGRAM, &chain, &salt, role, epoch, index);
+    let right = id(1, 0, 0);
+    for (what, id, q) in [
+        ("another index", id(1, 0, 1), 0u32),
+        ("the recovery role", id(2, 0, 0), 0),
+        ("another generation", id(1, 1, 0), 0),
+        ("another salt", identifier(&common::PROGRAM, &e.chain, &[8; 32], 1, 0, 0), 0),
+        ("another chain", identifier(&common::PROGRAM, &[10; 32], &e.salt, 1, 0, 0), 0),
+        ("another program", identifier(&[0xB4; 32], &e.chain, &e.salt, 1, 0, 0), 0),
+        ("a nonzero q", right, 1),
+    ] {
+        let proof = e.stage_bytes(&sign_under(&id, q, 1, &message, STEP_LIMIT), &message);
+        let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+        assert!(e.send(&[ix]).is_err(), "signed under {what}");
+    }
+    assert!(!e.pending() && !e.spent(&root(1)));
+    let proof = e.stage_bytes(&sign_under(&right, 0, 1, &message, STEP_LIMIT), &message);
+    let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+    e.send(&[ix]).unwrap();
+}
+
+/// A correct signature that would take more chain steps than the limit is
+/// refused, so verification has a ceiling whatever the signer chose.
+#[test]
+fn verification_cost_is_bounded() {
+    use bunker_lmots::{digits, message_hash, signer};
+    let mut e = Env::new();
+    e.init();
+    let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let id = identifier(&common::PROGRAM, &e.chain, &e.salt, 1, 0, 0);
+    let parts: [&[u8]; 4] = [&message, &[], &[], &[]];
+    let steps = |c: &[u8; 32]| digits(&message_hash(&id, 0, c, parts)).1;
+    let randomizer = |n: u32| hashv(&[b"cost", &n.to_le_bytes()]).to_bytes();
+    // The costliest signature the program accepts, and the cheapest it refuses,
+    // among a few thousand randomizers.
+    let (mut best, mut over) = (None::<[u8; 32]>, None::<[u8; 32]>);
+    for n in 0..4000 {
+        let c = randomizer(n);
+        let s = steps(&c);
+        if s <= STEP_LIMIT && best.is_none_or(|b| s > steps(&b)) {
+            best = Some(c);
+        }
+        if s > STEP_LIMIT && over.is_none_or(|o| s < steps(&o)) {
+            over = Some(c);
+        }
+    }
+    let (best, over) = (best.unwrap(), over.unwrap());
+    // The step count only takes the values 255 * (h + 2): the limit itself, then 255 more.
+    assert_eq!((steps(&best), steps(&over)), (STEP_LIMIT, STEP_LIMIT + 255));
+    let sign = |c: &[u8; 32]| signer::sign(&id, 0, &common::secret(1), c, parts).to_vec();
+
+    let proof = e.stage_bytes(&sign(&over), &message);
+    let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+    let refused = e.send(&[ix]).unwrap_err();
+    assert!(!e.pending());
+    // Refused before any chain is walked.
+    assert!(refused.meta.compute_units_consumed < 40_000, "{}", refused.meta.compute_units_consumed);
+
+    let proof = e.stage_bytes(&sign(&best), &message);
+    let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+    let meta = e.send(&[ix]).unwrap();
+    println!("announce at {} of {STEP_LIMIT} steps: {} compute units", steps(&best), meta.compute_units_consumed);
+    assert!(meta.compute_units_consumed < 700_000, "{}", meta.compute_units_consumed);
+    assert!(e.pending());
+}
+
+/// Anything that is not a well-formed signature of the one parameter set.
+#[test]
+fn a_malformed_signature_is_refused() {
+    let mut e = Env::new();
+    e.init();
+    let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let good = sign_in(&e.salt, 1, &message);
+    assert_eq!((good.len(), &good[..4]), (SIGNATURE_LEN, &[0u8, 0, 0, 4][..]));
+    let mut cases = Vec::new();
+    for typecode in [[0u8, 0, 0, 3], [0, 0, 0, 0], [4, 0, 0, 0], [0, 0, 0, 8]] {
+        let mut bad = good.clone();
+        bad[..4].copy_from_slice(&typecode);
+        cases.push(bad);
+    }
+    for at in [4usize, 35, 36, 67, 68, 600, SIGNATURE_LEN - 1] {
+        let mut bad = good.clone();
+        bad[at] ^= 0x80;
+        cases.push(bad);
+    }
+    for bad in cases {
+        let proof = e.stage_bytes(&bad, &message);
+        let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+        assert!(e.send(&[ix]).is_err());
+    }
+    assert!(!e.pending() && !e.spent(&root(1)));
+    let proof = e.stage_bytes(&good, &message);
+    let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+    e.send(&[ix]).unwrap();
+}
+
+/// The operation index is 64 bits all the way through: a key far past 2^32
+/// signs like any other, and only at the position it was made for.
+#[test]
+fn an_operation_index_beyond_32_bits_signs_like_any_other() {
+    use bunker_lmots::signer::public_key;
+    let mut e = Env::new();
+    e.init();
+    let index = (1u64 << 32) + 5;
+    let (chain, salt) = (e.chain, e.salt);
+    let id = |index| identifier(&common::PROGRAM, &chain, &salt, 1, 0, index);
+    // Put the vault at that index, holding the key that belongs there.
+    let key = public_key(&id(index), 0, &common::secret(1));
+    let mut account = e.svm.get_account(&e.vault).unwrap();
+    account.data[72..104].copy_from_slice(&key);
+    account.data[104..112].copy_from_slice(&index.to_le_bytes());
+    e.svm.set_account(e.vault, account).unwrap();
+
+    let w = e.sol(Pubkey::new_unique(), SOL, index, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    // The same key signing as if the index had wrapped to 32 bits: refused.
+    for wrong in [5u64, index - 1, index + 1] {
+        let proof = e.stage_bytes(&sign_under(&id(wrong), 0, 1, &message, STEP_LIMIT), &message);
+        let ix = e.announce_ix(&payload, proof, &key, &w.next);
+        assert!(e.send(&[ix]).is_err(), "signed for index {wrong}");
+    }
+    let proof = e.stage_bytes(&sign_under(&id(index), 0, 1, &message, STEP_LIMIT), &message);
+    let ix = e.announce_ix(&payload, proof, &key, &w.next);
+    e.send(&[ix]).unwrap();
+    assert_eq!(e.op_index(), index + 1);
+    assert!(e.pending() && e.spent(&key));
+}
+
+/// The heaviest transaction the reference client builds, inside the compute
+/// limit it requests: a token withdrawal to the last of four trusted wallets,
+/// with the costliest signature the program accepts, creating the recipient's
+/// token account, announcing, releasing and reclaiming the proof's deposit.
+#[test]
+fn the_heaviest_client_transaction_fits_the_requested_compute_limit() {
+    let mut e = Env::new();
+    let wallets: Vec<Pubkey> = (0..4).map(|_| Pubkey::new_unique()).collect();
+    for (slot, wallet) in e.trusted.iter_mut().zip(&wallets) {
+        *slot = wallet.to_bytes();
+    }
+    let ix = e.init_ix(root(1), root(100), DAY as u32);
+    e.send(&[ix]).unwrap();
+    let ata_program = Pubkey::from_str("ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL").unwrap();
+    let (mint, source, wallet) = (Pubkey::new_unique(), Pubkey::new_unique(), wallets[3]);
+    let associated = Pubkey::find_program_address(&[wallet.as_ref(), token_program().as_ref(), mint.as_ref()], &ata_program).0;
+    let vault = e.vault;
+    for (key, data) in [(mint, mint_data(TOKEN_DECIMALS)), (source, token_data(&mint, &vault, 900, false))] {
+        let lamports = e.svm.minimum_balance_for_rent_exemption(data.len());
+        e.svm.set_account(key, Account { lamports, data, owner: token_program(), executable: false, rent_epoch: 0 }).unwrap();
+    }
+    let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination: associated, amount: 100, announce_by: T0 + 3600, next: root(2) };
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let proof = e.stage_bytes(&common::sign_at_limit(&e.salt, 1, &message), &message);
+    // Create the recipient's associated token account if it is missing.
+    let create = Instruction {
+        program_id: ata_program,
+        accounts: vec![
+            AccountMeta::new(e.payer.pubkey(), true),
+            AccountMeta::new(associated, false),
+            AccountMeta::new_readonly(wallet, false),
+            AccountMeta::new_readonly(mint, false),
+            AccountMeta::new_readonly(system(), false),
+            AccountMeta::new_readonly(token_program(), false),
+        ],
+        data: vec![1],
+    };
+    let announce = e.announce_ix(&payload, proof, &root(1), &w.next);
+    let execute = e.execute_ix(
+        associated,
+        vec![AccountMeta::new(source, false), AccountMeta::new_readonly(mint, false), AccountMeta::new_readonly(token_program(), false)],
+    );
+    let close = Instruction {
+        program_id: e.program,
+        accounts: vec![AccountMeta::new(proof, false), AccountMeta::new(e.payer.pubkey(), true)],
+        data: vec![6u8],
+    };
+    assert!(e.svm.get_account(&associated).is_none());
+    let meta = e.send(&[create, announce, execute, close]).unwrap();
+    println!("heaviest client transaction: {} of {COMPUTE_LIMIT} compute units", meta.compute_units_consumed);
+    assert_eq!((token_amount(&e, &associated), e.pending(), e.spent(&root(1))), (100, false, true));
+    // Room left for address searches that take more tries than these did.
+    assert!(meta.compute_units_consumed < 700_000, "{}", meta.compute_units_consumed);
 }

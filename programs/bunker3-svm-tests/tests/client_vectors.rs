@@ -13,7 +13,9 @@ use solana_signer::Signer;
 use solana_system_interface::instruction as system_instruction;
 use solana_transaction::Transaction;
 use std::str::FromStr;
-use winterwallet_core::{WinternitzPrivkey, WinternitzRoot, WinternitzSignature};
+mod common;
+use bunker_lmots::{candidate_key, signer};
+use common::{identifier, ROLE_OPERATIONAL, ROLE_RECOVERY, STEP_LIMIT};
 
 fn fixture() -> serde_json::Value {
     serde_json::from_str(include_str!("../../../fixtures/bunker-v3.json")).unwrap()
@@ -32,9 +34,52 @@ fn expand(ikm: &[u8], info: &[u8], length: usize) -> Vec<u8> {
     Hkdf::<Sha256>::new(None, ikm).expand(info, &mut out).unwrap();
     out
 }
-fn root_of(secret: &[u8]) -> [u8; 32] {
-    let key: &WinternitzPrivkey<32> = secret.try_into().unwrap();
-    *key.to_pubkey().merklize().as_bytes()
+/// A derived one-time key is 34 chain starts followed by a randomizer seed.
+const ONE_TIME: usize = 34 * 32 + 32;
+fn secret_of(material: &[u8]) -> signer::Secret {
+    assert_eq!(material.len(), ONE_TIME);
+    let mut x = [[0u8; 32]; 34];
+    for (i, v) in x.iter_mut().enumerate() {
+        v.copy_from_slice(&material[32 * i..32 * i + 32]);
+    }
+    x
+}
+/// The client's signature for `message`, recomputed here: the first randomizer
+/// of the key's own sequence that stays within the program's step limit.
+fn sign(material: &[u8], id: &[u8; 16], message: &[u8]) -> Vec<u8> {
+    let parts: [&[u8]; 4] = [message, &[], &[], &[]];
+    let (c, _) = signer::grind(id, 0, parts, STEP_LIMIT, |n| {
+        expand(&material[34 * 32..], &[b"BUNKER-LMOTS-C".as_slice(), &n.to_le_bytes()].concat(), 32).try_into().unwrap()
+    });
+    signer::sign(id, 0, &secret_of(material), &c, parts).to_vec()
+}
+/// Everything the test derives on its own from the fixture's master.
+struct Derived {
+    program: [u8; 32],
+    chain: [u8; 32],
+    salt: [u8; 32],
+    master: Vec<u8>,
+    context: Vec<u8>,
+}
+impl Derived {
+    fn seed(&self, epoch: u64) -> Vec<u8> {
+        expand(&self.master, &info(&self.context, 2, &[epoch]), 32)
+    }
+    fn recovery(&self, epoch: u64) -> Vec<u8> {
+        expand(&self.master, &info(&self.context, 1, &[epoch]), ONE_TIME)
+    }
+    fn operational(&self, epoch: u64, index: u64) -> Vec<u8> {
+        expand(&self.seed(epoch), &info(&self.context, 3, &[epoch, index]), ONE_TIME)
+    }
+    fn id(&self, role: u8, epoch: u64, index: u64) -> [u8; 16] {
+        identifier(&self.program, &self.chain, &self.salt, role, epoch, index)
+    }
+    fn rec_root(&self, epoch: u64) -> [u8; 32] {
+        signer::public_key(&self.id(ROLE_RECOVERY, epoch, 0), 0, &secret_of(&self.recovery(epoch)))
+    }
+    fn op_root(&self, epoch: u64, index: u64) -> [u8; 32] {
+        signer::public_key(&self.id(ROLE_OPERATIONAL, epoch, index), 0, &secret_of(&self.operational(epoch, index)))
+    }
 }
 fn info(context: &[u8], role: u8, numbers: &[u64]) -> Vec<u8> {
     let mut i = context.to_vec();
@@ -45,11 +90,8 @@ fn info(context: &[u8], role: u8, numbers: &[u64]) -> Vec<u8> {
     i
 }
 
-#[test]
-fn rust_derivation_matches_the_client() {
-    let f = fixture();
-    let master = bytes(&f["master"]);
-    let mut context = b"BUNKER-KDF-3".to_vec();
+fn derived(f: &serde_json::Value) -> Derived {
+    let mut context = b"BUNKER-KDF-4".to_vec();
     context.push(0);
     context.extend(bytes(&f["chainTag"]));
     context.extend(bytes(&f["programBytes"]));
@@ -61,41 +103,60 @@ fn rust_derivation_matches_the_client() {
         trusted[32 * i..32 * i + 32].copy_from_slice(&bytes(wallet));
     }
     context.extend(trusted);
-    assert_eq!(context, bytes(&f["context"]));
-    assert_eq!(context.len(), 241);
-    let seed = |epoch: u64| expand(&master, &info(&context, 2, &[epoch]), 32);
-    let recovery = |epoch: u64| expand(&master, &info(&context, 1, &[epoch]), 1088);
-    let operational = |epoch: u64, index: u64| expand(&seed(epoch), &info(&context, 3, &[epoch, index]), 1088);
-    assert_eq!(seed(0), bytes(&f["epoch0"]["seed"]));
-    assert_eq!(seed(1), bytes(&f["epoch1"]["seed"]));
-    assert_eq!(root_of(&recovery(0)), arr(&f["epoch0"]["recRoot"]));
-    assert_eq!(root_of(&operational(0, 0)), arr(&f["epoch0"]["opRoot"]));
-    assert_eq!(root_of(&operational(0, 1)), arr(&f["epoch0"]["opRootIndex1"]));
-    assert_eq!(root_of(&operational(1, 0)), arr(&f["epoch1"]["opRoot"]));
-    assert_eq!(root_of(&operational(1, 1)), arr(&f["epoch1"]["opRootIndex1"]));
-    // The recovery packet names exactly the independently derived next roots.
-    let packet = bytes(&f["recover"]["payload"]);
-    assert_eq!(&packet[74..106], &root_of(&recovery(1)));
-    assert_eq!(&packet[106..138], &root_of(&operational(1, 0)));
+    Derived { program: arr(&f["programBytes"]), chain: arr(&f["chainTag"]), salt: arr(&f["salt"]), master: bytes(&f["master"]), context }
 }
 
 #[test]
-fn client_signatures_verify_with_the_vendored_verifier() {
+fn rust_derivation_matches_the_client() {
     let f = fixture();
-    for (name, root) in [
-        ("announce", &f["epoch0"]["opRoot"]),
-        ("recover", &f["epoch0"]["recRoot"]),
-        ("announceAfterRecovery", &f["epoch1"]["opRoot"]),
+    let d = derived(&f);
+    assert_eq!(d.context, bytes(&f["context"]));
+    assert_eq!(d.context.len(), 241);
+    assert_eq!(d.seed(0), bytes(&f["epoch0"]["seed"]));
+    assert_eq!(d.seed(1), bytes(&f["epoch1"]["seed"]));
+    assert_eq!(d.rec_root(0), arr(&f["epoch0"]["recRoot"]));
+    assert_eq!(d.op_root(0, 0), arr(&f["epoch0"]["opRoot"]));
+    assert_eq!(d.op_root(0, 1), arr(&f["epoch0"]["opRootIndex1"]));
+    assert_eq!(d.op_root(1, 0), arr(&f["epoch1"]["opRoot"]));
+    assert_eq!(d.op_root(1, 1), arr(&f["epoch1"]["opRootIndex1"]));
+    // The recovery packet names exactly the independently derived next roots.
+    let packet = bytes(&f["recover"]["payload"]);
+    assert_eq!(&packet[74..106], &d.rec_root(1));
+    assert_eq!(&packet[106..138], &d.op_root(1, 0));
+}
+
+/// The client's three signatures, recomputed byte for byte from the master,
+/// and checked by the verifier the program uses under the program's limit.
+#[test]
+fn client_signatures_are_reproduced_and_verify() {
+    let f = fixture();
+    let d = derived(&f);
+    let mut later_randomizers = 0;
+    for (name, material, role, epoch, index, root) in [
+        ("announce", d.operational(0, 0), ROLE_OPERATIONAL, 0u64, 0u64, &f["epoch0"]["opRoot"]),
+        ("recover", d.recovery(0), ROLE_RECOVERY, 0, 0, &f["epoch0"]["recRoot"]),
+        ("announceAfterRecovery", d.operational(1, 0), ROLE_OPERATIONAL, 1, 0, &f["epoch1"]["opRoot"]),
+        ("announceLaterRandomizer", d.operational(0, 1), ROLE_OPERATIONAL, 0, 1, &f["epoch0"]["opRootIndex1"]),
     ] {
         let message = bytes(&f[name]["message"]);
         let signature = bytes(&f[name]["signature"]);
-        let signature: &WinternitzSignature<32> = signature.as_slice().try_into().unwrap();
-        assert!(signature.verify(&[&message], &WinternitzRoot::new(arr(root))), "{name}");
+        let id = d.id(role, epoch, index);
+        assert_eq!(sign(&material, &id, &message), signature, "{name}");
+        // Whether the first candidate randomizer was passed over for this one.
+        let first: [u8; 32] = expand(&material[34 * 32..], &[b"BUNKER-LMOTS-C".as_slice(), &0u32.to_le_bytes()].concat(), 32).try_into().unwrap();
+        later_randomizers += (signature[4..36] != first) as u32;
         assert_eq!(hashv(&[&message]).to_bytes().to_vec(), bytes(&f[name]["digest"]), "{name}");
+        let verify = |message: &[u8], id: &[u8; 16], q: u32| candidate_key(id, q, [message, &[], &[], &[]], &signature, STEP_LIMIT) == Some(arr(root));
+        assert!(verify(&message, &id, 0), "{name}");
         let mut altered = message.clone();
         altered[100] ^= 1;
-        assert!(!signature.verify(&[&altered], &WinternitzRoot::new(arr(root))), "{name}");
+        assert!(!verify(&altered, &id, 0), "{name}");
+        assert!(!verify(&message, &id, 1), "{name}");
+        assert!(!verify(&message, &d.id(role, epoch + 1, index), 0), "{name}");
+        assert!(!verify(&message, &d.id(role, epoch, index + 1), 0), "{name}");
+        assert!(!verify(&message, &d.id(3 - role, epoch, index), 0), "{name}");
     }
+    assert!(later_randomizers >= 1, "one vector must exercise the search for a randomizer");
 }
 
 /// The exact bytes the client produces drive the compiled program through
@@ -125,7 +186,7 @@ fn the_compiled_program_accepts_the_client_bytes() {
         let budget = Instruction {
             program_id: Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap(),
             accounts: vec![],
-            data: [vec![2u8], 1_400_000u32.to_le_bytes().to_vec()].concat(),
+            data: [vec![2u8], 800_000u32.to_le_bytes().to_vec()].concat(),
         };
         let all = [vec![budget], ixs].concat();
         let tx = Transaction::new_signed_with_payer(&all, Some(&payer.pubkey()), &[&payer], svm.latest_blockhash());
@@ -136,7 +197,7 @@ fn the_compiled_program_accepts_the_client_bytes() {
         let signature = bytes(&f[name]["signature"]);
         let proof = Pubkey::find_program_address(&[b"proof", payer.pubkey().as_ref(), &digest], &program).0;
         for offset in [0usize, 600] {
-            let chunk = &signature[offset..(offset + 600).min(1088)];
+            let chunk = &signature[offset..(offset + 600).min(signature.len())];
             let data = [vec![1u8], digest.to_vec(), (offset as u16).to_le_bytes().to_vec(), chunk.to_vec()].concat();
             send(svm, vec![Instruction {
                 program_id: program,

@@ -6,16 +6,16 @@ The implementation is `programs/bunker3` (on-chain), `sdk/v3` (client), `tools/r
 
 Scope of this draft: the recovery authority (proposal §1), the stable archival secret (§2) and delayed withdrawals with cancel-by-recovery (§3). Pre-approved destinations (§4) and the alert service (§6) are out of scope; the vault layout reserves no space for them and a later version must be a new, reviewed layout.
 
-Fixed points: the vendored Winterwallet verifier at revision `672fc6789b1532ee680f24842d235e0be8737b61`, N=32, 1,088-byte signatures, two-chunk proof staging (a 1,088-byte signature does not fit one transaction), direct deposits, no administrator, no fee recipient, no arbitrary invocation, SOL and classic SPL only.
+Fixed points: LM-OTS one-time signatures as specified in RFC 8554 section 4, parameter set `LMOTS_SHA256_N32_W8` (§1.3), 1,124-byte signatures, two-chunk proof staging (a 1,124-byte signature does not fit one transaction), direct deposits, no administrator, no fee recipient, no arbitrary invocation, SOL and classic SPL only.
 
 ## 1. Roles and secrets
 
 | Secret | Size | Lives | Derives | Signs |
 |---|---|---|---|---|
 | Archival master `M` | 32 bytes, CSPRNG | Offline recovery kit only | Every recovery key and every epoch seed | Nothing directly |
-| Recovery key `R[e]` | 1,088 bytes | Derived offline on demand | — | Exactly one message: the recovery packet for epoch `e` |
+| Recovery key `R[e]` | 1,120 bytes | Derived offline on demand | — | Exactly one message: the recovery packet for epoch `e` |
 | Epoch seed `S[e]` | 32 bytes | Operational signer for epoch `e` | Operational keys of epoch `e` only | Nothing directly |
-| Operational key `K[e][i]` | 1,088 bytes | Derived by the operational signer | — | At most one withdrawal announcement |
+| Operational key `K[e][i]` | 1,120 bytes | Derived by the operational signer | — | At most one withdrawal announcement |
 
 `e` is the authority epoch, a u64 that starts at 0 and increases by one on every recovery. It is also the recovery index: there is exactly one recovery key per epoch. `i` is the operational index within the epoch, a u64 that starts at 0 on every epoch and increases by one on every accepted announcement. The pair `(e, i)` is never reused.
 
@@ -24,18 +24,18 @@ Fixed points: the vendored Winterwallet verifier at revision `672fc6789b1532ee68
 HKDF-SHA256 (RFC 5869) with an empty HKDF salt. All integers are unsigned little endian. `ctx` is a fixed 241-byte prefix:
 
 ```
-ctx = "BUNKER-KDF-3" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32) || delay_secs (4) || trusted (4 x 32)   // 241 bytes
+ctx = "BUNKER-KDF-4" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32) || delay_secs (4) || trusted (4 x 32)   // 241 bytes
 ```
 
-`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them. `delay_secs` and the trusted list (§2.1) are included so that the context holds every input of the vault identity other than the roots: a given recovery key can then only ever sign for one vault. The label `BUNKER-KDF-3` also fixes the message formats in §3; a change to either format needs a new label, so that an existing recovery key is never asked to sign a second encoding.
+`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them. `delay_secs` and the trusted list (§2.1) are included so that the context holds every input of the vault identity other than the roots: a given recovery key can then only ever sign for one vault. The label `BUNKER-KDF-4` also fixes the message formats in §3; a change to either format needs a new label, so that an existing recovery key is never asked to sign a second encoding.
 
 | Output | IKM | info | Length |
 |---|---|---|---|
-| `R[e]` | `M` | `ctx || 0x01 || e (8)` | 1,088 |
+| `R[e]` | `M` | `ctx || 0x01 || e (8)` | 1,120 |
 | `S[e]` | `M` | `ctx || 0x02 || e (8)` | 32 |
-| `K[e][i]` | `S[e]` | `ctx || 0x03 || e (8) || i (8)` | 1,088 |
+| `K[e][i]` | `S[e]` | `ctx || 0x03 || e (8) || i (8)` | 1,120 |
 
-The role byte makes the three derivations disjoint. 1,088 bytes is within HKDF-SHA256's 8,160-byte limit. `root(x)` is the existing Winternitz Merkle commitment of a 1,088-byte secret (`rootFromSecret`). An operational signer holding `S[e]` cannot compute `M`, any `R`, or `S[e+1]`.
+The role byte makes the three derivations disjoint. 1,120 bytes is within HKDF-SHA256's 8,160-byte limit. A one-time key is the 34 LM-OTS chain starts `x[0..33]` (1,088 bytes) followed by a 32-byte randomizer seed (§1.3). An operational signer holding `S[e]` cannot compute `M`, any `R`, or `S[e+1]`.
 
 ### 1.2 Vault identity
 
@@ -45,9 +45,34 @@ vault_id = SHA-256( "BUNKER3_VAULT_ID" (16) || salt (32) || chain_tag (32) || op
 
 The preimage after the domain is exactly the data of `initialize` (§4.0). The program computes `vault_id` itself and derives the vault address from it, so **a vault address commits to every parameter the vault is created with**. Whoever sends `initialize` for an address, and in whatever order, the only vault that can exist there is the one with those roots, that chain tag, that waiting period and those trusted destinations. A client that derives the address from its own recovery kit therefore needs no trust in who created the account or in what an RPC node reports about how it was created.
 
+### 1.3 One-time keys and signatures
+
+The signature scheme is LM-OTS, RFC 8554 section 4, with the one parameter set `LMOTS_SHA256_N32_W8` (typecode `0x00000004`): n = 32, w = 8, p = 34, signature `u32(typecode) || C (32) || y[0..33] (34 x 32)`, 1,124 bytes. Algorithm 1 (public key) and Algorithm 4b (candidate public key) are used as written; Algorithm 3 (signing) is used as written except for how the randomizer `C` is chosen (below). `docs/CRYPTOGRAPHY.md` states how this use relates to the RFC and what that leaves open.
+
+An LM-OTS key is named by an identifier `I` (16 bytes) and a number `q` (u32). LM-OTS is used here outside an LMS tree, so `q` is always zero, as section 4 of the RFC requires, and `I` is different for every key:
+
+```
+I(role, e, i) = first 16 bytes of SHA-256( "BUNKER3_LMOTS_ID" (16) || program_id (32) || chain_tag (32) || salt (32) || role (1) || e (8, LE) || i (8, LE) )
+
+operational key K[e][i]:   I = I(0x01, e, i),   q = 0
+recovery key    R[e]:      I = I(0x02, e, 0),   q = 0
+```
+
+`role` is the role byte of the message the key signs (§3). **`root(x)`**, wherever this document says a vault stores a root, is the LM-OTS public key `K` of Algorithm 1 for the key's chain starts under its `I`:
+
+```
+op_root  = root(K[epoch][op_index])        rec_root = root(R[epoch])
+```
+
+A consequence: a root is only usable in the position it was computed for. The next operational root named by an announcement is the key for index `i + 1` of the same epoch; the roots named by a recovery packet are the recovery key of epoch `e + 1` and the operational key at index 0 of epoch `e + 1`.
+
+**Randomizer.** With `seed` the last 32 bytes of the one-time key, candidate randomizers are `C[n] = HKDF-SHA256(IKM = seed, empty salt, info = "BUNKER-LMOTS-C" (14) || n (4, LE), 32 bytes)` for n = 0, 1, 2, .... The signer uses the first whose signature verifies within the step limit below. Signing the same message with the same key therefore always yields the same bytes.
+
+**Step limit.** Verifying takes `sum(255 - a[i])` chain steps over the 34 digits `a` of `Q || Cksm(Q)`, which is always `255 * (h + 2)` for `h` the high byte of the checksum. The program refuses any signature that would take more than **4,080** steps (`h > 14`), before walking any chain. About 28.3% of digests are within the limit. A signature within it is an ordinary RFC 8554 signature.
+
 ## 2. Accounts
 
-### 2.1 Vault — 415 bytes, PDA `["bunker3", vault_id]`
+### 2.1 Vault — 447 bytes, PDA `["bunker3", vault_id]`
 
 | Offset | Bytes | Field |
 |---|---:|---|
@@ -70,10 +95,11 @@ The preimage after the domain is exactly the data of `initialize` (§4.0). The p
 | 254 | 32 | pending `digest`, SHA-256 of the announced message |
 | 286 | 1 | PDA bump |
 | 287 | 128 | `trusted`: four 32-byte wallet addresses, immutable. Unused slots are zero and come last; no wallet appears twice |
+| 415 | 32 | `salt`, immutable; the salt of §1.1, kept so the program can name the vault's signers (§1.3) |
 
 When `pending` is 0, bytes 157..286 must be zero. The vault is never closed. At most one pending record exists.
 
-### 2.2 Proof — 1,162 bytes, PDA `["proof", payer, digest]`
+### 2.2 Proof — 1,198 bytes, PDA `["proof", payer, digest]`
 
 | Offset | Bytes | Field |
 |---|---:|---|
@@ -81,7 +107,7 @@ When `pending` is 0, bytes 157..286 must be zero. The vault is never closed. At 
 | 8 | 32 | Fee payer that created it |
 | 40 | 32 | SHA-256 of the signed message |
 | 72 | 2 | Bytes written so far, little endian |
-| 74 | 1,088 | Signature |
+| 74 | 1,124 | Signature |
 
 Written in append-only chunks of at most 600 bytes each; the reference client uses two. Re-sending bytes identical to those already stored succeeds; different bytes fail. Only the fee payer that created it can close it and reclaim its rent. Closing zeroes the account, shrinks it to nothing and returns it to the system program, so the same address can be staged again. A proof account carries a signature; it never carries authority, and closing it revokes nothing. Any fee payer may pass any complete proof account to `announce` or `recover`: what is checked is the signature in it.
 
@@ -178,11 +204,11 @@ Malformed input (a wrong length, a wrong account, an unknown opcode) fails with 
 
 ### 4.0 `initialize` — data: `salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4) || trusted (4 x 32)`
 
-Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, the trusted list in canonical form (used slots first, unused slots zero, no duplicates), and the vault account to be the address derived from `vault_id = SHA-256("BUNKER3_VAULT_ID" || data)` (§1.2). Creates the vault with that `vault_id`, `op_index = 0`, `epoch = 0`, `pending = 0`. The salt is not stored. A prefunded address must not block creation, no wallet key gains any authority over the vault, and a second `initialize` for an existing vault fails. Because the address fixes the data, creation is safe to race: a stranger who sends the same data first has created the owner's vault, and one who sends different data has created a vault at a different address.
+Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, the trusted list in canonical form (used slots first, unused slots zero, no duplicates), and the vault account to be the address derived from `vault_id = SHA-256("BUNKER3_VAULT_ID" || data)` (§1.2). Creates the vault with that `vault_id`, `op_index = 0`, `epoch = 0`, `pending = 0`, and the salt. A prefunded address must not block creation, no wallet key gains any authority over the vault, and a second `initialize` for an existing vault fails. Because the address fixes the data, creation is safe to race: a stranger who sends the same data first has created the owner's vault, and one who sends different data has created a vault at a different address.
 
 ### 4.1 `stage` — data: `digest (32) || offset (2) || chunk (1..600)`
 
-The proof account must be the address derived from the payer and `digest`, and the third account must be the system program on every chunk. The first chunk (offset 0) creates it and records the payer and digest. A later chunk must start exactly where the stored bytes end, or lie wholly inside them and be identical. `offset + len(chunk) ≤ 1,088`.
+The proof account must be the address derived from the payer and `digest`, and the third account must be the system program on every chunk. The first chunk (offset 0) creates it and records the payer and digest. A later chunk must start exactly where the stored bytes end, or lie wholly inside them and be identical. `offset + len(chunk) ≤ 1,124`.
 
 ### 4.2 `announce` — data: the 196-byte payload
 
@@ -196,7 +222,7 @@ Checks. All must pass; the order below is for reading, and differs from the orde
 5a. For SPL: exactly seven accounts, the seventh being the account at `mint`, owned by the classic token program, unpacking as a mint, with `decimals` equal to the payload's. For SOL: exactly six accounts. A classic mint can never be closed or change owner, so what is checked here still holds at execution. A Token-2022 mint, a mistyped mint and a token account named as a mint are all refused here, before any key is retired.
 6. `next_op_root` nonzero, differs from `op_root` and `rec_root`, its marker in this vault absent.
 7. Proof account owner, magic, full length, and digest equal to SHA-256 of the recomputed message.
-8. Signature verifies against `op_root`.
+8. The signature is a well-formed LM-OTS signature within the step limit whose candidate public key under `I(0x01, epoch, op_index)` and `q = 0` equals `op_root` (§1.3).
 
 Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + wait`, where `wait` is zero if the destination is trusted (below) and `delay_secs` otherwise, `deadline = opens_at + max(wait, 86,400)`, `epoch`, `digest`. **No lamports or tokens move.**
 
@@ -213,7 +239,7 @@ Requires `pending == 1` and `now > deadline`. Zeroes the pending record. Moves n
 
 ### 4.5 `recover` — data: the 138-byte payload
 
-Checks: vault as above; payload version and role; `vault_id`, `chain_tag` and `epoch` equal the stored values; `next_rec_root` and `next_op_root` nonzero, distinct from each other and from the current `rec_root`, both of their markers in this vault absent; proof digest; signature verifies against `rec_root`.
+Checks: vault as above; payload version and role; `vault_id`, `chain_tag` and `epoch` equal the stored values; `next_rec_root` and `next_op_root` nonzero, distinct from each other and from the current `rec_root`, both of their markers in this vault absent; proof digest; the signature is a well-formed LM-OTS signature within the step limit whose candidate public key under `I(0x02, epoch, 0)` and `q = 0` equals `rec_root` (§1.3).
 
 **`recover` neither reads nor marks the operational root.** The operational signer chooses each next operational root freely and can install any 32 bytes there, including a root that this packet, or a later one, names. If recovery compared the packet with that root, or marked that root spent, a stolen day key with sight of a packet could make this recovery or a future one fail for good. The displaced operational root is simply overwritten. That is safe because every announcement names its epoch: a signature made under a root in epoch `e` can never be accepted once the epoch has moved on, whether or not that root is ever installed again.
 
@@ -274,7 +300,7 @@ A Solana program cannot read the genesis hash. `chain_tag` is 32 bytes chosen at
 These are trust assumptions, not program guarantees.
 
 0. **A recovery packet is not secret, and nothing may rely on it being so.** It is uploaded to a website and broadcast. The protocol must hold against someone who has read it before it lands.
-1. The recovery tool exposes no general signing interface. Its only output for epoch `e` is the packet in §3.2, built from derived values. The claim that re-deriving and re-emitting the identical packet is safe rests on the message being byte-identical; it must be reviewed against the actual Winternitz construction.
+1. The recovery tool exposes no general signing interface. Its only output for epoch `e` is the packet in §3.2, built from derived values. The claim that re-deriving and re-emitting the identical packet is safe rests on the message being byte-identical; it must be reviewed against the LM-OTS construction and the derived randomizer of §1.3.
 2. `M` never enters the everyday web application. The operational signer receives `S[e]` only.
 3. One active operational signer per epoch, with a durable record written before signing. Two devices holding `S[e]` can still sign two different announcements at the same `(e, i)`; the chain accepts at most one, and the correct response to any doubt is `recover`, never a second signature.
 4. A restore without a trustworthy operational record must not sign with `K[e][i]`. It recovers to `e + 1` first.
@@ -291,26 +317,27 @@ These are trust assumptions, not program guarantees.
 - Root reuse: `next_op_root` or `next_rec_root` equal to any current or spent root, and to each other.
 - Isolation: a second vault holding the first vault's current, recovery or next root, recovered or announced in any order, leaves the first unaffected; `initialize` for an address with any parameter changed fails; `initialize` raced with identical parameters yields the intended vault.
 - Failed `execute` (frozen destination, closed token account, insufficient rent) leaves the record intact and retryable; `recover` then clears it.
-- Counter limits at `u64::MAX` for `epoch` and `op_index`; `opens_at` and `deadline` overflow.
+- Counter limits at `u64::MAX` for `epoch` and `op_index`, and an operation index beyond 32 bits; `opens_at` and `deadline` overflow.
 - Compute-unit measurements for `announce` and `recover` (one verification each, one and two marker creations).
 
 ## Implementation status
 
-`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. `sdk/v3` is the TypeScript client: `derive.ts` (section 1.1), `core.ts` (addresses, the vault identity and the recovery packet's bytes, with no Solana library), `master.ts` (everything computed from the archival master, including the fixed recovery packet), `protocol.ts` (encodings, vault parsing and instruction builders) and `authority.ts` (announcement signing from an epoch seed). `tools/cli` is a command-line client over the same code. `sdk/v3/kit.ts` defines the two key files (archival kit and day key), `sdk/v3/journal.ts` the operational signing journal, and `sdk/v3/chain.ts` the vault and clock reads. A draft web interface exists: the rebuilt `/vault` (open with a day key, deposit, announce, countdown, release, clear, seal) and `/recovery`, which only submits public files. **The archival master is handled only by the offline recovery tool** (`tools/recovery`, built by `scripts/build-recovery-tool.mjs` into one self-contained HTML file). Its own Content Security Policy sets `default-src 'none'` and `connect-src 'none'` and pins the inline script by hash; the build publishes the file's SHA-256. The tool and the site exchange three public file types defined in `sdk/v3/requests.ts`: a network card (site to tool), a creation request (the salt, two commitments and the waiting period; the site recomputes the vault address from them and refuses a request that does not match) and a recovery packet (payload and signature). The site verifies a packet's signature against the on-chain recovery commitment before submitting it. Remaining gaps for this separation: the tool is served from the same domain as the site, so a compromised site could serve a different file, and only the published hash and reproducible build let a user detect that; the day key is still opened in the site's origin by design; and a browser on an online device is not an air gap. The interface handles SOL and classic SPL tokens; for a token the recipient's associated token account is created when the withdrawal is announced, so it exists when a waiting withdrawal is released. A day key can optionally be saved on a device under a passkey (`sdk/v3/passkey.ts`): it is encrypted with a key derived from the authenticator's WebAuthn PRF output and only the ciphertext is stored in the browser. That protects a day key at rest on one device; it is not a backup and does not involve the archival master.
+`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. `crates/bunker-lmots` is the LM-OTS verifier it calls (section 1.3). `sdk/v3` is the TypeScript client: `derive.ts` (section 1.1), `onetime.ts` over `sdk/lmots.ts` (section 1.3), `core.ts` (addresses, the vault identity and the recovery packet's bytes, with no Solana library), `master.ts` (everything computed from the archival master, including the fixed recovery packet), `protocol.ts` (encodings, vault parsing and instruction builders) and `authority.ts` (announcement signing from an epoch seed). `tools/cli` is a command-line client over the same code. `sdk/v3/kit.ts` defines the two key files (archival kit and day key), `sdk/v3/journal.ts` the operational signing journal, and `sdk/v3/chain.ts` the vault and clock reads. A draft web interface exists: the rebuilt `/vault` (open with a day key, deposit, announce, countdown, release, clear, seal) and `/recovery`, which only submits public files. **The archival master is handled only by the offline recovery tool** (`tools/recovery`, built by `scripts/build-recovery-tool.mjs` into one self-contained HTML file). Its own Content Security Policy sets `default-src 'none'` and `connect-src 'none'` and pins the inline script by hash; the build publishes the file's SHA-256. The tool and the site exchange three public file types defined in `sdk/v3/requests.ts`: a network card (site to tool), a creation request (the salt, two commitments and the waiting period; the site recomputes the vault address from them and refuses a request that does not match) and a recovery packet (payload and signature). The site verifies a packet's signature against the on-chain recovery commitment before submitting it. Remaining gaps for this separation: the tool is served from the same domain as the site, so a compromised site could serve a different file, and only the published hash and reproducible build let a user detect that; the day key is still opened in the site's origin by design; and a browser on an online device is not an air gap. The interface handles SOL and classic SPL tokens; for a token the recipient's associated token account is created when the withdrawal is announced, so it exists when a waiting withdrawal is released. A day key can optionally be saved on a device under a passkey (`sdk/v3/passkey.ts`): it is encrypted with a key derived from the authenticator's WebAuthn PRF output and only the ciphertext is stored in the browser. That protects a day key at rest on one device; it is not a backup and does not involve the archival master.
 
 | Evidence | Where | Count |
 |---|---|---:|
-| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 24 |
-| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 25 |
-| Isolation, on the same VM: a stolen day key paying trusted wallets at once and a stranger only after a cancellable wait, a malformed trusted list, a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 15 |
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 25 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 30 |
+| Isolation, on the same VM: a stolen day key paying trusted wallets at once and a stranger only after a cancellable wait, a malformed trusted list, a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, a root copied under another salt, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 16 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
-| The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
+| The client's vectors against an independent Rust derivation (RustCrypto HKDF) of every key, public key and signature, byte for byte, including one whose first candidate randomizer is over the step limit; the program's verifier; and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
+| LM-OTS against RFC 8554 Appendix F, in Rust and in TypeScript. Test Case 1: both signatures verify to the candidate keys that lead, through the printed Merkle paths, to the printed LMS public keys. Test Case 2: from the printed private key, signing reproduces the printed signature and the public key leads to the printed LMS public key | `programs/bunker3-svm-tests/tests/rfc8554.rs`, `tests/lmots.test.ts`, `cargo test -p bunker-lmots` | 4, 9, 7 |
 
-The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; the signing recovery root retired and the displaced operational root left unmarked; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; a classic SPL withdrawal including a frozen destination that later thaws; and eleven wrong sets of token accounts for `execute` (a source owned by someone else, of another mint, with a delegate, with a close authority, or not owned by the token program; source equal to destination; another mint; another program in place of the token program; an unrecorded destination; missing and extra accounts), each leaving the record and balances untouched.
+The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; the signing recovery root retired and the displaced operational root left unmarked; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; a correct signature made under another index, role, generation, salt, chain or program; malformed signatures and other typecodes; a correct signature over the step limit, and the cost at the limit; an operation index beyond 32 bits; the heaviest client transaction inside the requested compute limit; a classic SPL withdrawal including a frozen destination that later thaws; and eleven wrong sets of token accounts for `execute` (a source owned by someone else, of another mint, with a delegate, with a close authority, or not owned by the token program; source equal to destination; another mint; another program in place of the token program; an unrecorded destination; missing and extra accounts), each leaving the record and balances untouched.
 
-Each of the following checks was removed in turn and the suite confirmed to fail (an earlier entry, retiring the displaced operational root, is gone because that rule was itself removed): the waiting period, signature verification, clearing the record on recovery, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`.
+Each of the following checks was removed in turn and the suite confirmed to fail (an earlier entry, retiring the displaced operational root, is gone because that rule was itself removed): the waiting period, signature verification, clearing the record on recovery, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`. For the signature verifier, nineteen further changes were each made and each caught: the step limit, the typecode check, either checksum digit, the chain index, step number or `q` left out of a chain hash, the randomizer or the last message part left out of the message hash, the comparison with the stored root, each of the six inputs of the identifier, the recovery identifier taking the operation index, and `q` set to one.
 
-Measured on that VM with the 1,400,000-unit limit: `announce` about 563,000 compute units and `recover` about 531,000 for the test messages. The cost follows the message digest, about 120 units per chain hash; observed announcements ranged from 470,000 to 626,000, and the worst possible digest extrapolates to about 1,055,000 for `announce` and 1,100,000 for `recover`, inside the limit.
+Measured on that VM: `announce` 568,040 compute units for a signature at the step limit of §1.3, which is the most signature verification can cost, and `recover` about 540,000. The reference client requests 800,000, and every VM test runs under that limit; the heaviest transaction the client builds (a token withdrawal to the last of four trusted wallets with a signature at the limit, creating the recipient's token account, announcing, releasing and closing the proof) used 603,120. A signature over the limit is refused for under 40,000 units. (The construction used before LM-OTS had no limit and could need over a million.)
 
 | Public file formats (rejecting secrets, mismatched vaults, a packet whose stated epoch differs from its signed payload, and signatures from another master) and the tool page's policy | `tests/requests-v3.test.ts` | 5 |
 | Randomized: 20,000 sequences of up to 40 interleaved announce, execute, expire, recover and time steps (a quarter corrupted) against invariants, with an operational signer that chooses its next roots adversarially (the current roots, marked roots, and the roots of this and the next recovery packet) and a model of the spent markers; the undamaged recovery packet must always land. And 300,000 arbitrary inputs to every decoder. Fixed seed, no external crates | `programs/bunker3/tests/model.rs` | 2 |
@@ -331,7 +358,8 @@ An internal design review (three reviewers; recorded in `docs/INTERNAL-REVIEW.md
 
 Each is a decision this draft made provisionally and wants challenged.
 
-1. **Deterministic recovery signature.** Is one fixed message per recovery key, re-emitted byte-identically, acceptable for this Winternitz construction, including after a crash between derivation and submission? If not, the recovery role needs a different, separately reviewed scheme.
+0. **The signature scheme.** *Changed after the internal design review:* LM-OTS as specified in RFC 8554 replaced a plain iterated-SHA-256 Winternitz construction. It is used on its own in a chain, as section 4 of the RFC permits (`q = 0`), not inside the LMS tree the RFC's cited analyses cover; the identifier is derived from the vault rather than random; and the randomizer is derived and selected (§1.3; `docs/CRYPTOGRAPHY.md`). Each of those three choices wants an outside cryptographer's judgement.
+1. **Deterministic recovery signature.** Is one fixed message per recovery key, re-emitted byte-identically, acceptable for LM-OTS with the derived randomizer of §1.3, including after a crash between derivation and submission? If not, the recovery role needs a different, separately reviewed scheme.
 2. **`epoch` doubles as the recovery index.** It removes a counter and a class of mismatch. Is there a case that needs them to diverge?
 3. **`announce_by` at all.** Announcement rotates the operational root, so an unlanded announcement leaves the on-chain root unchanged and the off-chain key consumed; `recover` resolves that. Dropping the field would remove a time check but let an old signed announcement land at any later time.
 4. **Unix seconds rather than slots.** `Clock::unix_timestamp` is validator-reported and can drift. A waiting period of an hour or more is large relative to plausible drift; the boundary tests in §8 should state the assumed bound.
@@ -346,5 +374,5 @@ Each is a decision this draft made provisionally and wants challenged.
 13. **The recorded `digest` is not read by the program.** It identifies the announcement for clients and alerts. Keep it, or drop 32 bytes from the layout?
 14. **Token decimals shown before signing came from the RPC.** *Decided:* the decimal places are part of the signed announcement and the program checks them against the mint (§3.1, §4.2 5a). A network connection that misreports them now causes a refused announcement, not a different amount. Balances shown are still whatever the connection reports.
 15. **No way to withdraw a pending record except execution, expiry or recovery.** A record that cannot execute (the recipient closed or froze the token account, the destination became a program, a Token-2022 mint was named) held the single pending slot for the waiting period plus seven days. **Decided:** the mint is checked at announcement (§4.2 5a) and the execution window is the waiting period again with a one-day floor (§4.2), so the remaining cases (a recipient who closes or freezes their token account) block the vault for at most the waiting period plus that window. A cancel signed by the operational key was considered and rejected for this version: it needs a second operational message type and consumes a key, and it would invite owners to "cancel" a thief's withdrawal when the only correct response is recovery.
-16. **`announce` and `recover` need most of a transaction's compute budget** (up to about 1.06M and 1.1M units for the worst digest). They work only as top-level instructions with an explicit 1.4M limit; a caller that wraps them in another program or bundles other work beside them can push a valid signature over the limit. Is that acceptable, or should the verifier be made cheaper?
+16. **`announce` and `recover` cost up to about 575,000 compute units.** *Changed:* an earlier draft could need 1.1M of the 1.4M a transaction may use. The step limit of §1.3 now caps verification, at the price of the signer discarding about three randomizers in four. Is selecting the randomizer by a public property of the digest acceptable, and is 4,080 the right limit?
 17. **Trusted destinations are immutable and identified by wallet.** Is four the right number? Should a vault be able to add one after a waiting period of its own, at the price of a second recovery-signed message type? Is matching only the associated token account the right rule for tokens?

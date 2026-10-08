@@ -12,23 +12,15 @@ use solana_signer::Signer;
 use solana_system_interface::instruction as system_instruction;
 use solana_transaction::Transaction;
 use std::str::FromStr;
-use winterwallet_core::WinternitzKeypair;
+mod common;
+use common::{root, root_in, sign_in, CHAIN, PROOF_LEN};
 
-const PHRASE: &str =
-    "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
 const T0: i64 = 1_800_000_000;
 const DAY: i64 = 86_400;
 const SOL: u64 = 1_000_000_000;
-const CHAIN: [u8; 32] = [9u8; 32];
 
 fn system() -> Pubkey {
     Pubkey::default()
-}
-fn key(tag: u32) -> WinternitzKeypair {
-    WinternitzKeypair::from_mnemonic_at(PHRASE, 0, 0, tag).unwrap()
-}
-fn root(tag: u32) -> [u8; 32] {
-    *key(tag).derive::<32>().to_pubkey().merklize().as_bytes()
 }
 
 /// One party: a fee wallet and the vault its parameters derive.
@@ -50,7 +42,7 @@ struct World {
 impl World {
     fn new() -> Self {
         let mut svm = LiteSVM::new();
-        let program = Pubkey::new_unique();
+        let program = Pubkey::new_from_array(common::PROGRAM);
         let so = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/bunker3.so");
         svm.add_program_from_file(program, so).expect("build bunker3.so first");
         let mut w = Self { svm, program, now: T0 };
@@ -93,7 +85,7 @@ impl World {
         let budget = Instruction {
             program_id: Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap(),
             accounts: vec![],
-            data: [vec![2u8], 1_400_000u32.to_le_bytes().to_vec()].concat(),
+            data: [vec![2u8], 800_000u32.to_le_bytes().to_vec()].concat(),
         };
         let all = [vec![budget], ixs.to_vec()].concat();
         let tx = Transaction::new_signed_with_payer(&all, Some(&signer.pubkey()), &[signer], self.svm.latest_blockhash());
@@ -149,7 +141,7 @@ impl World {
         }
     }
     fn stage(&mut self, p: &Party, tag: u32, message: &[u8]) -> Pubkey {
-        let bytes = key(tag).derive::<32>().sign(&[message]).as_bytes().to_vec();
+        let bytes = sign_in(&p.salt, tag, message);
         let digest = hashv(&[message]).to_bytes();
         for offset in [0usize, 600] {
             let ix = self.stage_ix(&p.payer.pubkey(), &digest, offset as u16, &bytes[offset..(offset + 600).min(bytes.len())]);
@@ -234,10 +226,12 @@ fn retiring_a_root_in_one_vault_does_not_retire_it_in_another() {
     // The stranger copies each root the owner depends on: the live operational
     // root, the live recovery root and the next operational root.
     for (salt, copied) in [(60u8, root(1)), (61, root(100)), (62, root(2))] {
-        let stranger = w.party(salt, copied, root(500), 0);
+        // The stranger's own recovery key belongs to the stranger's salt.
+        let own = |tag| root_in(&[salt; 32], tag);
+        let stranger = w.party(salt, copied, own(500), 0);
         w.init(&stranger, 0);
-        w.recover(&stranger, 500, 0, root(501), root(502)).unwrap();
-        assert!(w.spent(&stranger, &root(500)) && !w.spent(&owner, &copied));
+        w.recover(&stranger, 500, 0, own(501), own(10)).unwrap();
+        assert!(w.spent(&stranger, &own(500)) && !w.spent(&owner, &copied));
     }
     let destination = Pubkey::new_unique();
     w.announce(&owner, 1, 0, 0, destination, SOL, root(2)).unwrap();
@@ -250,13 +244,15 @@ fn retiring_a_root_in_one_vault_does_not_retire_it_in_another() {
     assert_eq!(w.lamports(&destination), 0);
 }
 
-/// The same owner can also reuse one root across two vaults of their own
-/// without either blocking the other.
+/// Two vaults can hold the same root without either blocking the other. A
+/// key is bound to the salt, so the two here share a salt and differ in their
+/// waiting period. (The client never does this: its keys also depend on the
+/// waiting period. Signing in both vaults with one key is one-time-key reuse.)
 #[test]
 fn two_vaults_may_hold_the_same_root() {
     let mut w = World::new();
     let a = w.party(7, root(1), root(100), 0);
-    let b = w.party(8, root(1), root(100), 0);
+    let b = w.party(7, root(1), root(100), 60);
     assert_ne!(a.vault, b.vault);
     w.init(&a, 10 * SOL);
     w.init(&b, 10 * SOL);
@@ -318,7 +314,7 @@ fn a_closed_proof_can_be_staged_again() {
         accounts: vec![AccountMeta::new(proof, false), AccountMeta::new(p.payer.pubkey(), true)],
         data: vec![6u8],
     };
-    let rent = w.svm.minimum_balance_for_rent_exemption(1162);
+    let rent = w.svm.minimum_balance_for_rent_exemption(PROOF_LEN);
     let refund = system_instruction::transfer(&p.payer.pubkey(), &proof, rent);
     w.send(&p.payer, &[close.clone(), refund]).unwrap();
     let a = w.svm.get_account(&proof).unwrap();
@@ -326,7 +322,7 @@ fn a_closed_proof_can_be_staged_again() {
     assert!(w.send(&p.payer, &[close.clone()]).is_err(), "nothing left to close");
     let proof = w.stage(&p, 1, &message);
     let a = w.svm.get_account(&proof).unwrap();
-    assert_eq!((a.owner, a.data.len(), &a.data[40..72]), (w.program, 1162, &digest[..]));
+    assert_eq!((a.owner, a.data.len(), &a.data[40..72]), (w.program, PROOF_LEN, &digest[..]));
     // And a plain close leaves no account behind.
     w.send(&p.payer, &[close]).unwrap();
     assert!(w.svm.get_account(&proof).is_none_or(|a| a.lamports == 0 && a.data.is_empty()));
@@ -577,7 +573,7 @@ fn stage_requires_the_system_program_on_every_chunk() {
     let p = w.party(7, root(1), root(100), 0);
     let message = b"any message".to_vec();
     let digest = hashv(&[&message]).to_bytes();
-    let bytes = key(1).derive::<32>().sign(&[&message]).as_bytes().to_vec();
+    let bytes = sign_in(&p.salt, 1, &message);
     let first = w.stage_ix(&p.payer.pubkey(), &digest, 0, &bytes[..600]);
     w.send(&p.payer, &[first]).unwrap();
     let mut second = w.stage_ix(&p.payer.pubkey(), &digest, 600, &bytes[600..]);
@@ -597,7 +593,8 @@ fn a_stolen_day_key_can_only_pay_trusted_wallets_without_waiting() {
     w.init(&owner, 10 * SOL);
     let d = w.vault_data(&owner);
     assert_eq!((&d[287..319], &d[319..351]), (&cold.to_bytes()[..], &exchange.to_bytes()[..]));
-    assert!(d[351..].iter().all(|b| *b == 0));
+    assert!(d[351..415].iter().all(|b| *b == 0));
+    assert_eq!(&d[415..447], &owner.salt, "the salt is kept after the trusted wallets");
     // To a trusted wallet: released in the same moment, no waiting.
     w.announce(&owner, 1, 0, 0, cold, SOL, root(2)).unwrap();
     w.execute(&owner, cold).unwrap();
@@ -658,3 +655,26 @@ fn a_malformed_trusted_list_cannot_create_a_vault() {
     w.send(&payer, &[ix]).unwrap();
 }
 
+
+/// A key is bound to the vault's salt: a vault that copies another vault's
+/// roots under a different salt cannot be signed for with the original keys.
+#[test]
+fn a_root_copied_under_another_salt_cannot_be_signed_for() {
+    let mut w = World::new();
+    let owner = w.party(7, root(1), root(100), 0);
+    let copy = w.party(8, root(1), root(100), 0);
+    w.init(&owner, 10 * SOL);
+    w.init(&copy, 10 * SOL);
+    // The owner's keys, signing where they belong for the owner's salt, placed
+    // in the copy: refused for both roles.
+    let as_owner = Party { payer: copy.payer.insecure_clone(), salt: owner.salt, ..party_like(&copy) };
+    assert!(w.announce(&as_owner, 1, 0, 0, Pubkey::new_unique(), SOL, root(2)).is_err());
+    assert!(w.recover(&as_owner, 100, 0, root(101), root(10)).is_err());
+    assert!(!w.spent(&copy, &root(1)) && !w.spent(&copy, &root(100)));
+    // The same keys work in the vault they were made for.
+    w.announce(&owner, 1, 0, 0, Pubkey::new_unique(), SOL, root(2)).unwrap();
+    w.recover(&owner, 100, 0, root(101), root(10)).unwrap();
+}
+fn party_like(p: &Party) -> Party {
+    Party { payer: p.payer.insecure_clone(), salt: p.salt, op: p.op, rec: p.rec, delay: p.delay, trusted: p.trusted.clone(), id: p.id, vault: p.vault }
+}

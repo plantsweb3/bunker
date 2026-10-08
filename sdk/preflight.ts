@@ -6,7 +6,7 @@ import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "./classic-token";
 import type { Asset } from "./client";
 import { formatAmount } from "./bytes";
-export const PROOF_ACCOUNT_SIZE = 1162;
+export const PROOF_ACCOUNT_SIZE = 1198;
 export const SPENT_MARKER_SIZE = 8;
 export const TOKEN_ACCOUNT_SIZE = 165;
 /** Three transactions plus headroom; fees are 5,000 lamports per signature. */
