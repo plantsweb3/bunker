@@ -1,7 +1,14 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getConfig, getRpcUrl } from "@/lib/bunker-config";
+/** The answer changes only when a program is deployed or its authority moves.
+ * Remembering it briefly keeps this public endpoint from being a way to spend
+ * the site's RPC quota. */
+let remembered: { at: number; body: unknown } | null = null;
+const REMEMBER_MS = 60_000;
 export async function GET() {
   const config = getConfig();
+  if (remembered && Date.now() - remembered.at < REMEMBER_MS)
+    return Response.json(remembered.body, { headers: { "Cache-Control": "no-store" } });
   const base = {
     network: config.network,
     program: config.programId,
@@ -46,14 +53,13 @@ export async function GET() {
               ? new PublicKey(d.data.subarray(13, 45)).toBase58()
               : "Unknown";
     }
-    return Response.json(
-      {
-        ...base,
-        deployment: "Executable on configured test network",
-        upgradeAuthority: authority,
-      },
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    const body = {
+      ...base,
+      deployment: "Executable on configured test network",
+      upgradeAuthority: authority,
+    };
+    remembered = { at: Date.now(), body };
+    return Response.json(body, { headers: { "Cache-Control": "no-store" } });
   } catch {
     return Response.json(
       {

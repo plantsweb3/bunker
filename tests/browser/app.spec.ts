@@ -154,6 +154,19 @@ test("unknown paths are served with the browser policy too", async ({
   );
   await expect(page.locator("h1")).toBeVisible();
 });
+test("paths outside the page policy still cannot run anything", async ({ request }) => {
+  // Not-found responses under prefixes the proxy skips.
+  for (const path of ["/api/nope", "/_next/nope", "/assets/nope", "/brand/nope", "/x/opengraph-image-nope"]) {
+    const r = await request.get(path);
+    expect(r.headers()["content-security-policy"], path).toContain("default-src 'none'");
+  }
+  // The recovery tool is handed over as a download and never runs on this origin.
+  const tool = await request.get("/source/bunker-recovery-tool.html");
+  expect(tool.status()).toBe(200);
+  expect(tool.headers()["content-disposition"]).toContain("attachment");
+  expect(tool.headers()["content-security-policy"]).toContain("sandbox");
+  expect((await request.get("/source/nope.html")).headers()["content-security-policy"]).toContain("sandbox");
+});
 test("server rejects mainnet transaction submission", async ({ request }) => {
   const r = await request.post("/api/rpc", {
     data: {
