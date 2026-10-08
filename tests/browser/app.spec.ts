@@ -57,6 +57,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/vault",
     "/demo",
     "/check",
+    "/recovery",
     "/integrate",
     "/emergency",
     "/terms",
