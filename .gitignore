@@ -64,3 +64,6 @@ id.json
 
 # standalone in-process VM tests
 /programs/bunker3-svm-tests/target/
+
+# Written by `next dev`; never part of this repository.
+/AGENTS.md
