@@ -38,10 +38,12 @@ const stops = [
   "A drainer site that tricks your wallet into signing. A wallet signature alone cannot move what is in the vault.",
   "A stolen or leaked seed phrase. Your seed phrase does not produce the Bunker key.",
   "A reused authorization. Every successful withdrawal replaces the key in the same transaction.",
+  "A stolen Bunker key, while the wait is on. It can pay only the addresses you fixed when you built your Bunker. Anything else waits a day, and you can cancel it.",
 ];
 const limits = [
   "Malware on the device where you open your keys. It can copy a key file and record its password.",
-  "A stolen day key, if you chose no waiting period. Whoever has it and its password can withdraw at once. With a waiting period, a thief can only pay your own trusted addresses at once; anything else waits, and you can cancel it.",
+  "A stolen day key, if you turn the wait off. Whoever has it and its password can then withdraw anywhere at once.",
+  "A trusted address that is not safe. Whoever steals your day key can send everything to a trusted address immediately, so it has to be a wallet they cannot also reach.",
   "A lost recovery kit. There is no reset and no administrator, and it is the only thing that replaces a lost key.",
 ];
 const gates = [
@@ -90,7 +92,20 @@ const faq: [string, React.ReactNode][] = [
       A hardware wallet keeps your key off your computer. It still signs
       whatever you approve, including a drainer’s transaction. Bunker does a
       different job: assets in the vault cannot be moved by your wallet’s
-      signature at all. The two work together.
+      signature at all. The two work together, and a hardware wallet is the
+      ideal trusted address for a Bunker to pay out to.
+    </>,
+  ],
+  [
+    "What if someone steals my Bunker key?",
+    <>
+      When you build a Bunker you list up to four trusted addresses and
+      choose how long anything else waits, 24 hours unless you change it. A
+      thief with your day key can send at once only to those addresses,
+      which are yours. A withdrawal anywhere else sits in public for the
+      whole wait, and your recovery kit cancels it and replaces the stolen
+      key. If you turn the wait off, a stolen day key can take everything
+      immediately.
     </>,
   ],
   [
