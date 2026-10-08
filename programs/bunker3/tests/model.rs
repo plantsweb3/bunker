@@ -130,7 +130,10 @@ fn random_interleavings_keep_every_invariant() {
                     }
                     match decode_recover(&bytes).and_then(|r| apply_recover(&mut v, &r)) {
                         Ok((old_rec, old_op)) => {
-                            assert_eq!((old_rec, old_op), (before.rec_root, before.op_root), "{context}");
+                            assert_eq!(old_rec, before.rec_root, "{context}");
+                            // Random roots never coincide with the packet's, so the displaced root is always retired here.
+                            let old_op = old_op.expect("displaced operational root");
+                            assert_eq!(old_op, before.op_root, "{context}");
                             assert_eq!((v.epoch, v.op_index, v.pending.clone()), (before.epoch + 1, 0, None), "{context}");
                             assert!(retired.insert(old_rec) && retired.insert(old_op), "{context}: an authority was used twice");
                             assert!(!retired.contains(&v.op_root) && !retired.contains(&v.rec_root) && v.op_root != v.rec_root, "{context}");

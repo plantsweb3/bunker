@@ -42,7 +42,7 @@ export function eventText(
         ? record(e.record)
         : e.lamports > 0n
           ? `−${sol(e.lamports)} since the last check`
-          : "A token withdrawal. Open your Bunker to see what moved.",
+          : "Open your Bunker to see what moved.",
       `Not you? Your day key is compromised. ${RECOVER}`,
     );
   else if (e.kind === "ended")
@@ -51,10 +51,21 @@ export function eventText(
       record(e.record),
       "Open your Bunker to see which.",
     );
+  else if (e.kind === "fell")
+    lines.push(
+      `${head}: the balance is lower by ${sol(e.lamports)} since the last check.`,
+      "One or more withdrawals left before the keys were replaced. Open your Bunker to see what moved.",
+    );
   else
     lines.push(
       `${head}: NEW KEYS were installed. Every earlier day key is dead${e.cancelled ? " and the waiting withdrawal was cancelled" : ""}.`,
       ...(e.cancelled ? [`Cancelled: ${record(e.cancelled)}`] : []),
+      ...(e.unresolved
+        ? [
+            `A withdrawal was waiting: ${record(e.unresolved)}`,
+            "It was either cancelled by this, or released just before it. Open your Bunker to see which.",
+          ]
+        : []),
       "Not you? Then someone else has your recovery kit. Withdraw everything to a new wallet immediately.",
     );
   if (link) lines.push(link);

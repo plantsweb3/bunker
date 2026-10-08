@@ -395,3 +395,31 @@ fn a_marker_from_another_vault_is_refused() {
     assert!(w.send(&p.payer, &[wrong_next]).is_err());
     w.send(&p.payer, &[right]).unwrap();
 }
+
+/// A thief with the day key who has seen the recovery packet plants one of the
+/// roots it names as the live operational root. Recovery must still land and
+/// cancel the theft, and the new epoch must work.
+#[test]
+fn a_day_key_cannot_block_recovery_by_planting_the_packets_roots() {
+    for planted in [root(10), root(101)] {
+        let mut w = World::new();
+        let owner = w.party(7, root(1), root(100), DAY as u32);
+        w.init(&owner, 10 * SOL);
+        let thief = Pubkey::new_unique();
+        // The packet for epoch 0 will name root(101) and root(10).
+        w.announce(&owner, 1, 0, 0, thief, 9 * SOL, planted).unwrap();
+        w.set_time(T0 + 3600);
+        w.recover(&owner, 100, 0, root(101), root(10)).unwrap();
+        let d = w.vault_data(&owner);
+        assert_eq!((&d[72..104], &d[120..152], d[112], d[156]), (&root(10)[..], &root(101)[..], 1, 0));
+        // The planted root was installed, not retired; the old recovery root was retired.
+        assert!(!w.spent(&owner, &planted) && w.spent(&owner, &root(100)));
+        w.set_time(T0 + 2 * DAY);
+        assert!(w.execute(&owner, thief).is_err());
+        assert_eq!(w.lamports(&thief), 0);
+        // The owner continues in the new epoch with the keys the packet installed.
+        let destination = Pubkey::new_unique();
+        w.announce(&owner, 10, 1, 0, destination, SOL, root(11)).unwrap();
+        w.recover(&owner, 101, 1, root(102), root(20)).unwrap();
+    }
+}

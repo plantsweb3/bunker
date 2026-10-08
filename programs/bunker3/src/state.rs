@@ -272,15 +272,24 @@ pub fn apply_expire(v: &mut Vault, now: i64) -> Result<(), ProgramError> {
     Ok(())
 }
 
-/// Installs a new epoch. Returns `(displaced recovery root, displaced operational
-/// root)`; the caller must mark both spent. The caller has already verified the
-/// signature against `v.rec_root`. Never touches balances and has no time guard.
-pub fn apply_recover(v: &mut Vault, r: &Recover) -> Result<([u8; 32], [u8; 32]), ProgramError> {
+/// Installs a new epoch. Returns the displaced recovery root, which the caller
+/// must mark spent, and the displaced operational root if it must be marked too.
+/// The caller has already verified the signature against `v.rec_root`. Never
+/// touches balances and has no time guard.
+///
+/// Nothing here depends on what the operational root currently is. An
+/// operational signer can install any 32 bytes as the live root, including a
+/// root this packet names; if that could make the packet fail, a stolen day
+/// key could block recovery. Such a root is simply installed: only the holder
+/// of the master can sign under it, and it is not marked spent.
+pub fn apply_recover(
+    v: &mut Vault,
+    r: &Recover,
+) -> Result<([u8; 32], Option<[u8; 32]>), ProgramError> {
     require(r.vault_id == v.vault_id && r.chain_tag == v.chain_tag && r.epoch == v.epoch)?;
-    for next in [r.next_rec_root, r.next_op_root] {
-        require(next != v.rec_root && next != v.op_root)?;
-    }
-    let displaced = (v.rec_root, v.op_root);
+    require(r.next_rec_root != v.rec_root && r.next_op_root != v.rec_root)?;
+    let reinstalled = v.op_root == r.next_rec_root || v.op_root == r.next_op_root;
+    let displaced = (v.rec_root, (!reinstalled).then_some(v.op_root));
     v.epoch = v
         .epoch
         .checked_add(1)

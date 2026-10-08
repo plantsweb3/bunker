@@ -6,7 +6,7 @@ Suggested in two phases.
 
 ## Phase 1: design, before the code is frozen
 
-- [PROTOCOL.md](PROTOCOL.md) in full, and its thirteen open questions.
+- [PROTOCOL.md](PROTOCOL.md) in full, and its fourteen open questions.
 - [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md): the findings of the project's own review and how each was resolved.
 - The vendored Winterwallet SHA-256 Winternitz scheme (N=32, checksum, Merkle commitment), distinguished from standardized constructions.
 - Whether one fixed, re-emitted recovery signature per epoch is acceptable for that scheme.

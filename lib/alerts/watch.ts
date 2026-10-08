@@ -42,12 +42,17 @@ export type Snapshot = {
   pending: PendingView | null;
 };
 export type WatchEvent =
-  | { kind: "recovered"; cancelled: PendingView | null }
+  /** `cancelled`: a waiting withdrawal the recovery certainly stopped.
+   * `unresolved`: one that was either stopped or released just before it. */
+  | { kind: "recovered"; cancelled: PendingView | null; unresolved: PendingView | null }
   | { kind: "announced"; pending: PendingView }
-  /** `count` withdrawals completed. `record` is known when one had been announced earlier. */
+  /** `count` withdrawals completed. `record` is known when one had been
+   * announced earlier; otherwise `lamports` is the SOL that left, if any. */
   | { kind: "left"; count: number; record: PendingView | null; lamports: bigint }
   /** A record ended after its deadline: released at the last moment, or cleared. */
   | { kind: "ended"; record: PendingView }
+  /** The SOL balance is lower and nothing above accounts for it. */
+  | { kind: "fell"; lamports: bigint }
   | { kind: "deposit"; lamports: bigint };
 /** Smaller SOL arrivals are not reported, so dust cannot be used to spam a chat. */
 export const MIN_DEPOSIT_ALERT_LAMPORTS = 1_000_000n;
@@ -81,31 +86,59 @@ function readSnapshot(raw: string | null): Snapshot | null {
     return null;
   }
 }
-/** What happened between two snapshots of one vault, in the order it happened. */
+/** What happened between two snapshots of one vault, in the order it happened.
+ *
+ * Only two snapshots are known, so some histories look alike. Where they do,
+ * the event says so rather than guess: a withdrawal is called cancelled only
+ * when the balance shows it did not leave. */
 export function diff(prev: Snapshot, cur: Snapshot, now: bigint): WatchEvent[] {
   const events: WatchEvent[] = [];
-  const drop = BigInt(prev.lamports) - BigInt(cur.lamports);
-  const left = (count: number, record: PendingView | null) =>
-    events.push({ kind: "left", count, record, lamports: drop > 0n ? drop : 0n });
+  const net = BigInt(prev.lamports) - BigInt(cur.lamports);
+  // SOL that left and has not yet been attributed to a known record.
+  let unexplained = net > 0n ? net : 0n;
+  /** Whether a recorded SOL withdrawal fits in what left. Null for a token. */
+  const fits = (p: PendingView) => {
+    if (p.kind !== 0) return null;
+    const amount = BigInt(p.amount);
+    if (unexplained < amount) return false;
+    unexplained -= amount;
+    return true;
+  };
   const fresh = cur.pending && cur.pending.digest !== prev.pending?.digest ? cur.pending : null;
+  const others = (done: number) => {
+    if (done > 0) {
+      events.push({ kind: "left", count: done, record: null, lamports: unexplained });
+      unexplained = 0n;
+    }
+  };
   if (BigInt(cur.epoch) > BigInt(prev.epoch)) {
-    events.push({ kind: "recovered", cancelled: prev.pending });
+    const p = prev.pending;
+    const released = p ? fits(p) : false;
+    if (p && released === true) events.push({ kind: "left", count: 1, record: p, lamports: 0n });
+    events.push({
+      kind: "recovered",
+      cancelled: p && released === false ? p : null,
+      unresolved: p && released === null ? p : null,
+    });
     // Anything announced under the new keys since.
-    const done = Number(BigInt(cur.opIndex)) - (fresh ? 1 : 0);
-    if (done > 0) left(done, null);
+    others(Number(BigInt(cur.opIndex)) - (fresh ? 1 : 0));
+    // Withdrawals made under the old keys before the recovery leave no count
+    // behind, only a lower balance.
+    if (unexplained > 0n) events.push({ kind: "fell", lamports: unexplained });
   } else {
     if (prev.pending && prev.pending.digest !== cur.pending?.digest) {
       // Release is only possible up to the deadline; clearing only after it.
-      if (now <= BigInt(prev.pending.deadline)) left(1, prev.pending);
-      else events.push({ kind: "ended", record: prev.pending });
+      if (now <= BigInt(prev.pending.deadline)) {
+        fits(prev.pending);
+        events.push({ kind: "left", count: 1, record: prev.pending, lamports: 0n });
+      } else events.push({ kind: "ended", record: prev.pending });
     }
     // Announced and already completed between two passes (no waiting period).
-    const done = Number(BigInt(cur.opIndex) - BigInt(prev.opIndex)) - (fresh ? 1 : 0);
-    if (done > 0) left(done, null);
+    others(Number(BigInt(cur.opIndex) - BigInt(prev.opIndex)) - (fresh ? 1 : 0));
   }
   if (fresh) events.push({ kind: "announced", pending: fresh });
-  if (events.length === 0 && -drop >= MIN_DEPOSIT_ALERT_LAMPORTS)
-    events.push({ kind: "deposit", lamports: -drop });
+  if (events.length === 0 && -net >= MIN_DEPOSIT_ALERT_LAMPORTS)
+    events.push({ kind: "deposit", lamports: -net });
   return events;
 }
 export async function runWatch(options: {
