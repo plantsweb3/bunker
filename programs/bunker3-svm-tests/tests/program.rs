@@ -819,3 +819,97 @@ fn classic_token_withdrawal_waits_executes_once_and_survives_a_frozen_destinatio
     assert!(e.send(&[ix]).is_err(), "at most once");
     assert_eq!(token_amount(&e, &destination), 400);
 }
+
+/// Every way of handing `execute` the wrong token accounts fails and leaves
+/// the record and both balances untouched.
+#[test]
+fn a_token_withdrawal_accepts_only_the_recorded_mint_destination_and_a_clean_vault_source() {
+    let mut e = Env::new();
+    e.init();
+    let (mint, source, destination, owner) =
+        (Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique());
+    let put_as = |e: &mut Env, key: Pubkey, data: Vec<u8>, program: Pubkey| {
+        let lamports = e.svm.minimum_balance_for_rent_exemption(data.len());
+        e.svm
+            .set_account(key, Account { lamports, data, owner: program, executable: false, rent_epoch: 0 })
+            .unwrap();
+    };
+    let put = |e: &mut Env, key: Pubkey, data: Vec<u8>| put_as(e, key, data, token_program());
+    let vault = e.vault;
+    put(&mut e, mint, mint_data(6));
+    put(&mut e, source, token_data(&mint, &vault, 900, false));
+    put(&mut e, destination, token_data(&mint, &owner, 0, false));
+    let w = Withdrawal {
+        epoch: 0,
+        index: 0,
+        kind: 1,
+        mint: mint.to_bytes(),
+        destination,
+        amount: 400,
+        announce_by: T0 + 3600,
+        next: root(2),
+    };
+    e.announce(1, &w).unwrap();
+    e.set_time(T0 + DAY);
+    let accounts = |source: Pubkey, mint: Pubkey, program: Pubkey| {
+        vec![
+            AccountMeta::new(source, false),
+            AccountMeta::new_readonly(mint, false),
+            AccountMeta::new_readonly(program, false),
+        ]
+    };
+    let other_mint = Pubkey::new_unique();
+    put(&mut e, other_mint, mint_data(6));
+    // Sources that are not a plain token account of the vault for this mint.
+    let strangers = Pubkey::new_unique();
+    put(&mut e, strangers, token_data(&mint, &owner, 900, false));
+    let wrong_mint = Pubkey::new_unique();
+    put(&mut e, wrong_mint, token_data(&other_mint, &vault, 900, false));
+    let delegated = Pubkey::new_unique();
+    let mut d = token_data(&mint, &vault, 900, false);
+    d[72..76].copy_from_slice(&1u32.to_le_bytes());
+    d[76..108].copy_from_slice(owner.as_ref());
+    d[121..129].copy_from_slice(&900u64.to_le_bytes());
+    put(&mut e, delegated, d);
+    let closable = Pubkey::new_unique();
+    let mut d = token_data(&mint, &vault, 900, false);
+    d[129..133].copy_from_slice(&1u32.to_le_bytes());
+    d[133..165].copy_from_slice(owner.as_ref());
+    put(&mut e, closable, d);
+    // The right bytes under the wrong program.
+    let imitation = Pubkey::new_unique();
+    put_as(&mut e, imitation, token_data(&mint, &vault, 900, false), system());
+    // Destinations other than the recorded one.
+    let elsewhere = Pubkey::new_unique();
+    put(&mut e, elsewhere, token_data(&mint, &owner, 0, false));
+    let attempts = [
+        ("source owned by someone else", e.execute_ix(destination, accounts(strangers, mint, token_program()))),
+        ("source of another mint", e.execute_ix(destination, accounts(wrong_mint, mint, token_program()))),
+        ("source with a delegate", e.execute_ix(destination, accounts(delegated, mint, token_program()))),
+        ("source with a close authority", e.execute_ix(destination, accounts(closable, mint, token_program()))),
+        ("source not owned by the token program", e.execute_ix(destination, accounts(imitation, mint, token_program()))),
+        ("source equal to destination", e.execute_ix(destination, accounts(destination, mint, token_program()))),
+        ("another mint account", e.execute_ix(destination, accounts(source, other_mint, token_program()))),
+        ("another program in place of the token program", e.execute_ix(destination, accounts(source, mint, system()))),
+        ("a destination that was not recorded", e.execute_ix(elsewhere, accounts(source, mint, token_program()))),
+        ("no token accounts at all", e.execute_ix(destination, vec![])),
+        ("an extra account", e.execute_ix(destination, [accounts(source, mint, token_program()), vec![AccountMeta::new_readonly(owner, false)]].concat())),
+    ];
+    for (what, ix) in attempts {
+        assert!(e.send(&[ix]).is_err(), "{what}");
+        assert!(e.pending(), "{what}: the record must survive");
+        assert_eq!((token_amount(&e, &source), token_amount(&e, &destination)), (900, 0), "{what}");
+    }
+    // A destination whose mint differs from the record's cannot receive it.
+    put(&mut e, destination, token_data(&other_mint, &owner, 0, false));
+    let ix = e.execute_ix(destination, accounts(source, mint, token_program()));
+    assert!(e.send(&[ix.clone()]).is_err(), "destination of another mint");
+    put(&mut e, destination, token_data(&mint, &owner, 0, false));
+    // More than the source holds: the token program refuses, the record stays.
+    put(&mut e, source, token_data(&mint, &vault, 399, false));
+    assert!(e.send(&[ix.clone()]).is_err(), "insufficient token balance");
+    assert!(e.pending());
+    put(&mut e, source, token_data(&mint, &vault, 900, false));
+    e.send(&[ix]).unwrap();
+    assert_eq!((token_amount(&e, &source), token_amount(&e, &destination), e.pending()), (500, 400, false));
+}
