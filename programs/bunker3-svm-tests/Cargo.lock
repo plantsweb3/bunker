@@ -526,7 +526,10 @@ dependencies = [
 name = "bunker3-svm-tests"
 version = "0.1.0"
 dependencies = [
+ "hkdf",
  "litesvm",
+ "serde_json",
+ "sha2 0.10.9",
  "solana-account",
  "solana-address 2.7.0",
  "solana-clock 3.2.1",

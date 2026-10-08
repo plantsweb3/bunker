@@ -208,18 +208,22 @@ These are trust assumptions, not program guarantees.
 
 ## Implementation status
 
-`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. Not yet written: the derivation in section 1.1, the offline recovery tool, a client SDK, and any web interface.
+`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. `sdk/v3` is the TypeScript client: `derive.ts` (section 1.1), `protocol.ts` (encodings, vault parsing and instruction builders) and `authority.ts` (the fixed recovery packet and announcement signing from an epoch seed). Not yet written: the offline recovery tool as a separately distributed artefact, a durable signing journal for protocol 3, and a web interface.
 
 | Evidence | Where | Count |
 |---|---|---:|
 | Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 16 |
 | The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests` (standalone crate; see `docs/TESTING.md`) | 20 |
+| TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 14 |
+| The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
 
 The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; both displaced roots retired; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root and as a new vault's root; the rent reserve; a forged vault account; proof staging and close; and a classic SPL withdrawal including a frozen destination that later thaws.
 
 Each of the following checks was removed in turn and the suite confirmed to fail: the waiting period, signature verification, clearing the record on recovery, retiring the displaced operational root, the vault PDA check, clearing the record after execution, destination binding, and the next-root marker check.
 
 Measured on that VM with the 1,400,000-unit limit: `announce` about 594,000 compute units, `recover` about 639,000.
+
+The client and the Rust check share one author and one reading of this document; agreement between them shows consistency, not correctness of the design.
 
 Known gaps: no fuzzing; no validator-level test of the same binary; no independent implementation of the encodings; SPL coverage is one scenario. None of this is an audit.
 
