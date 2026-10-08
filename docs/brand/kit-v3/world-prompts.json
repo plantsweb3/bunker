@@ -1,0 +1,240 @@
+{
+  "version": 3,
+  "style": "User-supplied style lock, prepended verbatim.",
+  "entries": [
+    {
+      "key": "01-approach",
+      "ratio": "21:9",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nVery wide establishing shot from far down a wet black gravel valley; the bunker small and centred on the horizon, its doorway a thin vertical line of teal light; low cloud on the ridgeline; large empty dark foreground for text. Wide 21:9, 3840px long edge.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": true,
+      "native": "source/world/01-approach.png",
+      "nativeDimensions": {
+        "width": 1916,
+        "height": 821
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "02-door",
+      "ratio": "4:5",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nStraight-on close view of a tall, narrow recessed rectangular concrete doorway, three metres deep, cold teal light spilling from within onto wet stone steps; symmetrical; the wall fills the frame. Portrait 4:5, 3840px long edge. Keep lower third dark and quiet enough for a text overlay.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": true,
+      "native": "source/world/02-door.png",
+      "nativeDimensions": {
+        "width": 1122,
+        "height": 1402
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "03-threshold",
+      "ratio": "16:9",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nInterior looking outward: a long bare concrete corridor, the open doorway at the far end a bright slot of grey daylight; faint teal light strips along the floor edge; empty. Wide 16:9, 3840px long edge. A dark left third for copy.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": true,
+      "native": "source/world/03-threshold.png",
+      "nativeDimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "04-vault-room",
+      "ratio": "16:9",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nA plain square concrete chamber, one low plinth at its centre lit from a narrow ceiling slot with cold teal light; nothing on the plinth; subtle dust in the light. Wide 16:9, 3840px long edge, center-safe framing for a square crop. Keep left third dark and uncluttered.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": true,
+      "native": "source/world/04-vault-room.png",
+      "nativeDimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "05-weather",
+      "ratio": "16:9",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nThe same bunker exterior in driving rain and wind, rock streaming with water, the doorway light unchanged and steady. Wide 16:9, 3840px long edge. The building stands in the right two-thirds; dark stormy valley left third for copy.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": true,
+      "native": "source/world/05-weather.png",
+      "nativeDimensions": {
+        "width": 1672,
+        "height": 941
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "06-detail",
+      "ratio": "3:2",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nMacro of board-formed concrete where it meets black basalt, a thin seam between them carrying a hairline of teal light. Tileable feel, real material texture, not a perfectly seamless repeating tile. Landscape 3:2, 3840px long edge. A subdued dark third for copy.\nInput image is the established Bunker building and landscape reference. Create this additional viewpoint within the same architectural world: severe rectangular portal, massive weathered concrete piers, volcanic valley. Keep the materials and palette consistent. Photographic environment only, no lettering or branding. Preserve a dark gradient-safe third.",
+      "selected": false,
+      "native": "source/world/06-detail-unused-first-attempt.png",
+      "nativeDimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "reference": "source/hero-original.png",
+      "generation": "built-in image generation"
+    },
+    {
+      "key": "06-detail",
+      "ratio": "3:2",
+      "prompt": "Monumental brutalist concrete architecture set into dark volcanic basalt and alpine rock under heavy overcast sky. Board-formed concrete with real weathering and water staining. Almost monochrome: charcoal, slate, near-black, cold grey. The only colour is a single narrow source of cold glacier-teal light (#7DD3C7) from a doorway or slit. Soft diffuse natural light, light mist, no sun. Photographic, medium-format, 35mm-equivalent lens, deep focus, restrained contrast, fine grain. Still, silent, permanent. No people, no text, no logos, no vehicles, no weapons, no flags, no lens flare, no neon, no sci-fi panels.\n\nSHOT OVERRIDE: extreme material macro photograph, camera 20 centimetres from a wall seam. The ENTIRE image shows ONLY rough dark basalt rock on the left and weathered board-formed concrete on the right, meeting along a hairline vertical join emitting the faintest glacier-teal light. Surface grain, stone pores, damp board impressions and mineral water staining fill the frame edge-to-edge. No building view, NO sky, NO mountains, NO landscape, NO doorway, NO horizon, no identifiable architecture beyond the material join. A continuous tactile texture study with tileable feel, not a repeating seamless tile. Left third mostly dark basalt for copy. Landscape 3:2. Deliver maximum detail, target 3840px long edge. No text or logo.",
+      "selected": true,
+      "reason": "Corrected material macro; first attempt was too wide.",
+      "native": "source/world/06-detail.png",
+      "nativeDimensions": {
+        "width": 1536,
+        "height": 1024
+      },
+      "reference": null,
+      "generation": "built-in image generation"
+    }
+  ],
+  "exports": [
+    {
+      "key": "01-approach",
+      "ratio": "21:9",
+      "master": "world/01-approach-3840.png",
+      "web": "world/01-approach-web.webp",
+      "native": "source/world/01-approach.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 1646
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 686
+      },
+      "webBytes": 126262,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "02-door",
+      "ratio": "4:5",
+      "master": "world/02-door-3840.png",
+      "web": "world/02-door-web.webp",
+      "native": "source/world/02-door.png",
+      "dimensions": {
+        "width": 3072,
+        "height": 3840
+      },
+      "webDimensions": {
+        "width": 1280,
+        "height": 1600
+      },
+      "webBytes": 255432,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "03-threshold",
+      "ratio": "16:9",
+      "master": "world/03-threshold-3840.png",
+      "web": "world/03-threshold-web.webp",
+      "native": "source/world/03-threshold.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 900
+      },
+      "webBytes": 98006,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "04-vault-room",
+      "ratio": "16:9",
+      "master": "world/04-vault-room-16x9-3840.png",
+      "web": "world/04-vault-room-16x9-web.webp",
+      "native": "source/world/04-vault-room.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 900
+      },
+      "webBytes": 115678,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "04-vault-room",
+      "ratio": "1:1",
+      "master": "world/04-vault-room-1x1-3840.png",
+      "web": "world/04-vault-room-1x1-web.webp",
+      "native": "source/world/04-vault-room.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 3840
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 1600
+      },
+      "webBytes": 167830,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "right square crop to retain plinth",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "05-weather",
+      "ratio": "16:9",
+      "master": "world/05-weather-3840.png",
+      "web": "world/05-weather-web.webp",
+      "native": "source/world/05-weather.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 2160
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 900
+      },
+      "webBytes": 178258,
+      "webQuality": 86,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    },
+    {
+      "key": "06-detail",
+      "ratio": "3:2",
+      "master": "world/06-detail-3840.png",
+      "web": "world/06-detail-web.webp",
+      "native": "source/world/06-detail.png",
+      "dimensions": {
+        "width": 3840,
+        "height": 2560
+      },
+      "webDimensions": {
+        "width": 1600,
+        "height": 1067
+      },
+      "webBytes": 343828,
+      "webQuality": 78,
+      "upscaled": true,
+      "framing": "aspect-ratio export",
+      "note": "3840px delivery is resized from the recorded native generation; not native 4K detail."
+    }
+  ]
+}

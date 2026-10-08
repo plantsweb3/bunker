@@ -12,6 +12,7 @@ export default function Page() {
         <span />
         <b>ENTERING BUNKER</b>
       </div>
+      <div className="vault-room" aria-hidden="true" />
       <VaultApp />
       <Footer />
     </>
