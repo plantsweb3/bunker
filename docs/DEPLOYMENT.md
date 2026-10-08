@@ -10,6 +10,20 @@ Set `SOLANA_RPC_URL` as a **sensitive, server-only** Vercel production environme
 
 The RPC route uses a fixed configured endpoint, a method allowlist, origin checks, streaming byte limits, deadlines, and pinned genesis verification before test-network writes. Origin checks are not authentication. Before allocating a paid RPC quota, configure provider spending limits and an edge rate limit for `/api/rpc`; an in-memory limiter on a serverless instance is not a global quota. The frontend contains no analytics or third-party scripts. A per-request nonce authorizes scripts through Content Security Policy. Inline styles remain permitted for UI components.
 
+## Telegram alerts (optional)
+
+Off unless all six variables are set, and off whenever no program is configured. Set them as sensitive, server-only variables:
+
+| Variable | What |
+|---|---|
+| `TELEGRAM_BOT_TOKEN` | From @BotFather |
+| `TELEGRAM_BOT_USERNAME` | The bot's username, without `@` |
+| `TELEGRAM_WEBHOOK_SECRET` | 24+ random characters; Telegram sends it with every update |
+| `CRON_SECRET` | 24+ random characters; the scheduler sends it as a bearer token |
+| `KV_REST_API_URL`, `KV_REST_API_TOKEN` | An Upstash Redis REST endpoint (the Vercel Marketplace integration sets these) |
+
+Then run `scripts/telegram-setup.mjs` once with the token and webhook secret in the environment to point the bot at `/api/telegram`. The scheduler entry is in `vercel.json`. Rotating the webhook secret means running the script again.
+
 ## Reproduce and deploy
 
 ```sh
