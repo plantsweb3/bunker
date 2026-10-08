@@ -54,6 +54,13 @@ it("stops, rather than skips, when key material sits inside a published director
     "id.json",
     ".env.production",
     "signer.pem",
+    "keypair.json",
+    "mainnet_keypair_backup.json",
+    "cert.p12",
+    "id_ed25519",
+    "my-RECOVERY-KIT-copy.json",
+    "old-day-key.json",
+    ".npmrc",
   ]) {
     const dir = mkdtempSync(join(tmpdir(), "bunker-source-test-"));
     try {
@@ -62,6 +69,7 @@ it("stops, rather than skips, when key material sits inside a published director
       const build = spawnSync(process.execPath, [resolve("scripts/bundle-source.mjs")], { cwd: dir, encoding: "utf8" });
       expect(build.status, name).not.toBe(0);
       expect(build.stderr, name).toContain("Refusing to publish");
+      expect(build.stderr, name).toContain(`docs/${name}`);
       expect(existsSync(join(dir, "public/source/bunker-source.tar.gz")), name).toBe(false);
     } finally {
       rmSync(dir, { recursive: true, force: true });

@@ -149,6 +149,9 @@ export async function runWatch(options: {
   /** A page where the vault can be inspected. */
   link: (vault: string) => string | null;
   maxVaults?: number;
+  /** Stop starting new batches after this long, so the pass ends inside the
+   * platform's time limit. */
+  budgetMs?: number;
   log?: (message: string) => void;
 }): Promise<WatchResult> {
   const { store, connection, program, send, link } = options;
@@ -156,14 +159,28 @@ export async function runWatch(options: {
   const result: WatchResult = { vaults: 0, events: 0, messages: 0, errors: 0 };
   // The scheduler can start a pass while the last one is still running.
   if (!(await store.lock(50))) return { ...result, skipped: "busy" };
-  const vaults = await store.nextVaults(options.maxVaults ?? 1000);
-  if (vaults.length === 0) return result;
-  const now = await chainTime(connection);
-  for (let i = 0; i < vaults.length; i += BATCH) {
-    const batch = vaults.slice(i, i + BATCH);
+  const max = options.maxVaults ?? 1000;
+  const deadline = Date.now() + (options.budgetMs ?? 40_000);
+  const seen = new Set<string>();
+  let now: bigint | null = null;
+  // One batch at a time. The store's turn only advances past vaults that
+  // were actually taken, so a pass that runs out of time leaves the rest
+  // first in line for the next pass instead of skipping them.
+  while (seen.size < max && Date.now() < deadline) {
+    const batch = (await store.nextVaults(Math.min(BATCH, max - seen.size))).filter(
+      (v) => !seen.has(v),
+    );
+    // Wrapped round to vaults already read in this pass: every one is done.
+    if (batch.length === 0) break;
+    for (const v of batch) seen.add(v);
+    now ??= await chainTime(connection);
     let infos: Awaited<ReturnType<Connection["getMultipleAccountsInfo"]>>;
+    let previous: (string | null)[];
     try {
-      infos = await connection.getMultipleAccountsInfo(batch.map((a) => new PublicKey(a)));
+      [infos, previous] = await Promise.all([
+        connection.getMultipleAccountsInfo(batch.map((a) => new PublicKey(a))),
+        store.snapshots(batch),
+      ]);
     } catch (e) {
       result.errors += batch.length;
       log(`batch read failed: ${e instanceof Error ? e.message : "unknown"}`);
@@ -179,7 +196,7 @@ export async function runWatch(options: {
         if (!vaultAddress(program, state.vaultId).equals(new PublicKey(address)))
           throw new Error("address does not match identity");
         const cur = snapshotOf(state, BigInt(info.lamports));
-        const prev = readSnapshot(await store.snapshot(address));
+        const prev = readSnapshot(previous[j]);
         const encoded = JSON.stringify(cur);
         if (!prev) {
           // First sight of this vault: start from now.

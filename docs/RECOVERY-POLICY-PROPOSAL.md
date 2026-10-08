@@ -1,6 +1,6 @@
 # Proposal: recoverable authority and delayed withdrawals
 
-**Status: historical design rationale.** Written 7 October 2026 against an earlier protocol that has since been removed. Sections 1 to 3 were made concrete in [PROTOCOL.md](PROTOCOL.md) and implemented in draft; the waiting period described here as mandatory became optional there; pre-approved destinations (section 4) and the alert service (section 6) are not built. Where this document and PROTOCOL.md differ, PROTOCOL.md is current. References below to "protocol 2" or "v2" describe the removed design.
+**Status: historical design rationale.** Written 7 October 2026 against an earlier protocol that has since been removed. Sections 1 to 3 were made concrete in [PROTOCOL.md](PROTOCOL.md) and implemented in draft; the waiting period described here as mandatory became optional there; pre-approved destinations (section 4) are not built; an optional alert service (section 6) was built later in a simpler form (`lib/alerts`). Where this document and PROTOCOL.md differ, PROTOCOL.md is current. References below to "protocol 2" or "v2" describe the removed design.
 
 ## Decision requested
 

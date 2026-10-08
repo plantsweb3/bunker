@@ -105,7 +105,8 @@ export default function Page() {
           <li>
             <strong>One day key used on two devices.</strong> One device cannot
             know what the other has signed. Signing two different messages with
-            the same one-time key may weaken security.
+            the same one-time key makes forging a third practical. If that may
+            have happened, install new keys with your recovery kit.
           </li>
           <li>
             <strong>A substituted recovery tool.</strong> The offline tool is

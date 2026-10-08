@@ -6,27 +6,38 @@
  * address, which is always the case in production. */
 type Window = { start: number; count: number };
 const MAX_TRACKED = 5000;
+/** Everyone who does not fit in the table shares this one window, so filling
+ * the table cannot be used to get a fresh allowance. */
+const OVERFLOW = "*";
 export function rateLimiter(limit: number, windowMs: number) {
   const seen = new Map<string, Window>();
-  /** True if this request is within the limit. */
-  return function allow(client: string | null, now = Date.now()): boolean {
-    if (!client) return true;
-    const w = seen.get(client);
+  const count = (key: string, now: number) => {
+    const w = seen.get(key);
     if (!w || now - w.start >= windowMs) {
-      if (seen.size >= MAX_TRACKED) {
-        for (const [k, v] of seen) if (now - v.start >= windowMs) seen.delete(k);
-        // Still full of live windows: drop the oldest so memory stays bounded.
-        if (seen.size >= MAX_TRACKED) seen.delete(seen.keys().next().value!);
-      }
-      seen.set(client, { start: now, count: 1 });
+      seen.set(key, { start: now, count: 1 });
       return true;
     }
     return ++w.count <= limit;
   };
+  /** True if this request is within the limit. */
+  return function allow(client: string | null, now = Date.now()): boolean {
+    if (!client) return true;
+    if (seen.has(client)) return count(client, now);
+    if (seen.size >= MAX_TRACKED)
+      for (const [k, v] of seen) if (now - v.start >= windowMs) seen.delete(k);
+    return count(seen.size >= MAX_TRACKED ? OVERFLOW : client, now);
+  };
 }
-/** The client address as reported by the platform's proxy, if any. */
+/** The client address as the hosting platform reports it. Vercel sets
+ * `x-real-ip` and overwrites `x-forwarded-for` itself; a value the client
+ * sent is never trusted there. An IPv6 client is identified by its /64, since
+ * one subscriber controls all of it. */
 export function clientOf(request: Request): string | null {
-  const forwarded = request.headers.get("x-forwarded-for");
-  const first = forwarded?.split(",")[0]?.trim();
-  return first && first.length <= 64 ? first : null;
+  const raw =
+    request.headers.get("x-real-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0] ??
+    "";
+  const ip = raw.trim();
+  if (!ip || ip.length > 64) return null;
+  return ip.includes(":") ? ip.toLowerCase().split(":").slice(0, 4).join(":") : ip;
 }

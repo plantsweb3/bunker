@@ -179,3 +179,27 @@ describe("RPC request limits", () => {
     expect((await from("203.0.113.10")).status).toBe(200);
   });
 });
+describe("Client identity for rate limiting", () => {
+  it("prefers the platform's address, groups an IPv6 subscriber, and cannot be reset by filling the table", async () => {
+    const { clientOf, rateLimiter } = await import("../lib/rate-limit");
+    const req = (h: Record<string, string>) => new Request("https://bunkermode.io/api/rpc", { headers: h });
+    expect(clientOf(req({ "x-real-ip": "203.0.113.9", "x-forwarded-for": "198.51.100.1" }))).toBe("203.0.113.9");
+    expect(clientOf(req({ "x-forwarded-for": "198.51.100.1, 10.0.0.1" }))).toBe("198.51.100.1");
+    expect(clientOf(req({}))).toBeNull();
+    // Two addresses in one /64 are one client.
+    expect(clientOf(req({ "x-real-ip": "2001:db8:1:2:aaaa::1" }))).toBe(
+      clientOf(req({ "x-real-ip": "2001:DB8:1:2:bbbb::2" })),
+    );
+    const allow = rateLimiter(3, 60_000);
+    for (let i = 0; i < 3; i++) expect(allow("victim", 0)).toBe(true);
+    expect(allow("victim", 0)).toBe(false);
+    // Thousands of other addresses arrive; the limited client stays limited.
+    for (let i = 0; i < 6000; i++) allow(`other-${i}`, 1);
+    expect(allow("victim", 2)).toBe(false);
+    // Addresses beyond the table share one allowance instead of each getting a new one.
+    const late = Array.from({ length: 10 }, (_, i) => allow(`late-${i}`, 3));
+    expect(late.filter(Boolean).length).toBeLessThanOrEqual(3);
+    // A new window restores it.
+    expect(allow("victim", 60_001)).toBe(true);
+  });
+});

@@ -16,4 +16,4 @@ Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [PROTOCOL.md](docs/PROTOCOL.md), [
 
 ## Supported release
 
-Only the latest reviewed repository revision is maintained. This pre-release is suitable for inspection and valueless testing, not real-asset custody. Security fixes are published with explicit affected revisions and migration guidance where applicable. No independent source-to-mainnet-binary equivalence is claimed.
+Only the latest revision of `main` is maintained. No revision has been independently reviewed. This pre-release is suitable for inspection and valueless testing, not real-asset custody. Security fixes are published with explicit affected revisions and migration guidance where applicable. No independent source-to-mainnet-binary equivalence is claimed.

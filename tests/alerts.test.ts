@@ -3,7 +3,7 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { alertsFromEnv, sameSecret } from "../lib/alerts/config";
 import { handleUpdate } from "../lib/alerts/commands";
 import { eventText, FOOTER } from "../lib/alerts/messages";
-import { MAX_VAULTS_PER_CHAT, MemoryStore } from "../lib/alerts/store";
+import { MAX_CHATS_PER_VAULT, MAX_VAULTS_PER_CHAT, MemoryStore } from "../lib/alerts/store";
 import { diff, runWatch, Snapshot, WatchEvent } from "../lib/alerts/watch";
 import { configFromEnv } from "../lib/bunker-config";
 import { vaultAddress, VAULT_SIZE } from "../sdk/v3/protocol";
@@ -158,6 +158,24 @@ describe("Alert watcher", () => {
     c.of().epoch = 1n;
     expect(await watch(store, c, sent)).toMatchObject({ events: 0, messages: 0 });
     expect(await store.nextVaults(5)).toEqual([]);
+  });
+  it("a pass that runs out of time leaves the rest first in line", async () => {
+    const many = Array.from({ length: 250 }, (_, i) => new Uint8Array(32).fill(2).map((b, k) => (k === 0 ? i : b)));
+    const c = chain(many);
+    const store = new MemoryStore();
+    for (let i = 0; i < many.length; i += 5)
+      for (const v of many.slice(i, i + 5)) await store.subscribe(`c${i}`, vaultAddress(program, v).toBase58(), null);
+    // No time at all: nothing is taken, so nothing is skipped.
+    store.unlock();
+    const none = await runWatch({ store, connection: c.connection, program, send: async () => undefined, link: () => null, budgetMs: -1, log: () => undefined });
+    expect(none.vaults).toBe(0);
+    // A pass limited to one batch, then full passes: every vault is reached, none twice in a pass.
+    store.unlock();
+    const first = await runWatch({ store, connection: c.connection, program, send: async () => undefined, link: () => null, maxVaults: 100, log: () => undefined });
+    expect(first.vaults).toBe(100);
+    expect(await watch(store, c, [])).toMatchObject({ vaults: 250, errors: 0 });
+    // Every vault now has a snapshot.
+    for (const v of many) expect(await store.snapshot(vaultAddress(program, v).toBase58())).not.toBeNull();
   });
   it("takes vaults in turn within its per-pass limit, in batches", async () => {
     const ids = [1, 2, 3, 4, 5].map(id);
@@ -317,6 +335,13 @@ describe("Bot commands", () => {
     const over = await handleUpdate(say(`/start ${vaultAddress(program, id(6)).toBase58()}`), d);
     expect(over?.text).toContain(`up to ${MAX_VAULTS_PER_CHAT}`);
     expect((await handleUpdate(say("/list"), d))?.text.split("\n").filter((l) => l.length > 40)).toHaveLength(MAX_VAULTS_PER_CHAT);
+    // One Bunker cannot collect unlimited watchers, and the reply says which limit it was.
+    const crowd = new MemoryStore();
+    for (let n = 0; n < MAX_CHATS_PER_VAULT; n++)
+      expect(await crowd.subscribe(`chat-${n}`, vault.toBase58(), null)).toBe("ok");
+    expect(await crowd.subscribe("one-more", vault.toBase58(), null)).toBe("vault-limit");
+    expect(await crowd.subscribe("chat-0", vault.toBase58(), null)).toBe("ok");
+    expect((await handleUpdate(say(`/start ${vault.toBase58()}`, { id: 999, type: "private" }), deps(crowd)))?.text).toContain("as many watchers");
     expect((await handleUpdate(say("/stop"), d))?.text).toContain(`${MAX_VAULTS_PER_CHAT} Bunker`);
     expect(await store.vaultsOf("100")).toEqual([]);
     expect(await store.nextVaults(10)).toEqual([]);
@@ -345,6 +370,11 @@ describe("Alert configuration", () => {
     const test = { ...full, BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "localnet", BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn" };
     expect(configFromEnv(test).alertsBot).toBe("BunkerAlertsBot");
     expect(configFromEnv({ ...test, CRON_SECRET: undefined }).alertsBot).toBeNull();
+    // Never advertised in a state where the alert service itself would be off.
+    for (const weak of [{ CRON_SECRET: "short" }, { TELEGRAM_WEBHOOK_SECRET: "short" }]) {
+      expect(alertsFromEnv({ ...test, ...weak })).toBeNull();
+      expect(configFromEnv({ ...test, ...weak }).alertsBot).toBeNull();
+    }
   });
   it("compares secrets without accepting a prefix or an absent value", () => {
     expect(sameSecret("abc", "abc")).toBe(true);

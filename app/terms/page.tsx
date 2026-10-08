@@ -25,7 +25,9 @@ export default function Page() {
           Bunker is open-source software: a website, a browser signing
           library and a Solana program. It is not a bank, broker, exchange,
           custodian or wallet provider. Nobody operating this site holds your
-          keys or can move, freeze or return your assets.
+          keys, and the program gives nobody a way to move, freeze or return
+          your assets. Whoever can upgrade the program could change that; the
+          upgrade policy will be published before real funds are accepted.
         </p>
       </section>
       <section>
@@ -45,9 +47,9 @@ export default function Page() {
             dependencies, including ones that cause total loss.
           </li>
           <li>
-            Permanent loss of access from an expired or interrupted
-            lost recovery kit, or from using one day key on more than one
-            device.
+            Permanent loss of access from a lost recovery kit or a forgotten
+            password, and loss of funds from using one day key on more than
+            one device.
           </li>
           <li>
             A compromised device, browser, extension, website deployment or

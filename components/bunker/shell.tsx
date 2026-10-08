@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Shield, FlaskConical, Menu } from "lucide-react";
+import { FlaskConical, Menu } from "lucide-react";
 import { NavLinks } from "./nav-links";
 export function Mark({ small = false }: { small?: boolean }) {
   return (
@@ -86,16 +86,5 @@ export function Footer() {
         BUNKERMODE.IO
       </span>
     </footer>
-  );
-}
-export function Notice() {
-  return (
-    <div className="notice">
-      <Shield size={18} />
-      <span>
-        Experimental custody. No completed audit. Use valueless devnet assets
-        only.
-      </span>
-    </div>
   );
 }

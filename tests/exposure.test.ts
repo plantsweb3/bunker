@@ -62,3 +62,13 @@ describe("Wallet exposure summary", () => {
     expect(() => summarizeExposure(Number.MAX_SAFE_INTEGER + 2, [], [])).toThrow();
   });
 });
+describe("Approvals on empty accounts", () => {
+  it("still counts: the approval applies to whatever arrives later", () => {
+    const e = summarizeExposure(
+      1,
+      [{ account: "z", info: info("0", { delegate: "x", delegatedAmount: { amount: "9" } }) }],
+      [],
+    );
+    expect(e.approvals.map((t) => t.account)).toEqual(["z"]);
+  });
+});
