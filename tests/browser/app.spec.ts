@@ -144,6 +144,84 @@ test("wallet check summarises balances and open approvals without a wallet", asy
   );
   expect(overflow).toBe(false);
 });
+test("wallet check reads a very large wallet and flags tokens their issuer can move", async ({
+  page,
+}) => {
+  const owner = "vines1vzrYbzLMRdu58ou5XTby4qAqVRLmqo36NKPTg";
+  const CLASSIC = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+  const controlled = "2b1kV6DkPAnxd5ixfnxCpjxmKwqjjaYmCZfHsFu24GXo";
+  const issuer = "Sysvar1nstructions1111111111111111111111111";
+  // The first 129 bytes of a token account holding 5 units, approved to nobody.
+  const raw = Buffer.alloc(129);
+  raw.fill(7, 0, 64);
+  raw.writeBigUInt64LE(5n, 64);
+  raw[108] = 1;
+  const seen: string[] = [];
+  await page.route("**/api/rpc", async (route) => {
+    const body = route.request().postDataJSON();
+    const reply = (value: unknown) =>
+      route.fulfill({ json: { jsonrpc: "2.0", id: body.id, result: { context: { slot: 1 }, value } } });
+    if (body.method === "getBalance") return reply(2_000_000_000);
+    if (body.method === "getMultipleAccounts") {
+      seen.push(`mints:${body.params[0].join(",")}`);
+      return reply([
+        {
+          data: {
+            parsed: {
+              info: { decimals: 6, extensions: [{ extension: "permanentDelegate", state: { delegate: issuer } }] },
+              type: "mint",
+            },
+            program: "spl-token-2022",
+            space: 200,
+          },
+          executable: false,
+          lamports: 1,
+          owner: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          rentEpoch: 0,
+        },
+      ]);
+    }
+    const classic = body.params?.[1]?.programId === CLASSIC;
+    const parsed = body.params?.[2]?.encoding === "jsonParsed";
+    seen.push(`${classic ? "classic" : "2022"}:${body.params?.[2]?.encoding}:${JSON.stringify(body.params?.[2]?.dataSlice ?? null)}`);
+    // The classic accounts are too many to return parsed.
+    if (classic && parsed) return route.fulfill({ status: 502, body: "RPC response too large" });
+    if (classic)
+      return reply(
+        Array.from({ length: 3 }, (_, i) => ({
+          pubkey: ["So11111111111111111111111111111111111111112", "SysvarC1ock11111111111111111111111111111111", "SysvarRent111111111111111111111111111111111"][i],
+          account: { data: [raw.toString("base64"), "base64"], executable: false, lamports: 2039280, owner: CLASSIC, rentEpoch: 0, space: 165 },
+        })),
+      );
+    return reply([
+      {
+        pubkey: "Vote111111111111111111111111111111111111111",
+        account: {
+          data: {
+            parsed: { info: { mint: controlled, state: "initialized", tokenAmount: { amount: "9000000", decimals: 6 } }, type: "account" },
+            program: "spl-token-2022",
+            space: 165,
+          },
+          executable: false,
+          lamports: 2039280,
+          owner: "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+          rentEpoch: 0,
+        },
+      },
+    ]);
+  });
+  await page.goto(`/check?a=${owner}`);
+  await expect(page.locator(".check-card.exposed")).toContainText("4 token balances");
+  // The large wallet was read again as account prefixes, and only then.
+  expect(seen).toContain('classic:base64:{"offset":0,"length":129}');
+  expect(seen.filter((s) => s.startsWith("2022:"))).toEqual(["2022:jsonParsed:null"]);
+  expect(seen).toContain(`mints:${controlled}`);
+  await expect(page.getByText("amount not loaded").first()).toBeVisible();
+  await expect(page.getByText("too many token accounts to load amounts", { exact: false })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Balances the token’s issuer can move" })).toBeVisible();
+  await expect(page.getByText("Movable by", { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
 test("unknown paths are served with the browser policy too", async ({
   page,
 }) => {
