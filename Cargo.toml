@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["programs/bunker3", "crates/bunker-lmots"]
+members = ["programs/bunker3", "programs/bunker3-cpi-probe", "crates/bunker-lmots"]
 # The Solana version `solana-verify` builds the program with (docs/LAUNCH-RUNBOOK.md).
 # Keep it equal to SOLANA_VERSION in .github/workflows/ci.yml.
 [workspace.metadata.cli]

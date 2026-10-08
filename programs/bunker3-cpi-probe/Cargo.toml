@@ -1,0 +1,20 @@
+# TEST ONLY. A program that does nothing but call another program with the
+# accounts and data it was given, so the VM tests can exercise bunker3 through
+# a cross-program invocation. Never deployed.
+[package]
+name = "bunker3-cpi-probe"
+version.workspace = true
+edition = "2021"
+license.workspace = true
+publish = false
+[lib]
+crate-type = ["cdylib", "lib"]
+[dependencies]
+solana-account-info = "=2.3.0"
+solana-cpi = "=2.2.1"
+solana-instruction = "=2.3.3"
+solana-program-entrypoint = "=2.3.0"
+solana-program-error = "=2.2.2"
+solana-pubkey = "=2.4.0"
+[lints]
+workspace = true

@@ -7,6 +7,7 @@ Status: pre-release. Nothing is deployed on mainnet, no independent audit is com
 | Part | Where | Role |
 |---|---|---|
 | On-chain program | `programs/bunker3` | Holds assets and releases them only under the rules in [PROTOCOL.md](PROTOCOL.md) |
+| Test-only forwarder | `programs/bunker3-cpi-probe` | Calls another program with what it is given, for cross-program tests. Never deployed |
 | Signature verifier | `crates/bunker-lmots` | LM-OTS (RFC 8554 §4) candidate-key computation with a bound on its cost; see [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) |
 | Client | `sdk/v3`, `sdk/lmots.ts` | Derivation, encodings, instructions, key files, signing journal, passkey storage |
 | Offline recovery tool | `tools/recovery` | The only code that handles the archival master |
