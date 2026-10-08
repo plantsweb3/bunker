@@ -300,6 +300,44 @@ test("tokens: deposit and withdraw a classic SPL token", async ({ page }, info) 
   expect(errors).toEqual([]);
 });
 
+test("bunker mode: sweep the wallet in, then read the activity back", async ({ page }, info) => {
+  const { c, recipient, errors, payer, build, unseal }: Ctx = await setup(page, info);
+  const mint = await createMint(c, payer, payer.publicKey, null, 6);
+  const walletToken = await getOrCreateAssociatedTokenAccount(c, payer, mint, payer.publicKey);
+  await mintTo(c, payer, mint, walletToken.address, payer, 42_000_000);
+  const { day0, vault } = await build(false);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  await page.getByRole("button", { name: "Bunker Mode" }).click();
+  await expect(page.getByLabel("Move SOL")).toBeChecked();
+  await expect(page.locator(".sweep-list li")).toHaveCount(2);
+  await page.getByRole("button", { name: "Move it all in" }).click();
+  await expect(page.getByText("Bunker Mode on.", { exact: false })).toBeVisible({ timeout: 40000 });
+  // The wallet keeps only its fee reserve; everything else is inside.
+  expect(await c.getBalance(payer.publicKey)).toBe(20_000_000);
+  const vaultToken = await getAssociatedTokenAddress(mint, new PublicKey(vault), true);
+  expect((await getAccount(c, vaultToken)).amount).toBe(42_000_000n);
+  expect((await getAccount(c, walletToken.address)).amount).toBe(0n);
+  await expect(page.locator(".token-rows")).toContainText("42");
+  // One withdrawal, then the activity log shows the whole story.
+  await page.getByRole("button", { name: "Withdraw", exact: true }).click();
+  await page.getByLabel("Amount", { exact: true }).fill("1");
+  await page.getByLabel("Recipient wallet address").fill(recipient.publicKey.toBase58());
+  await page.getByRole("button", { name: "Review withdrawal" }).click();
+  await page.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Sign and send" }).click();
+  await expect(page.getByText("Withdrawal sent.", { exact: false })).toBeVisible({ timeout: 40000 });
+  await page.getByRole("button", { name: "Show activity" }).click();
+  const log = page.locator(".activity-log ul");
+  await expect(log.locator("li")).toHaveCount(4, { timeout: 20000 });
+  await expect(log.locator("li").nth(0)).toContainText("Withdrawal sent");
+  await expect(log.locator("li").nth(0)).toContainText("−1 SOL");
+  await expect(log.locator("li").nth(1)).toContainText("Deposit");
+  await expect(log.locator("li").nth(2)).toContainText("+42");
+  await expect(log.locator("li").nth(3)).toContainText("Bunker built");
+  expect(errors).toEqual([]);
+});
+
 test("passkey: save a day key to the device and unseal with it", async ({ page }, info) => {
   // WebAuthn needs a registrable host name; an IP address cannot be an RP ID.
   const { c, recipient, errors, vaultState, build, unseal, deposit }: Ctx = await setup(page, info, "http://localhost:5173");
