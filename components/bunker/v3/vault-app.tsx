@@ -176,8 +176,12 @@ function App() {
     const vaultKey = new PublicKey(day.vault);
     // Read the wallet again: amounts must be what is there now.
     const held = await assets(b.connection, payer);
+    // Only what was on the list the user looked at. Something that arrived in
+    // the wallet since then is left where it is.
+    const shown = new Set(walletAssets.map((a) => a.mint));
     const tokens = held.filter(
-      (a) => a.mint && a.amount > 0n && !a.frozen && !skipped.includes(a.mint),
+      (a) =>
+        a.mint && shown.has(a.mint) && a.amount > 0n && !a.frozen && !skipped.includes(a.mint),
     );
     const batches: Awaited<ReturnType<typeof depositIxs>>[] = [];
     for (let i = 0; i < tokens.length; i += 3)
