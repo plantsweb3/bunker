@@ -129,6 +129,26 @@ export default function Page() {
         </p>
       </section>
       <section>
+        <h2>7. If this website is gone</h2>
+        <p>
+          Nothing above needs this site to exist. The offline tool is a file
+          you already have. To withdraw, release or submit a recovery packet
+          without the website, there is a command-line program in one file:
+          it needs Node 22, your day key file, an ordinary Solana wallet file
+          to pay fees, and the address of any Solana connection.
+        </p>
+        <p>
+          <a href="/source/bunker-cli.mjs" download="bunker-cli.mjs">
+            Download bunker-cli.mjs
+          </a>{" "}
+          and keep it with your day key. Its SHA-256 is in{" "}
+          <a href="/source/cli-manifest.json">cli-manifest.json</a>; compare it
+          with a copy built from the public source. Run{" "}
+          <code>node bunker-cli.mjs help</code> for the commands. Like the
+          rest of this release it works on test networks only.
+        </p>
+      </section>
+      <section>
         <h2>What to keep in mind</h2>
         <ul>
           <li>

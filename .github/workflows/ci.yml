@@ -51,6 +51,24 @@ jobs:
             public/source/recovery-tool-manifest.json
           if-no-files-found: error
           retention-days: 90
+      - name: Command-line client builds reproducibly
+        run: |
+          cp public/source/bunker-cli.mjs /tmp/cli-first.mjs
+          npm run cli:build
+          cmp /tmp/cli-first.mjs public/source/bunker-cli.mjs
+          cat public/source/cli-manifest.json
+          # The single file runs on its own, away from the repository.
+          mkdir /tmp/cli-alone && cp public/source/bunker-cli.mjs /tmp/cli-alone/
+          (cd /tmp/cli-alone && node bunker-cli.mjs help)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: bunker-cli
+          path: |
+            public/source/bunker-cli.mjs
+            public/source/cli-manifest.json
+          if-no-files-found: error
+          retention-days: 90
       - run: npm run build
   # The compiled program, exercised in an in-process VM: every instruction,
   # the vault-isolation attacks, and the client's own bytes.
@@ -107,6 +125,54 @@ jobs:
           retention-days: 90
       - run: cargo test --locked
         working-directory: programs/bunker3-svm-tests
+  # The program built the way a deployment would be: by solana-verify, inside
+  # its container image for the Solana version in Cargo.toml. Built twice from
+  # two separate checkouts; the two must be byte for byte the same. Nothing is
+  # deployed from here.
+  verified-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SOLANA_VERIFY_VERSION: 0.5.2
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d
+        with:
+          toolchain: 1.99.0
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cargo/bin/solana-verify
+          key: solana-verify-${{ env.SOLANA_VERIFY_VERSION }}-${{ runner.os }}
+      - name: Install solana-verify
+        run: command -v solana-verify || cargo install solana-verify --locked --version "${SOLANA_VERIFY_VERSION}"
+      - name: Build in the pinned container
+        run: |
+          solana-verify build --library-name bunker3
+          solana-verify get-executable-hash target/deploy/bunker3.so | tee /tmp/first.hash
+      - name: Build again from a separate checkout
+        run: |
+          git clone --no-hardlinks . /tmp/second
+          cd /tmp/second
+          solana-verify build --library-name bunker3
+          solana-verify get-executable-hash target/deploy/bunker3.so | tee /tmp/second.hash
+      - name: The two builds are identical
+        run: |
+          cmp target/deploy/bunker3.so /tmp/second/target/deploy/bunker3.so
+          cmp /tmp/first.hash /tmp/second.hash
+          sha256sum target/deploy/bunker3.so | tee target/deploy/bunker3.verified.sha256
+          cp /tmp/first.hash target/deploy/bunker3.verified.executable-hash
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: bunker3-program-verified-build
+          path: |
+            target/deploy/bunker3.so
+            target/deploy/bunker3.verified.sha256
+            target/deploy/bunker3.verified.executable-hash
+          if-no-files-found: error
+          retention-days: 90
   browser-release:
     runs-on: ubuntu-latest
     timeout-minutes: 12

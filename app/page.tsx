@@ -131,10 +131,10 @@ const faq: [string, React.ReactNode][] = [
         public
       </a>
       . The recovery tool is a file you keep and runs without this site, and
-      the public source includes a command-line program that withdraws and
-      submits recovery packets with nothing but your key files and a Solana
-      connection. Today it is a draft for technical users and, like this
-      site, works on test networks only.
+      there is a command-line program, in one file you can download and keep,
+      that withdraws and submits recovery packets with nothing but your key
+      files and a Solana connection. It needs a computer with Node, and like
+      this site it works on test networks only.
     </>,
   ],
   [
