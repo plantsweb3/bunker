@@ -13,7 +13,6 @@ import {
 import {
   decryptArchival,
   decryptDayKey,
-  descriptorOf,
   encryptFile,
   ArchivalKit,
   DayKey,

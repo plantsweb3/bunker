@@ -8,3 +8,10 @@ playwright-report
 .wrangler
 dist
 .local-validator
+*-keypair.json
+*.recovery.json
+*.pem
+*.key
+id.json
+bunker-devnet-*.json
+bunker-test-*.json

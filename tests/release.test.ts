@@ -24,11 +24,18 @@ describe("Release gate", () => {
         configFromEnv({
           BUNKER_ENABLE_TEST_CUSTODY: "true",
           BUNKER_TEST_NETWORK: mode,
-          BUNKER_TEST_PROGRAM_ID: "test",
+          BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn",
         }).custodyEnabled,
       ).toBe(false);
     },
   );
+  it("stays off when the program id is not an address", () => {
+    for (const id of ["test", "", "https://evil.example/x", "k7FaK87W HGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn"])
+      expect(
+        configFromEnv({ BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "devnet", BUNKER_TEST_PROGRAM_ID: id }).custodyEnabled,
+        id,
+      ).toBe(false);
+  });
   it("requires explicit test opt-in and program", () => {
     expect(
       configFromEnv({ BUNKER_TEST_NETWORK: "devnet" }).custodyEnabled,

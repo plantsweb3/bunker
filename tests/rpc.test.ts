@@ -52,8 +52,17 @@ describe("RPC boundary", () => {
         Promise.resolve(Response.json({ jsonrpc: "2.0", id: 1, result: null })),
       );
     vi.stubGlobal("fetch", fetcher);
+    const key = "11111111111111111111111111111111";
     const call = async (method: string) =>
-      (await (await POST(request({ ...read, method }))).json()) as {
+      (await (
+        await POST(
+          request({
+            ...read,
+            method,
+            params: method === "getSignaturesForAddress" ? [key, { limit: 15 }] : [],
+          }),
+        )
+      ).json()) as {
         error?: { code: number };
       };
     for (const method of [
@@ -88,7 +97,7 @@ describe("RPC boundary", () => {
   it("rejects unexpected or mainnet genesis before forwarding test writes", async () => {
     vi.stubEnv("BUNKER_ENABLE_TEST_CUSTODY", "true");
     vi.stubEnv("BUNKER_TEST_NETWORK", "localnet");
-    vi.stubEnv("BUNKER_TEST_PROGRAM_ID", "test");
+    vi.stubEnv("BUNKER_TEST_PROGRAM_ID", "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn");
     for (const [expected, actual] of [
       ["local", "wrong"],
       [MAINNET_GENESIS, MAINNET_GENESIS],
@@ -105,7 +114,7 @@ describe("RPC boundary", () => {
   it("forwards test writes only after a pinned local genesis match", async () => {
     vi.stubEnv("BUNKER_ENABLE_TEST_CUSTODY", "true");
     vi.stubEnv("BUNKER_TEST_NETWORK", "localnet");
-    vi.stubEnv("BUNKER_TEST_PROGRAM_ID", "test");
+    vi.stubEnv("BUNKER_TEST_PROGRAM_ID", "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn");
     vi.stubEnv("BUNKER_LOCAL_GENESIS", "local");
     const fetch = vi
       .fn()
@@ -137,5 +146,36 @@ describe("RPC boundary", () => {
       BodyLimitError,
     );
     expect(cancel).toHaveBeenCalledOnce();
+  });
+});
+describe("RPC request limits", () => {
+  const ok = () => vi.fn().mockImplementation(async () => Response.json({ jsonrpc: "2.0", id: 1, result: [] }));
+  const call = (method: string, params: unknown[], headers: Record<string, string> = {}) =>
+    POST(
+      new Request("https://bunkermode.io/api/rpc", {
+        method: "POST",
+        headers: { origin: "https://bunkermode.io", ...headers },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      }),
+    );
+  it("refuses list reads that ask for more than the site needs", async () => {
+    const fetcher = ok();
+    vi.stubGlobal("fetch", fetcher);
+    const key = "11111111111111111111111111111111";
+    expect((await call("getSignaturesForAddress", [key, { limit: 15 }])).status).toBe(200);
+    for (const params of [[key], [key, {}], [key, { limit: 1000 }], [key, { limit: 0 }], [key, { limit: "9" }]])
+      expect((await call("getSignaturesForAddress", params)).status, JSON.stringify(params)).toBe(400);
+    expect((await call("getMultipleAccounts", [Array(100).fill(key)])).status).toBe(200);
+    expect((await call("getMultipleAccounts", [Array(101).fill(key)])).status).toBe(400);
+    expect((await call("getSignatureStatuses", [Array(33).fill("s")])).status).toBe(400);
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+  it("limits how fast one client address can call, and no other", async () => {
+    vi.stubGlobal("fetch", ok());
+    const from = (ip: string) => call("getSlot", [], { "x-forwarded-for": `${ip}, 10.0.0.1` });
+    let last = 200;
+    for (let i = 0; i < 301; i++) last = (await from("203.0.113.9")).status;
+    expect(last).toBe(429);
+    expect((await from("203.0.113.10")).status).toBe(200);
   });
 });

@@ -24,10 +24,11 @@ export function configFromEnv(
     /^[A-Za-z0-9_]{5,32}$/.test(env.TELEGRAM_BOT_USERNAME ?? "")
       ? env.TELEGRAM_BOT_USERNAME!
       : null;
+  // A malformed program id leaves custody off rather than half configured.
   const enabled =
     env.BUNKER_ENABLE_TEST_CUSTODY === "true" &&
     (mode === "devnet" || mode === "localnet") &&
-    !!env.BUNKER_TEST_PROGRAM_ID;
+    /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(env.BUNKER_TEST_PROGRAM_ID ?? "");
   return enabled
     ? {
         network: mode as "devnet" | "localnet",

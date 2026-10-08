@@ -304,7 +304,7 @@ describe("Alert configuration", () => {
   });
   it("is never advertised on the read-only public site", () => {
     expect(configFromEnv(full).alertsBot).toBeNull();
-    const test = { ...full, BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "localnet", BUNKER_TEST_PROGRAM_ID: "x" };
+    const test = { ...full, BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "localnet", BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn" };
     expect(configFromEnv(test).alertsBot).toBe("BunkerAlertsBot");
     expect(configFromEnv({ ...test, CRON_SECRET: undefined }).alertsBot).toBeNull();
   });
