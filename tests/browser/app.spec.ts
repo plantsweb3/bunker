@@ -28,8 +28,40 @@ test("brand, navigation, release gate, and wallet empty state", async ({
   await page.getByRole("button", { name: "Close", exact: true }).click();
   expect(errors).toEqual([]);
 });
+test("practice run: pack the Bunker, take the bait, press stop", async ({ page }) => {
+  await page.goto("/demo");
+  const game = page.locator(".practice");
+  await expect(game.getByRole("heading", { name: "Put your coins behind the door." })).toBeVisible();
+  // Two coins by hand, then the rest of eight with the helper.
+  await game.getByRole("button", { name: /Coin 1, in the wallet/ }).click();
+  await expect(game.locator(".practice-tally")).toContainText("Wallet 9");
+  await game.getByRole("button", { name: /Coin 1, in the Bunker/ }).click();
+  await game.getByRole("button", { name: "Move 8 in for me" }).click();
+  await expect(game.locator(".practice-tally")).toContainText("Bunker 8");
+  await game.getByRole("button", { name: "I’m ready" }).click();
+  await game.getByRole("button", { name: /FREE COINS/ }).click();
+  await expect(game.getByRole("heading", { name: "He took your 2." })).toBeVisible();
+  await expect(game.getByText("The 8 behind the door did not move.", { exact: false })).toBeVisible();
+  await game.getByRole("button", { name: "What if he gets my door key too?" }).click();
+  await game.getByRole("button", { name: "STOP" }).click();
+  await expect(game.getByText("You kept 8 of 10.", { exact: false })).toBeVisible();
+  await expect(game.getByRole("link", { name: "Build my Bunker" })).toBeVisible();
+  // Without a Bunker, everything goes; and not pressing stop loses the rest.
+  await game.getByRole("button", { name: "Play again" }).click();
+  await game.getByRole("button", { name: "Skip the Bunker and see what happens" }).click();
+  await game.getByRole("button", { name: /FREE COINS/ }).click();
+  await expect(game.getByRole("heading", { name: "He took everything." })).toBeVisible();
+  await game.getByRole("button", { name: "Try again, with a Bunker" }).click();
+  await game.getByRole("button", { name: "Move 8 in for me" }).click();
+  await game.getByRole("button", { name: "I’m ready" }).click();
+  await game.getByRole("button", { name: /FREE COINS/ }).click();
+  await game.getByRole("button", { name: "What if he gets my door key too?" }).click();
+  await expect(game.getByRole("heading", { name: "Too slow." })).toBeVisible({ timeout: 12000 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
 test("demo has a complete, resettable journey", async ({ page }) => {
   await page.goto("/demo");
+  await page.getByText("For the curious", { exact: false }).click();
   await page.getByRole("button", { name: "Move assets into Bunker" }).click();
   await page
     .getByRole("button", { name: "Approve the fake airdrop" })
