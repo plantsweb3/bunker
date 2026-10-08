@@ -3929,3 +3929,15 @@ details.advanced .field {
 .door-plate dl > div {
   min-width: 0;
 }
+.field-aside {
+  justify-self: start;
+  font-size: 13px;
+}
+.wait-hint {
+  margin: -6px 0 0;
+  color: #e6c38a;
+}
+.wait-hint.is-trusted {
+  color: #bfe6d9;
+}
+

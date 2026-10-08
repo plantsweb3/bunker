@@ -327,6 +327,7 @@ test("trusted addresses: instant to them, a cancellable wait to anyone else", as
   await page.getByLabel("Amount", { exact: true }).fill("0.5");
   await page.locator(".trusted-picks button").first().click();
   await expect(page.getByLabel("Recipient wallet address")).toHaveValue(trusted.toBase58());
+  await expect(page.locator(".wait-hint")).toContainText("A trusted address: this arrives as soon as you approve it.");
   await page.getByRole("button", { name: "Review withdrawal" }).click();
   await expect(page.getByText("one of your Bunker’s trusted addresses", { exact: false })).toBeVisible();
   await page.getByRole("checkbox").check();
@@ -356,8 +357,13 @@ test("trusted addresses: instant to them, a cancellable wait to anyone else", as
   const stranger = Keypair.generate().publicKey;
   await page.getByRole("button", { name: "Withdraw", exact: true }).click();
   await page.getByLabel("Asset").selectOption("SOL");
+  // The shortcut fills in exactly what is available, which the user can then change.
+  await page.getByRole("button", { name: "Use everything available" }).click();
+  await expect(page.getByLabel("Amount", { exact: true })).toHaveValue("1.5");
   await page.getByLabel("Amount", { exact: true }).fill("1");
   await page.getByLabel("Recipient wallet address").fill(stranger.toBase58());
+  // Before anything is reviewed or signed, the form says this one will wait.
+  await expect(page.locator(".wait-hint")).toContainText("Not a trusted address: this waits 1d 0h");
   await page.getByRole("button", { name: "Review withdrawal" }).click();
   await expect(page.getByText("It can leave after", { exact: false })).toBeVisible();
   await expect(page.getByText("your recovery kit can cancel it", { exact: false })).toBeVisible();
