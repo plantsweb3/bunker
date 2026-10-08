@@ -58,6 +58,7 @@ const withdrawal = {
   destination: new PublicKey(new Uint8Array(32).fill(3)),
   amount: 5n,
   announceBy: BigInt(Math.floor(Date.now() / 1000)) + 3600n,
+  decimals: 0,
 };
 /** The chain as it honestly is at `opIndex` in epoch 0. */
 const at = (opIndex: bigint) => chain({ opIndex, opRoot: operationalRoot(g.seed, d, 0n, opIndex) });

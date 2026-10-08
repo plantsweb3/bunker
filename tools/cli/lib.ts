@@ -297,7 +297,14 @@ export async function withdraw(s: Session, day: DayKey, dayKeyPath: string, revi
     unhex(day.seed),
     descriptorOf(day),
     state,
-    { kind: reviewed.kind, mint: reviewed.mint, destination: reviewed.destination, amount: reviewed.amount, announceBy: by < limit ? by : limit },
+    {
+      kind: reviewed.kind,
+      mint: reviewed.mint,
+      destination: reviewed.destination,
+      amount: reviewed.amount,
+      announceBy: by < limit ? by : limit,
+      decimals: reviewed.kind === 1 ? reviewed.decimals : 0,
+    },
     reviewed.kind === 1 ? reviewed.recipient : undefined,
   );
   s.log("Signed. This key is now used; if anything below fails, run `resume`, never `withdraw` again for the same thing.");

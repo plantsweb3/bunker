@@ -92,7 +92,7 @@ Magic `BKSPENT3`, never closable. **A marker belongs to one vault.** Within that
 
 Both messages are `domain || program_id (32) || vault_address (32) || payload`. The verifier recomputes the message from instruction data and account keys; nothing is trusted from the proof account except the signature bytes and the digest.
 
-### 3.1 Announcement — domain `BUNKER3_ANNOUNCE` (16 bytes), payload 195 bytes
+### 3.1 Announcement — domain `BUNKER3_ANNOUNCE` (16 bytes), payload 196 bytes
 
 | Offset | Bytes | Field |
 |---|---:|---|
@@ -108,8 +108,11 @@ Both messages are `domain || program_id (32) || vault_address (32) || payload`. 
 | 147 | 8 | `amount`, > 0 |
 | 155 | 8 | `announce_by`, i64 Unix seconds, > 0, at most 86,400 after the time it lands |
 | 163 | 32 | `next_op_root` = `root(K[epoch][op_index + 1])`, nonzero |
+| 195 | 1 | `decimals`: the decimal places of the token as the signer was shown them; zero for SOL |
 
-Signed by `K[epoch][op_index]`. Total message 275 bytes.
+Signed by `K[epoch][op_index]`. Total message 276 bytes.
+
+`decimals` is signed so that a wrong belief about a token fails instead of moving a different amount than the signer was shown: the amount is in the token's smallest unit, and a network connection that misreported the decimal places could otherwise make "1.0" mean a thousand times more.
 
 ### 3.2 Recovery packet — domain `BUNKER3_RECOVER_` (16 bytes), payload 138 bytes
 
@@ -137,7 +140,7 @@ Opcode is the first byte of instruction data. Any account count, data length, ve
 |---:|---|---|---|---|
 | 0 | `initialize` | payer | payer (w), vault (w), system program | Create the vault with both roots and a delay |
 | 1 | `stage` | payer | payer (w), proof (w), system program | Append signature bytes to a proof account |
-| 2 | `announce` | payer | vault (w), proof, payer (w), marker of `op_root` (w), marker of `next_op_root`, system program | Verify an operational signature, rotate it, record a pending withdrawal; moves nothing |
+| 2 | `announce` | payer | vault (w), proof, payer (w), marker of `op_root` (w), marker of `next_op_root`, system program; for SPL also the mint | Verify an operational signature, rotate it, record a pending withdrawal; moves nothing |
 | 3 | `execute` | none | vault (w), destination (w); for SPL also source token account (w), mint, token program | Carry out the pending withdrawal inside its window; permissionless |
 | 4 | `expire` | none | vault (w) | Clear a pending withdrawal past its deadline; permissionless |
 | 5 | `recover` | payer | vault (w), proof, payer (w), marker of `rec_root` (w), marker of `next_rec_root`, marker of `next_op_root`, system program | Verify the recovery packet, install a new epoch, clear any pending withdrawal |
@@ -153,7 +156,7 @@ Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, and the vaul
 
 The proof account must be the address derived from the payer and `digest`, and the third account must be the system program on every chunk. The first chunk (offset 0) creates it and records the payer and digest. A later chunk must start exactly where the stored bytes end, or lie wholly inside them and be identical. `offset + len(chunk) ≤ 1,088`.
 
-### 4.2 `announce` — data: the 195-byte payload
+### 4.2 `announce` — data: the 196-byte payload
 
 Checks. All must pass; the order below is for reading, and differs from the order in the code only in which error is returned when several fail.
 
@@ -161,12 +164,13 @@ Checks. All must pass; the order below is for reading, and differs from the orde
 2. Payload version and role; `vault_id`, `chain_tag`, `epoch`, `op_index` equal the stored values.
 3. `pending == 0`.
 4. `now ≤ announce_by ≤ now + 86,400`. A signed announcement that has not landed stops being usable within a day of when it could first have landed.
-5. `amount > 0`; `kind ≤ 1`; `mint` zero iff SOL; `destination` is not the vault, proof or either marker.
+5. `amount > 0`; `kind ≤ 1`; `mint` zero iff SOL; `decimals` zero for SOL; `destination` is not the vault, proof or either marker.
+5a. For SPL: exactly seven accounts, the seventh being the account at `mint`, owned by the classic token program, unpacking as a mint, with `decimals` equal to the payload's. For SOL: exactly six accounts. A classic mint can never be closed or change owner, so what is checked here still holds at execution. A Token-2022 mint, a mistyped mint and a token account named as a mint are all refused here, before any key is retired.
 6. `next_op_root` nonzero, differs from `op_root` and `rec_root`, its marker in this vault absent.
 7. Proof account owner, magic, full length, and digest equal to SHA-256 of the recomputed message.
 8. Signature verifies against `op_root`.
 
-Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + delay_secs`, `deadline = opens_at + 604,800`, `epoch`, `digest`. **No lamports or tokens move.** The destination's present state is not validated here; it is validated at execution.
+Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + delay_secs`, `deadline = opens_at + max(delay_secs, 86,400)`, `epoch`, `digest`. **No lamports or tokens move.** The destination's present state is not validated here; it is validated at execution.
 
 ### 4.3 `execute` — no data
 
@@ -262,8 +266,8 @@ These are trust assumptions, not program guarantees.
 
 | Evidence | Where | Count |
 |---|---|---:|
-| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 19 |
-| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 22 |
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 21 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 23 |
 | Isolation, on the same VM: a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 12 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
 | The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
@@ -288,6 +292,8 @@ Known gaps: the randomized tests cover the pure state machine and decoders, not 
 
 ## Open questions
 
+An internal design review (three reviewers; recorded in `docs/INTERNAL-REVIEW.md`) ruled on each of these. Where it led to a change, the entry says *Decided*. The others were ruled "keep" and stay listed because an outside reviewer should still be free to disagree.
+
 Each is a decision this draft made provisionally and wants challenged.
 
 1. **Deterministic recovery signature.** Is one fixed message per recovery key, re-emitted byte-identically, acceptable for this Winternitz construction, including after a crash between derivation and submission? If not, the recovery role needs a different, separately reviewed scheme.
@@ -295,14 +301,14 @@ Each is a decision this draft made provisionally and wants challenged.
 3. **`announce_by` at all.** Announcement rotates the operational root, so an unlanded announcement leaves the on-chain root unchanged and the off-chain key consumed; `recover` resolves that. Dropping the field would remove a time check but let an old signed announcement land at any later time.
 4. **Unix seconds rather than slots.** `Clock::unix_timestamp` is validator-reported and can drift. A waiting period of an hour or more is large relative to plausible drift; the boundary tests in §8 should state the assumed bound.
 5. **Immutable `delay_secs`.** Changing the delay is a policy operation with its own delay and is deferred. Is a fixed per-vault delay acceptable for a first release?
-6. **Fixed 7-day execution window** as a program constant rather than a signed field.
+6. **Execution window.** *Decided in the internal design review:* the window is the vault's waiting period again, with a one-day floor, as a program rule rather than a signed field. Execution is permissionless, so a day is enough for an honest release, and a record that cannot execute blocks a vault with no waiting period for one day rather than seven.
 7. **Permissionless `execute`.** It means the fee wallet is not needed at execution and alerts cannot be bypassed by withholding; it also means anyone can complete an announced transfer the moment it opens. The alternative binds execution to a signer and reintroduces a liveness dependency.
 8. **One spent-marker namespace for both roles within a vault, holding only roots that have signed.** An operational root displaced by recovery is not marked. The argument that this is safe is that announcements are bound to their epoch; it deserves an independent check.
-9. **No migration path between program deployments.** A changed layout means a new program id and new vaults.
+9. **No migration path between program deployments.** A changed layout means a new program id and new vaults. *Decided:* the real-funds program is deployed immutable (docs/DEPLOYMENT.md), so there is no upgrade and no migration instruction; a successor is a new program that users move to by withdrawing.
 10. **`chain_tag` is client-asserted.** It is now part of the vault address, so a wrong tag cannot be attached to an owner's address by someone else, but the owner's own tool still takes it from a file. Is a stronger check worth its cost?
 11. **A zero waiting period is permitted and is the interface default.** It removes the reaction window for a stolen day key in exchange for withdrawals that complete at once. Should a reviewed release allow it, allow it only below a balance, or require a minimum?
 12. **Token-2022 is not supported, and nothing stops someone sending such a token to a vault.** It would be held by an account the program cannot move. Should a reviewed release add support, or a recovery path for tokens it does not handle?
 13. **The recorded `digest` is not read by the program.** It identifies the announcement for clients and alerts. Keep it, or drop 32 bytes from the layout?
-14. **Token decimals and balances shown before signing come from the RPC.** The signed amount is in base units, so a node that misreports a mint's decimals changes how many units "1.0" means. The destination is unaffected. Pin decimals for known mints, or read the mint account and show the raw amount as well?
-15. **No way to withdraw a pending record except execution, expiry or recovery.** A record that cannot execute (the recipient closed or froze the token account, the destination became a program, a Token-2022 mint was named) holds the single pending slot for the waiting period plus seven days unless the owner recovers, which costs an epoch. Should the program check the mint's owner at announcement, or allow the current operational key to cancel?
+14. **Token decimals shown before signing came from the RPC.** *Decided:* the decimal places are part of the signed announcement and the program checks them against the mint (§3.1, §4.2 5a). A network connection that misreports them now causes a refused announcement, not a different amount. Balances shown are still whatever the connection reports.
+15. **No way to withdraw a pending record except execution, expiry or recovery.** A record that cannot execute (the recipient closed or froze the token account, the destination became a program, a Token-2022 mint was named) held the single pending slot for the waiting period plus seven days. **Decided:** the mint is checked at announcement (§4.2 5a) and the execution window is the waiting period again with a one-day floor (§4.2), so the remaining cases (a recipient who closes or freezes their token account) block the vault for at most the waiting period plus that window. A cancel signed by the operational key was considered and rejected for this version: it needs a second operational message type and consumes a key, and it would invite owners to "cancel" a thief's withdrawal when the only correct response is recovery.
 16. **`announce` and `recover` need most of a transaction's compute budget** (up to about 1.06M and 1.1M units for the worst digest). They work only as top-level instructions with an explicit 1.4M limit; a caller that wraps them in another program or bundles other work beside them can push a valid signature over the limit. Is that acceptable, or should the verifier be made cheaper?

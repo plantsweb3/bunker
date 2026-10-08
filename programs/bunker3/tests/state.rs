@@ -33,6 +33,7 @@ fn announce_bytes(v: &Vault, next: [u8; 32]) -> Vec<u8> {
     d.extend(5_000_000u64.to_le_bytes());
     d.extend((NOW + 3600).to_le_bytes());
     d.extend(next);
+    d.push(0); // decimals: zero for SOL
     d
 }
 fn recover_bytes(v: &Vault, next_rec: [u8; 32], next_op: [u8; 32]) -> Vec<u8> {
@@ -57,7 +58,7 @@ fn layout_sizes_match_the_specification() {
     assert_eq!(recover_bytes(&vault(), root(21), root(12)).len(), RECOVER_LEN);
     assert_eq!(ANNOUNCE_DOMAIN.len(), RECOVER_DOMAIN.len());
     assert_ne!(ANNOUNCE_DOMAIN, RECOVER_DOMAIN);
-    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (287, 195, 138, 132));
+    assert_eq!((VAULT_LEN, ANNOUNCE_LEN, RECOVER_LEN, INIT_LEN), (287, 196, 138, 132));
 }
 
 #[test]
@@ -180,7 +181,7 @@ fn announce_rotates_records_and_moves_nothing() {
     assert_eq!(v.rec_root, root(20));
     let p = v.pending.unwrap();
     assert_eq!(p.opens_at, NOW + DAY as i64);
-    assert_eq!(p.deadline, p.opens_at + EXECUTE_WINDOW_SECS);
+    assert_eq!(p.deadline, p.opens_at + execute_window(DAY));
     assert_eq!((p.amount, p.destination, p.epoch, p.digest), (5_000_000, root(77), 0, root(99)));
 }
 
@@ -261,7 +262,8 @@ fn a_vault_without_a_waiting_period_can_execute_at_once() {
     let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
     apply_announce(&mut v, &a, root(99), NOW).unwrap();
     let p = v.pending.clone().unwrap();
-    assert_eq!((p.opens_at, p.deadline), (NOW, NOW + EXECUTE_WINDOW_SECS));
+    // With no waiting period the window is the one-day minimum.
+    assert_eq!((p.opens_at, p.deadline), (NOW, NOW + MIN_EXECUTE_WINDOW_SECS));
     assert_eq!(check_execute(&v, NOW).unwrap(), p, "same second as the announcement");
     assert!(check_execute(&v, NOW - 1).is_err());
     // The authority still rotated and the record still clears on recovery.
@@ -397,4 +399,33 @@ fn a_pending_record_of_an_unknown_kind_does_not_load() {
     assert!(Vault::unpack(&d).is_ok());
     d[157] = 2;
     assert!(Vault::unpack(&d).is_err());
+}
+
+#[test]
+fn the_execution_window_follows_the_waiting_period_with_a_one_day_floor() {
+    for (delay, window) in [(0u32, 86_400i64), (1, 86_400), (3_600, 86_400), (86_400, 86_400), (86_401, 86_401), (MAX_DELAY_SECS, 604_800)] {
+        assert_eq!(execute_window(delay), window);
+        let mut v = vault();
+        v.delay_secs = delay;
+        let a = decode_announce(&announce_bytes(&v, root(11))).unwrap();
+        apply_announce(&mut v, &a, root(99), NOW).unwrap();
+        let p = v.pending.unwrap();
+        assert_eq!((p.opens_at, p.deadline), (NOW + delay as i64, NOW + delay as i64 + window));
+    }
+}
+
+#[test]
+fn an_announcement_states_the_tokens_decimals_and_sol_states_none() {
+    let v = vault();
+    let sol = announce_bytes(&v, root(11));
+    assert_eq!(decode_announce(&sol).unwrap().decimals, 0);
+    let mut wrong = sol.clone();
+    wrong[195] = 9;
+    assert!(decode_announce(&wrong).is_err(), "SOL with a decimal count");
+    let mut token = sol.clone();
+    token[82] = 1;
+    token[83..115].copy_from_slice(&root(50));
+    token[195] = 6;
+    assert_eq!(decode_announce(&token).unwrap().decimals, 6);
+    assert!(decode_announce(&sol[..195]).is_err(), "the earlier, shorter payload");
 }

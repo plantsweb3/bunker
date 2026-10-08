@@ -34,7 +34,7 @@ export default function Page() {
         <p>
           Download the recovery tool from the{" "}
           <Link href="/recovery">recovery page</Link>. It is a single file
-          whose own security policy forbids every network connection, and it
+          whose own security policy stops it making network connections, and it
           only runs from the copy you saved, never from the website. In it
           you choose two passwords, one for the recovery kit and a different
           one for the day key, and whether to add a waiting period. It saves

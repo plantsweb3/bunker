@@ -105,12 +105,23 @@ export default function Page() {
         <h2>If you have a Bunker</h2>
         <p>
           A Bunker is built so that the drained wallet’s key cannot authorize
-          a withdrawal from it. Do not rush. From a clean device, open it with
-          your day key and withdraw to the <em>new</em> wallet, never back to
-          the drained one. Any wallet can pay the network fee. If the day key
-          was on the compromised device, use your recovery kit in the offline
-          tool to install new keys first. If the recovery kit itself was on
-          that device, withdraw immediately.
+          a withdrawal from it. What to do next depends on where your day key
+          was.
+        </p>
+        <p>
+          <strong>If the day key was never on the compromised device,</strong>{" "}
+          you have time. From a clean device, open your Bunker and withdraw to
+          the <em>new</em> wallet, never back to the drained one. Any wallet
+          can pay the network fee.
+        </p>
+        <p>
+          <strong>If the day key or its password was on that device,</strong>{" "}
+          act now. Whoever has them can announce a withdrawal, and if your
+          Bunker has no waiting period it leaves at once. From a clean device,
+          use your recovery kit in the offline tool to install new keys, which
+          kills the stolen day key and cancels a withdrawal that is still
+          waiting. If the recovery kit itself was on that device, withdraw
+          everything immediately instead.
         </p>
         <p>
           Bunker is a pre-release and does not hold real funds yet.{" "}

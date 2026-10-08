@@ -229,7 +229,9 @@ fn stage(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 /// withdrawal. Moves no assets.
 fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let a = decode_announce(data)?;
-    require(accounts.len() == 6)?;
+    // A token withdrawal also names its mint, so the mint can be checked now
+    // rather than discovered to be unusable when the withdrawal is released.
+    require(accounts.len() == if a.kind == 1 { 7 } else { 6 })?;
     let it = &mut accounts.iter();
     let vault = next_account_info(it)?;
     let proof = next_account_info(it)?;
@@ -237,6 +239,14 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
     let spent = next_account_info(it)?;
     let next_spent = next_account_info(it)?;
     let system = next_account_info(it)?;
+    if a.kind == 1 {
+        let mint = next_account_info(it)?;
+        // A classic mint can never be closed or change owner, so what is
+        // checked here still holds at execution.
+        require(mint.key.to_bytes() == a.mint && mint.owner == &spl_token::id())?;
+        let m = spl_token::state::Mint::unpack(&mint.try_borrow_data()?)?;
+        require(m.decimals == a.decimals)?;
+    }
     let mut v = load_vault(id, vault)?;
     for reserved in [vault.key, proof.key, spent.key, next_spent.key] {
         require(a.destination != reserved.to_bytes())?;

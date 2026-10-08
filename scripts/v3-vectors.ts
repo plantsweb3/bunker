@@ -38,6 +38,7 @@ export function vectors() {
     destination,
     amount: 2_000_000_000n,
     announceBy: 1_800_003_600n,
+    decimals: 0,
   };
   const signed = (m: { payload: Uint8Array; message: Uint8Array; signature: Uint8Array }) => ({
     payload: hex(m.payload),
