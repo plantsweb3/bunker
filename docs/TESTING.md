@@ -7,7 +7,7 @@ Automated tests do not establish cryptographic security and are not an audit.
 | Command | What it covers |
 |---|---|
 | `npm run typecheck`, `npm run lint` | Strict TypeScript and lint over app, client, tool, scripts and tests |
-| `npm test` | Client: exact amounts, the vendored-primitive vectors, key derivation and encodings, byte-for-byte reproduction of `fixtures/bunker-v3.json`, the vault identity, signing journal (including a chain view that goes back), key files, public file formats, activity classification, alert state changes, wallet-check classification, preflight decisions, RPC proxy rules and limits, release gate, and that the source bundle is exactly what Git tracks and refuses key material |
+| `npm test` | Client: exact amounts, the vendored-primitive vectors, key derivation and encodings, byte-for-byte reproduction of `fixtures/bunker-v3.json`, the vault identity, signing journal (including a chain view that goes back), key files, public file formats, activity classification, alert state changes, wallet-check classification, preflight decisions, RPC proxy rules and limits, release gate, and that the source bundle is exactly what Git tracks or would track (tracked files plus new files not ignored) and refuses key material |
 | `cargo test --workspace --locked` | The unchanged upstream primitive's own tests; the program's state machine row by row (`programs/bunker3/tests/state.rs`); fixed-seed randomized sequences and decoder inputs (`tests/model.rs`) |
 | `npm run program:build` | Compiles the program to `target/deploy/bunker3.so` |
 | `cd programs/bunker3-svm-tests && cargo test --locked` | The compiled program in an in-process Solana VM (LiteSVM) with the Clock sysvar set, so waiting periods and deadlines are tested to the second (`tests/program.rs`); isolation between vaults and between a vault and whoever creates it (`tests/isolation.rs`); plus the client's vectors against an independent Rust derivation (`tests/client_vectors.rs`) |
@@ -39,13 +39,15 @@ Every case gives the day key a different password from the recovery kit and asse
 3. **Tokens:** mint a test token, deposit, withdraw to a recipient with no token account, assert both balances, refuse an amount above the balance.
 4. **Passkey:** with a simulated authenticator supporting PRF: save a day key, assert storage holds no plaintext, reopen with the passkey (after the cross-device statement, without which the button is disabled), withdraw, then alter the ciphertext and assert it does not unlock.
 
+5. **Bunker Mode:** sweep the wallet's SOL and tokens in, leaving the fee reserve, then read the activity log back.
+
 The browser cannot wait 24 hours, so releasing after a wait is exercised by the VM suite, not by a click.
 
 ## How the tests were checked
 
-For the program, eight safety checks were removed one at a time and the VM suite re-run. Seven were caught immediately; removing destination binding was not caught by the first version of the suite, and a dedicated test was added and confirmed to fail without the check. After the internal review ([INTERNAL-REVIEW.md](INTERNAL-REVIEW.md)) the same was done for the four checks it added: computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on an announcement's deadline. Each removal failed the suite. This has not been repeated for every later change.
+For the program, eight safety checks were removed one at a time and the VM suite re-run. Seven were caught immediately; removing destination binding was not caught by the first version of the suite, and a dedicated test was added and confirmed to fail without the check. After the internal review ([INTERNAL-REVIEW.md](INTERNAL-REVIEW.md)) the same was done for the four checks it added: computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on an announcement's deadline. Each removal failed the suite. When the randomized model was rebuilt around an adversarial operational signer, the old rule it was written to catch (retiring an unsigned root at recovery) was put back into the model and the model failed on its second sequence. This has not been repeated for every later change.
 
-The suites passed while two critical flaws were present, because no test put two vaults in one world. Passing tests show the cases someone thought of.
+The suites passed while two critical flaws were present, because no test put two vaults in one world, and the first randomized model passed while a third was present, because its operational signer chose roots at random and so never chose a harmful one. Passing tests show the cases someone thought of.
 
 ## Known gaps
 

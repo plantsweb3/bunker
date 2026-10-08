@@ -20,7 +20,7 @@ Seven instructions, no administrator, no fee recipient, no arbitrary invocation,
 
 ## Keys and files
 
-One 32-byte archival master derives everything (PROTOCOL.md §1). Two encrypted files exist, both AES-256-GCM under PBKDF2-SHA256 (see CRYPTOGRAPHY.md):
+One 32-byte archival master derives everything (PROTOCOL.md §1). Two encrypted files exist, both AES-256-GCM under a key derived with scrypt (see CRYPTOGRAPHY.md):
 
 - **Recovery kit** (archival): holds the master. Created once, never changes. Opened only by the offline tool.
 - **Day key**: holds one epoch's seed. Opened by the vault page. Replaced whenever a recovery installs a new epoch.
@@ -31,7 +31,7 @@ Three public files cross between the offline tool and the site (`sdk/v3/requests
 
 `scripts/build-recovery-tool.mjs` bundles `tools/recovery` into one HTML file, `public/source/bunker-recovery-tool.html`, at build time, and writes its SHA-256 to `recovery-tool-manifest.json`. The page's own Content Security Policy is `default-src 'none'; connect-src 'none'; form-action 'none'` with the inline script pinned by hash. The build is reproducible and its output is not committed.
 
-CI builds the tool on every run, checks that a second build is byte-identical, prints its manifest and uploads the file as a workflow artifact, so there is a copy and a hash that do not come from the website. It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
+CI builds the tool on every run, checks that a second build is byte-identical and prints its manifest. For commits on `main` it also uploads the file as a workflow artifact, kept 90 days, so there is a copy and a hash that do not come from the website. Nothing yet compares that hash with the file the site serves automatically. It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
 
 ## The web app
 
@@ -49,17 +49,17 @@ Passkey storage (`sdk/v3/passkey.ts`) encrypts a day key with a key derived from
 ## Server side
 
 - `/api/config` reports network and release status, never credentials.
-- `/api/rpc` proxies an allowlist of read methods (balances, accounts, token accounts, signatures for an address, and single transactions for the activity log) to one server-configured endpoint, refuses write methods in the production release, checks origin and request size, bounds list-shaped reads and the size of an answer, and applies timeouts. It limits each client address to 300 requests a minute per server instance, which is a floor and not a firewall; add edge limits and a dedicated provider before wider use.
+- `/api/rpc` proxies an allowlist of read methods (balances, accounts, token accounts, signatures for an address, and single transactions for the activity log) to one server-configured endpoint, refuses write methods in the production release, checks origin and request size, bounds list-shaped reads and the size of an answer, and applies timeouts. It limits each client address (as the platform reports it; an IPv6 /64 counts as one) to 300 requests a minute per server instance, which is a floor and not a firewall; add edge limits and a dedicated provider before wider use.
 - `/api/verify` reports executable and upgrade-authority state for a configured test program. Source equivalence and audit status are reported as unverified until real evidence exists.
-- `proxy.ts` attaches a per-request nonce Content Security Policy to every page. Paths it does not handle (`/api`, `/_next`, `/assets`, `/brand`, `/source`, share images) get a fixed policy from `next.config.ts` that runs and loads nothing, so their not-found pages are covered too. Everything under `/source` is served as a sandboxed download.
+- `proxy.ts` attaches a per-request nonce Content Security Policy to every page. Paths it does not handle (`/api`, `/_next`, `/assets`, `/brand`, `/source`, share images, and exactly `/favicon.ico`, `/sitemap.xml` and `/robots.txt`) get a fixed policy from `next.config.ts` that runs and loads nothing, so their not-found pages are covered too. Everything under `/source` is served as a sandboxed download.
 - The public source archive (`scripts/bundle-source.mjs`) is built from an allow-list of top-level entries and stops if anything inside them looks like key material.
 
 ## Alerts
 
 Optional, and off unless every piece is configured (`lib/alerts/config.ts`): a Telegram bot token and username, a webhook secret, a cron secret, and an Upstash-compatible Redis REST endpoint. It is also off whenever no program is configured, so the read-only public site never advertises it.
 
-- **Subscribing.** The vault page links to `https://t.me/<bot>?start=<vault address>`. Telegram delivers the message to `/api/telegram`, which checks Telegram's secret header, accepts only private chats, confirms on-chain that the address is a vault under the configured program, and stores the pair. `/list` and `/stop` are the only other commands. A chat may watch five vaults.
-- **Watching.** `vercel.json` schedules `/api/cron/watch` every minute; the route requires the cron secret. Each pass takes a lock, reads up to 1,000 watched vault accounts in batches of 100, compares each with the snapshot from the previous pass (`lib/alerts/watch.ts` `diff`), and sends one plain-text message per change to each subscriber. It does not read transactions, so traffic aimed at a vault can neither bury a change nor imitate one.
+- **Subscribing.** The vault page links to `https://t.me/<bot>?start=<vault address>`. Telegram delivers the message to `/api/telegram`, which checks Telegram's secret header, accepts only private chats, confirms on-chain that the address is a vault under the configured program, and stores the pair. `/list` and `/stop` are the only other commands. A chat may watch five vaults, a vault may have twenty watchers, and 5,000 vaults may be watched in all; a refusal says which limit it was. Anyone may watch any vault, so the last limit can be used up by someone determined; alerts are a convenience, not a guarantee.
+- **Watching.** `vercel.json` schedules `/api/cron/watch` every minute; the route requires the cron secret. Each pass takes a lock and, until it has covered up to 1,000 watched vaults or 40 seconds have gone, takes the next 100 in turn, reads their accounts and their stored snapshots in one request each, compares each with the snapshot from the previous pass (`lib/alerts/watch.ts` `diff`), and sends one plain-text message per change to each subscriber. It does not read transactions, so traffic aimed at a vault can neither bury a change nor imitate one.
 - **What is stored:** Telegram chat ids, the vault addresses each watches, and each vault's last reported public state. No keys, no wallet addresses, no message contents.
 - **Limits.** Best effort. A pass can be late or fail; an event is reported after it is confirmed, so on a vault with no waiting period the alert for a withdrawal arrives after the assets have left. A delivery Telegram refuses is not retried. A crash mid-pass can repeat an alert. Token deposits and SOL arrivals under 0.001 SOL are not reported. Two changes between passes are reported as what they add up to. Anyone can subscribe to any vault's public activity. The subscription message says that silence is not proof nothing happened.
 
