@@ -52,7 +52,7 @@ The suites passed while two critical flaws were present, because no test put two
 - No coverage-guided fuzzing. The randomized tests cover the pure state machine and decoders, not account validation.
 - No independent implementation by a second author.
 - Passkeys are tested only with Chromium's virtual authenticator; no real phone or wallet in-app browser.
-- One token scenario in the VM suite and one in the browser.
+- Two token tests in the VM suite (one path that succeeds, one of wrong accounts) and one scenario in the browser.
 - No test of fork, rollback or clock-drift behaviour.
 
 ## Other
