@@ -6,7 +6,8 @@ Suggested in two phases.
 
 ## Phase 1: design, before the code is frozen
 
-- [PROTOCOL.md](PROTOCOL.md) in full, and its eleven open questions.
+- [PROTOCOL.md](PROTOCOL.md) in full, and its thirteen open questions.
+- [INTERNAL-REVIEW.md](INTERNAL-REVIEW.md): the findings of the project's own review and how each was resolved.
 - The vendored Winterwallet SHA-256 Winternitz scheme (N=32, checksum, Merkle commitment), distinguished from standardized constructions.
 - Whether one fixed, re-emitted recovery signature per epoch is acceptable for that scheme.
 - The HKDF derivation and its context binding.
@@ -17,12 +18,12 @@ Suggested in two phases.
 
 - `programs/bunker3`: owner, PDA and alias validation; SOL rent; classic SPL mint, owner, delegate and close-authority checks; CPI; error paths; arithmetic and time boundaries.
 - Fuzzing of instruction lengths, account counts, partial proofs, duplicate accounts and adversarial token states.
-- Spent markers, rollback of failed transactions, root-reinstallation rejection.
+- Spent markers and their per-vault scope, the vault-identity hash, rollback of failed transactions, root-reinstallation rejection, and interference between vaults.
 - Exact correspondence of `sdk/v3` and the program, with independent vectors.
-- `sdk/v3/journal.ts`: crash windows, storage failure, same-origin races, multi-device use.
+- `sdk/v3/journal.ts`: crash windows, storage failure, same-origin races, a chain view that moves backwards, multi-device use.
 - `sdk/v3/kit.ts` and `sdk/v3/passkey.ts`: parsing, KDF, associated data, and what a passkey does and does not protect.
 - `tools/recovery` and its build: page policy, bundle contents, reproducibility.
-- The website: CSP, RPC proxy, release gate, dependency supply chain.
+- The website: CSP on pages and on unproxied paths, RPC proxy bounds, release gate, source-bundle contents, the alert watcher, dependency supply chain.
 - Upgrade-authority policy, incident response, disclosure process and bounty.
 
 ## Release requirements
