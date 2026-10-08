@@ -144,7 +144,9 @@ function useTween(target: number) {
   }, [target]);
   return `$${value.toLocaleString("en-US")}`;
 }
-export default function Demo() {
+/** `nested`: shown under another page heading, so its own is one level down. */
+export default function Demo({ nested = false }: { nested?: boolean }) {
+  const Heading = nested ? "h2" : "h1";
   const [stage, setStage] = useState<DemoStage>("wallet");
   const [log, setLog] = useState<Line[]>([]);
   const [lock, setLock] = useState<{ root: string; spent?: string } | null>(
@@ -259,11 +261,11 @@ export default function Demo() {
       <div className="page-heading">
         <div>
           <div className="eyebrow">EXPERIENCE THE BOUNDARY</div>
-          <h1>
+          <Heading>
             A drained wallet.
             <br />
             <span className="ice">A different outcome.</span>
-          </h1>
+          </Heading>
           <p>
             Four clicks. The signature checks are real and run in this tab; the
             balances and the drainer are simulated.
