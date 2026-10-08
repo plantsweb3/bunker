@@ -17,6 +17,15 @@ export default function Page() {
           quantum-resistance level is claimed.
         </p>
       </div>
+      <figure className="explainer">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/assets/diagrams/drainer-boundary.svg"
+          width={1280}
+          height={720}
+          alt="Diagram: with your wallet key an attacker can spend what is in that wallet, pay fees and send assets into a vault; without the Bunker key there is no valid withdrawal authorization. If the device itself is compromised, both keys may be at risk. Labelled as a simulation."
+        />
+      </figure>
       <section>
         <h2>The intended security boundary</h2>
         <p>

@@ -12,3 +12,46 @@ Scene/backdrop: Sparse dark basalt terrain, cool overcast sky, subtle atmospheri
 Color palette: Near-black and charcoal, desaturated cool grays, the blue doorway light is subtle and controlled.
 Materials/textures: Cast charcoal concrete with subtle pores, seams and weathering, rough dark basalt with realistic natural textures.
 Constraints: No people, no lettering, no logos, no UI, no watermark. Keep image restrained and architectural, with the tall doorway clearly readable. One finished photograph.
+
+------------------------------------------------------------------------
+Brand kit v3 assets, added 2026-10-07
+------------------------------------------------------------------------
+World stills (public/assets/world): six scenes generated with the OpenAI
+built-in image_gen tool on 2026-10-07, exported to WebP. Every generation
+prompt, the native source dimensions and which attempts were selected or
+rejected are recorded in docs/brand/kit-v3/world-prompts.json.
+
+Hero loop (public/assets/video): an 8-second, silent, deterministic local
+composite over the existing hero still (seeded mist and a narrow light
+emphasis; no camera motion, no generated frames). Method and limits are in
+docs/brand/kit-v3/motion-spec.json. The still remains the poster and the
+reduced-motion fallback.
+
+Diagrams (public/assets/diagrams): authored vector layouts with embedded
+fonts, labelled SIMULATION. They are illustrations, not security evidence.
+
+Share cards (app/**/opengraph-image.png): composed from the hero still, the
+existing lockup and set type.
+
+Icons (components/bunker/icon.tsx): sixteen authored vector icons; path data
+copied from the kit.
+
+No asset implies an audit, a mainnet deployment or a safety guarantee.
+
+SHA-256, path, size:
+535fff724ebdc34dd89e63950ec6fa7a06b2483997e875da0f1a7c15f57cc12e  app/demo/opengraph-image.png  787250 bytes
+637316ecec703b608134c8ca30995f596f52046f8d65f2d34c8b98b3d2674407  app/docs/opengraph-image.png  788111 bytes
+e3570c6c3d16628789497f1b51bd89644efa965f57c20e7e6c4223274a8efe4a  app/opengraph-image.png  797901 bytes
+ab1cb207f94d12c41196a10d7d1b84369f2a835cf36ed84b1f1780e8ad4991fe  app/security/opengraph-image.png  784222 bytes
+67da489c7691623981a25b501490c3607fa5ae1e2c5cc5bd304c4ef84f6a9cb5  app/verify/opengraph-image.png  786385 bytes
+a570b4f4646604a449c9b76ee3b961dd6cc49f8494a7b5f962aeab76f1511c6a  public/assets/diagrams/drainer-boundary.svg  53423 bytes
+840ab04a3edd69bb3b47925926ee835f0d1ecd4abacd2bed1cde3ad583c8c565  public/assets/diagrams/two-keys.svg  53418 bytes
+acc8434ee7e5e4fd54e8febdbf684c5a5aeba6949f7c129e42554a9a72adf247  public/assets/video/hero-loop.mp4  169293 bytes
+37b547061c7b9929612b0bcbb339fa0c2c5bca22c6350bc63245ea97e637cc37  public/assets/video/hero-loop.webm  251554 bytes
+f56a761cc71d20054bddb826cc6c5f264eba2e8aece036c8019cb27b4d8b9303  public/assets/world/01-approach.webp  126262 bytes
+a88684a22945bc5e9ce32b690d1169e328e6bd4cd023ba5e82db2c82f6797df8  public/assets/world/02-door.webp  255432 bytes
+f60ebee01a183b49f00fc0fa4a979ce88fa7720012dd8386867b9dd2919db0ed  public/assets/world/03-threshold.webp  98006 bytes
+caa59508a0affdcc728e2c4f243a8cd6b6ceba6a887b30af122b4c6c68250e24  public/assets/world/04-vault-room-16x9.webp  115678 bytes
+a543caff316068402a4bd0c44f95de8053407cb41abac5e37486533d1dd57b9b  public/assets/world/04-vault-room-1x1.webp  167830 bytes
+3ec008f970571326564e00aff1433dc199275552af89d38e4b5861447ed7a726  public/assets/world/05-weather.webp  178258 bytes
+8ca7acf4abe7d0f7c5461697d00709aaf577eee692712e62a906f8d96e266a8f  public/assets/world/06-detail.webp  343828 bytes

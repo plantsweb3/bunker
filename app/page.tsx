@@ -1,19 +1,37 @@
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Shield,
-  Fingerprint,
-  Layers,
   Play,
   MoveUpRight,
   Check,
   X,
   LockKeyhole,
-  HardDrive,
-  Globe,
-  KeyRound,
 } from "lucide-react";
 import { Header, Footer } from "@/components/bunker/shell";
+import { BIcon, BunkerIconName } from "@/components/bunker/icon";
+function Plate({
+  src,
+  alt,
+  level,
+  line,
+  tall = false,
+}: {
+  src: string;
+  alt: string;
+  level: string;
+  line: string;
+  tall?: boolean;
+}) {
+  return (
+    <section className={`world-plate ${tall ? "tall" : ""}`}>
+      <Image unoptimized fill sizes="100vw" src={src} alt={alt} />
+      <div>
+        <span className="mono">{level}</span>
+        <p>{line}</p>
+      </div>
+    </section>
+  );
+}
 const REPO = "https://github.com/plantsweb3/bunker";
 const X_URL = "https://x.com/BunkerModeIO";
 const stops = [
@@ -127,6 +145,21 @@ export default function Home() {
             src="/assets/bunker-hero.png"
             alt="A monumental concrete bunker set into a basalt landscape, with a narrow illuminated entrance"
           />
+          {/* Mist and door light only; the still above is the poster and the
+              reduced-motion fallback. */}
+          <video
+            className="hero-image hero-loop"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/assets/bunker-hero.png"
+            aria-hidden="true"
+          >
+            <source src="/assets/video/hero-loop.webm" type="video/webm" />
+            <source src="/assets/video/hero-loop.mp4" type="video/mp4" />
+          </video>
           <div className="hero-shade" />
           <div className="hero-content">
             <div className="eyebrow">
@@ -155,7 +188,7 @@ export default function Home() {
               </Link>
             </div>
             <div className="hero-note">
-              <Shield size={14} />
+              <BIcon name="bunker-key" size={15} />
               Your wallet gets you in. A separate key gets you out.
             </div>
             <div className="ca-line" aria-label="Contract address coming soon">
@@ -178,14 +211,14 @@ export default function Home() {
         </section>
         <section className="principles">
           <span>
-            <Layers />A wallet signature can’t move it
+            <BIcon name="everyday-wallet" />A wallet signature can’t move it
           </span>
           <span>
-            <Fingerprint />
+            <BIcon name="recovery-kit" />
             Your seed phrase doesn’t open it
           </span>
           <span>
-            <KeyRound />
+            <BIcon name="lock-changed" />
             Every withdrawal changes the lock
           </span>
           <Link href="#limits">
@@ -193,7 +226,14 @@ export default function Home() {
             <MoveUpRight size={16} />
           </Link>
         </section>
-        <section className="check-teaser section" data-level="01">
+        <section className="check-teaser section surface" data-level="01">
+          <Image
+            unoptimized
+            fill
+            sizes="100vw"
+            src="/assets/world/01-approach.webp"
+            alt=""
+          />
           <div>
             <div className="eyebrow">
               <b>01 / SURFACE</b>TEN SECONDS, NOTHING TO CONNECT
@@ -242,28 +282,37 @@ export default function Home() {
               never has and a website can’t ask it for.
             </p>
           </div>
+          <figure className="explainer">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/assets/diagrams/two-keys.svg"
+              width={1280}
+              height={720}
+              loading="lazy"
+              alt="Diagram: the everyday wallet pays fees and stops at authorization; a separate Bunker key authorizes an exact withdrawal and a new lock. Labelled as a simulation."
+            />
+          </figure>
           <div className="feature-grid">
             {[
               [
-                Shield,
+                "vault",
                 "A drainer gets your wallet, not your vault",
                 "Approve the wrong thing and whatever sits in your wallet is exposed. What sits in your Bunker is not.",
               ],
               [
-                Fingerprint,
+                "bunker-key",
                 "A different key to the door",
                 "Withdrawals need the Bunker key from your recovery kit. Your connected wallet only pays the network fee.",
               ],
               [
-                Layers,
+                "simulation",
                 "It only does three things",
                 "Create, deposit, withdraw. No trading, no approvals, no calls to other programs. Less to get wrong.",
               ],
-            ].map(([Icon, title, body]) => {
-              const I = Icon as typeof Shield;
+            ].map(([icon, title, body]) => {
               return (
                 <article key={String(title)}>
-                  <I size={25} />
+                  <BIcon name={icon as BunkerIconName} size={28} />
                   <h3>{String(title)}</h3>
                   <p>{String(body)}</p>
                 </article>
@@ -271,6 +320,13 @@ export default function Home() {
             })}
           </div>
         </section>
+        <Plate
+          tall
+          src="/assets/world/02-door.webp"
+          alt="A tall, narrow doorway recessed into a concrete wall, lit from inside with cold light"
+          level="02 / THRESHOLD"
+          line="Your wallet key stops here."
+        />
         <section className="demo-teaser section" data-level="02">
           <div>
             <div className="eyebrow">
@@ -312,7 +368,7 @@ export default function Home() {
               <span />
             </div>
             <div className="flow-row bunker-row">
-              <Shield size={26} />
+              <BIcon name="vault" size={26} />
               <div>
                 <strong>Your Bunker</strong>
                 <span>Needs a key the drainer never saw</span>
@@ -366,6 +422,12 @@ export default function Home() {
             </div>
           </div>
         </section>
+        <Plate
+          src="/assets/world/03-threshold.webp"
+          alt="A bare concrete corridor seen from inside, the open doorway a slot of grey daylight at the far end"
+          level="03 / INSIDE"
+          line="Past this point, the only key is yours."
+        />
         <section className="section role" data-level="03">
           <div className="eyebrow">
             <b>03 / INSIDE</b>YOUR PART
@@ -384,7 +446,7 @@ export default function Home() {
           </div>
           <ol className="role-grid">
             <li>
-              <HardDrive size={22} />
+              <BIcon name="recovery-kit" size={26} />
               <h3>Keep the kit off your everyday device</h3>
               <p>
                 Store the recovery kit somewhere your daily browser and wallet
@@ -392,7 +454,7 @@ export default function Home() {
               </p>
             </li>
             <li>
-              <Globe size={22} />
+              <BIcon name="approved-address" size={26} />
               <h3>Open it in one place only</h3>
               <p>
                 The kit is only ever used at bunkermode.io. Nobody from Bunker
@@ -400,7 +462,7 @@ export default function Home() {
               </p>
             </li>
             <li>
-              <KeyRound size={22} />
+              <BIcon name="bunker-key" size={26} />
               <h3>Treat it as the only copy of the key</h3>
               <p>
                 If the kit or its password is lost, the vault cannot be opened
@@ -409,7 +471,14 @@ export default function Home() {
             </li>
           </ol>
         </section>
-        <section className="section limits" id="limits">
+        <section className="section limits weather" id="limits">
+          <Image
+            unoptimized
+            fill
+            sizes="100vw"
+            src="/assets/world/05-weather.webp"
+            alt=""
+          />
           <div className="eyebrow">
             <b>03 / INSIDE</b>HONEST ABOUT THE EDGES
           </div>
@@ -508,7 +577,14 @@ export default function Home() {
             ))}
           </div>
         </section>
-        <section className="closing section">
+        <section className="closing section room">
+          <Image
+            unoptimized
+            fill
+            sizes="100vw"
+            src="/assets/world/04-vault-room-16x9.webp"
+            alt=""
+          />
           <span className="eyebrow">PREPARE. DON’T PANIC.</span>
           <h2>Step inside.</h2>
           <div className="actions">

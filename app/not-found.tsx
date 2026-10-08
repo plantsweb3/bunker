@@ -5,7 +5,7 @@ export default function NotFound() {
   return (
     <>
       <Header />
-      <main className="page-container not-found">
+      <main className="page-container not-found corridor">
         <div className="eyebrow">404 / NOTHING BEHIND THIS DOOR</div>
         <h1>This page isn’t here.</h1>
         <p>
