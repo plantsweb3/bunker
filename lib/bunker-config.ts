@@ -5,8 +5,6 @@ export type BunkerConfig = {
   network: "mainnet-beta" | "devnet" | "localnet";
   custodyEnabled: boolean;
   programId: string | null;
-  /** Which draft protocol the configured TEST program implements. */
-  protocolVersion: 2 | 3;
   expectedGenesis: string;
   releaseStatus: string;
 };
@@ -23,7 +21,6 @@ export function configFromEnv(
         network: mode as "devnet" | "localnet",
         custodyEnabled: true,
         programId: env.BUNKER_TEST_PROGRAM_ID!,
-        protocolVersion: env.BUNKER_TEST_PROTOCOL === "3" ? 3 : 2,
         expectedGenesis:
           mode === "devnet" ? DEVNET_GENESIS : (env.BUNKER_LOCAL_GENESIS ?? ""),
         releaseStatus: "Experimental test custody. Valueless assets only.",
@@ -32,7 +29,6 @@ export function configFromEnv(
         network: "mainnet-beta",
         custodyEnabled: false,
         programId: null,
-        protocolVersion: 2,
         expectedGenesis: MAINNET_GENESIS,
         releaseStatus:
           "Mainnet custody is locked pending independent cryptographic and program review.",

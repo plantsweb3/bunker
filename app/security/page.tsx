@@ -29,18 +29,38 @@ export default function Page() {
       <section>
         <h2>The intended security boundary</h2>
         <p>
-          A connected Solana wallet funds a program-derived vault. The program
-          verifies a separate Winternitz one-time signature before a withdrawal
-          and atomically replaces the authorization commitment. Possession of
-          the original wallet signing key alone is not sufficient to satisfy
-          that check.
+          A connected Solana wallet funds a program-derived vault. To withdraw,
+          the program verifies a separate Winternitz one-time signature over
+          the exact asset, amount and destination, and replaces the key in the
+          same step. Possession of the wallet’s signing key alone does not
+          satisfy that check.
         </p>
         <p>
-          This is a design objective supported by local tests, not an external
-          assessment of the complete product. The website, recovery workflow,
-          deployment process, and dependencies remain part of the attack
+          This is a design objective supported by tests, not an external
+          assessment of the complete product. The website, the offline tool,
+          the deployment process and dependencies remain part of the attack
           surface.
         </p>
+      </section>
+      <section>
+        <h2>Three secrets, and what each can do</h2>
+        <ul>
+          <li>
+            <strong>Your wallet key.</strong> Pays fees and deposits. Cannot
+            withdraw from the vault.
+          </li>
+          <li>
+            <strong>Your day key.</strong> Can announce withdrawals. If it is
+            stolen and your Bunker has no waiting period, the thief can
+            withdraw immediately. If it has one, you have that long to cancel
+            with your recovery kit.
+          </li>
+          <li>
+            <strong>Your recovery kit.</strong> Can replace every key. Whoever
+            holds it and its password controls the Bunker. It is opened only
+            in an offline tool, never on this website.
+          </li>
+        </ul>
       </section>
       <section>
         <h2>Documented prior art. Unreviewed integration.</h2>
@@ -70,16 +90,27 @@ export default function Page() {
           <li>
             <strong>A compromised browser or device.</strong> Malware, malicious
             extensions, injected scripts, or a compromised build can steal a
-            recovery key or alter a destination.
+            day key opened on that device or alter a destination.
           </li>
           <li>
-            <strong>Recovery-file loss or password loss.</strong> There is no
-            reset, administrator recovery, or wallet-key fallback.
+            <strong>A stolen day key with no waiting period.</strong> The
+            waiting period is optional and off by default. Without it there is
+            no time to react.
           </li>
           <li>
-            <strong>One-time-key reuse.</strong> Old backups, multiple devices,
-            forks, or separate origins can bypass a browser’s local safeguards.
-            Two different messages signed with the same key may weaken security.
+            <strong>Loss of the recovery kit or its password.</strong> There is
+            no reset and no administrator. A lost day key can be replaced only
+            with the kit.
+          </li>
+          <li>
+            <strong>One day key used on two devices.</strong> One device cannot
+            know what the other has signed. Signing two different messages with
+            the same one-time key may weaken security.
+          </li>
+          <li>
+            <strong>A substituted recovery tool.</strong> The offline tool is
+            downloaded from this site. Its published hash lets you check it;
+            nothing forces you to.
           </li>
           <li>
             <strong>Solana as a whole.</strong> Consensus, transaction fee
@@ -99,19 +130,17 @@ export default function Page() {
         </ul>
       </section>
       <section>
-        <h2>One-time signatures require careful recovery</h2>
+        <h2>When something goes wrong</h2>
         <p>
-          The app reserves an exact withdrawal before signing and saves an
-          encrypted pending recovery file before uploading the signature. If
-          submission is interrupted, only that exact withdrawal can be resumed.
-          A successful withdrawal advances the on-chain nonce and changes the
-          authorization root in the same transaction.
+          The app reserves a one-time key before signing with it and never
+          signs a reserved key again. If a withdrawal is signed but never
+          reaches the network, or a tab closes mid-way, that key is finished.
+          The remedy is the same every time: in the offline tool, your recovery
+          kit installs new keys. Your assets do not move.
         </p>
         <p>
-          A pending transfer cannot simply be changed or cancelled. If its
-          destination or token becomes unusable, funds may be stuck. Do not
-          erase local signing history or restore an older backup to make a
-          different transfer. Browser locks cannot coordinate different devices.
+          A withdrawal that is waiting can be cancelled the same way. One that
+          has been released cannot be undone.
         </p>
       </section>
       <section>
@@ -129,9 +158,10 @@ export default function Page() {
         <p>
           There is no advertising or analytics code in the app. Public wallet
           addresses and transactions go to the configured Solana RPC provider.
-          Recovery secrets are handled in browser memory; only
-          password-encrypted pending files may be stored in local browser
-          storage. JavaScript cannot guarantee erasure of all copies from
+          A day key is handled in browser memory. If you save it with a
+          passkey, an encrypted copy is kept in local browser storage, along
+          with a record of which one-time keys this browser has used. The
+          recovery kit is never handled by this site. JavaScript cannot guarantee erasure of all copies from
           memory.
         </p>
         <p>

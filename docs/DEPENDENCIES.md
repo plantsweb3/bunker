@@ -14,4 +14,8 @@ As of October 7, 2026, a full npm advisory scan reports **one underlying high-se
 
 Vitest was upgraded to 4.1.11, tsx to 4.23.15, and compatible transitive dependencies refreshed to remediate the other reported development advisories. Runtime npm advisories remain zero at the recorded check.
 
-The Rust program imports the specific official Solana account, entrypoint, CPI, public-key, system-interface, hashing, rent, and sysvar crates it uses. Removing the `solana-program` umbrella also removes its unused secp256k1 recovery dependency and the affected rand 0.7 chain. The verifier's algorithm is unchanged. A freshly loaded validator exercises the rebuilt binary; the evidence file records that binary's SHA-256.
+The Rust program imports the specific official Solana account, entrypoint, CPI, public-key, system-interface, hashing, rent, and sysvar crates it uses. Removing the `solana-program` umbrella also removes its unused secp256k1 recovery dependency and the affected rand 0.7 chain. The verifier's algorithm is unchanged. The local validator and the in-process VM suite exercise the compiled binary.
+
+The in-process VM suite (`programs/bunker3-svm-tests`) is a standalone crate with its own lockfile: LiteSVM, the Solana crates it requires, and RustCrypto `hkdf` and `sha2` for an independent derivation check. None of these are dependencies of the program or the website.
+
+The offline recovery tool is bundled with esbuild, which is already present as a dependency of the development tooling. Its bundle includes the pinned Solana address library, `@noble/hashes` and `zod`, and nothing at runtime beyond that.

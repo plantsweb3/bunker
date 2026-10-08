@@ -1,7 +1,7 @@
 /** Checks that can make a withdrawal fail on-chain, run BEFORE the one-time key
- * is used. Under protocol 2 a withdrawal that cannot land before its expiry
- * leaves the key consumed with no replacement, so anything knowable in advance
- * must stop the flow before signing rather than after. */
+ * is used. A withdrawal that cannot land leaves that key finished and sends
+ * the user to recovery, so anything knowable in advance should stop the flow
+ * before signing rather than after. */
 import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "./classic-token";
 import type { Asset } from "./client";

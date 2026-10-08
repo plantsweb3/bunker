@@ -1,7 +1,7 @@
 //! Protocol 3 draft implementation: recovery authority and delayed withdrawals.
 //! NOT deployed, NOT audited, NOT enabled anywhere. Specification and open
-//! questions: docs/PROTOCOL-3-DRAFT.md. Signature verification is the unchanged
-//! vendored Winterwallet core, as in protocol 2.
+//! questions: docs/PROTOCOL.md. Signature verification is the unchanged
+//! vendored Winterwallet core.
 pub mod state;
 use solana_account_info::{next_account_info, AccountInfo};
 use solana_clock::Clock;

@@ -1,5 +1,5 @@
 import { Header, Footer } from "@/components/bunker/shell";
-import VaultRouter from "@/components/bunker/vault-router";
+import VaultApp from "@/components/bunker/v3/vault-app";
 export const metadata = { title: "Your Bunker" };
 export default function Page() {
   return (
@@ -13,7 +13,7 @@ export default function Page() {
         <b>ENTERING BUNKER</b>
       </div>
       <div className="vault-room" aria-hidden="true" />
-      <VaultRouter />
+      <VaultApp />
       <Footer />
     </>
   );

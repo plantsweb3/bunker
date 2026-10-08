@@ -157,8 +157,7 @@ function Page() {
           <div>
             <h2>Not available in this release.</h2>
             <p>
-              Recovery belongs to the next protocol version, a draft under
-              review. It runs only against an isolated test network. The
+              The protocol is a draft under review. It runs only against an isolated test network. The
               offline tool below can be inspected today.
             </p>
             <Link href="/verify">View release requirements</Link>

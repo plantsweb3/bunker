@@ -11,6 +11,7 @@ import {
   getAssociatedTokenAddress,
 } from "@/sdk/classic-token";
 import { mintLabel } from "@/sdk/known-mints";
+import { withdrawalPreflight } from "@/sdk/preflight";
 import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
 import { authorizeAnnouncement, journalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "@/sdk/v3/kit";
@@ -219,6 +220,15 @@ function App() {
       const lamports = parseAmount(amount, 9);
       if (lamports <= 0n || lamports > available)
         throw new Error(`Enter an amount up to ${sol(available)}`);
+      // Things the network would reject, found before a key is used.
+      await withdrawalPreflight(
+        b.connection,
+        payer,
+        to,
+        to,
+        { key: "SOL", mint: null, account: null, label: "SOL", amount: available, decimals: 9, frozen: false },
+        lamports,
+      );
     } else {
       const qty = parseAmount(amount, chosen.decimals);
       if (qty <= 0n || qty > chosen.amount || chosen.frozen)
@@ -227,8 +237,10 @@ function App() {
             ? "This token account is frozen by its issuer"
             : `Enter an amount up to ${formatAmount(chosen.amount, chosen.decimals)}`,
         );
-      // Confirms the mint is a classic SPL mint and the recipient can hold it.
-      await withdrawalDestination(b.connection, payer, to, chosen);
+      // Confirms the mint is a classic SPL mint, that the recipient's token
+      // account is usable, and that the fee wallet can pay for the withdrawal.
+      const dest = await withdrawalDestination(b.connection, payer, to, chosen);
+      await withdrawalPreflight(b.connection, payer, to, dest.destination, chosen, qty);
     }
     setStep("review");
   }
@@ -451,9 +463,9 @@ function App() {
           <div>
             <h2>Built, tested, and locked until it is reviewed.</h2>
             <p>
-              This is the app for the next protocol version: withdrawals wait,
-              you can cancel them, and one recovery kit lasts for good. It
-              runs today only against an isolated test network.
+              One recovery kit that lasts for good, a day key you can
+              replace, and an optional waiting period you can cancel within.
+              It runs today only against an isolated test network.
             </p>
             <Link href="/verify">View release requirements</Link>
           </div>

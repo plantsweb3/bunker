@@ -3,13 +3,16 @@ import { mkdtempSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
-it("source archives exclude both generations of exported recovery blobs", () => {
+it("source archives exclude key files and exchanged files", () => {
   const dir = mkdtempSync(join(tmpdir(), "bunker-source-test-"));
   try {
     writeFileSync(join(dir, "README.md"), "Public source fixture");
     for (const name of [
-      "bunker-test-v2-public-0.json",
-      "bunker-test-v2-public-0-pending.json",
+      "bunker-test-RECOVERY-KIT-7ayn5V2r.json",
+      "bunker-test-day-key-7ayn5V2r-epoch-0.json",
+      "bunker-test-creation-request-7ayn5V2r.json",
+      "bunker-test-recovery-packet-7ayn5V2r-epoch-0.json",
+      "bunker-test-network-card-localnet.json",
       "bunker-devnet-public-0.json",
       "test.recovery.json",
       ".env.local",
