@@ -161,16 +161,19 @@ jobs:
         run: |
           cmp target/deploy/bunker3.so /tmp/second/target/deploy/bunker3.so
           cmp /tmp/first.hash /tmp/second.hash
-          sha256sum target/deploy/bunker3.so | tee target/deploy/bunker3.verified.sha256
-          cp /tmp/first.hash target/deploy/bunker3.verified.executable-hash
+          # The container writes target/ as root, so the results are kept elsewhere.
+          mkdir /tmp/verified
+          cp target/deploy/bunker3.so /tmp/verified/bunker3.so
+          (cd /tmp/verified && sha256sum bunker3.so | tee bunker3.so.sha256)
+          cp /tmp/first.hash /tmp/verified/bunker3.executable-hash
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           name: bunker3-program-verified-build
           path: |
-            target/deploy/bunker3.so
-            target/deploy/bunker3.verified.sha256
-            target/deploy/bunker3.verified.executable-hash
+            /tmp/verified/bunker3.so
+            /tmp/verified/bunker3.so.sha256
+            /tmp/verified/bunker3.executable-hash
           if-no-files-found: error
           retention-days: 90
   browser-release:
