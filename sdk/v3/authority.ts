@@ -28,15 +28,16 @@ export function genesisAuthorities(master: Uint8Array, d: KeyContext) {
 }
 /** Everything needed to create a vault from a master: its genesis roots and
  * the descriptor whose `vaultId` commits to them and to the waiting period. */
-export function genesisVault(master: Uint8Array, k: KeyContext, delaySecs: number) {
+export function genesisVault(master: Uint8Array, k: KeyContext) {
   const genesis = genesisAuthorities(master, k);
   const d: Descriptor = {
     chainTag: k.chainTag,
     programId: k.programId,
     salt: k.salt,
-    vaultId: vaultIdOf({ ...k, opRoot: genesis.opRoot, recRoot: genesis.recRoot, delaySecs }),
+    delaySecs: k.delaySecs,
+    vaultId: vaultIdOf({ ...k, opRoot: genesis.opRoot, recRoot: genesis.recRoot }),
   };
-  return { ...genesis, d, delaySecs };
+  return { ...genesis, d, delaySecs: k.delaySecs };
 }
 export const operationalRoot = (
   seed: Uint8Array,

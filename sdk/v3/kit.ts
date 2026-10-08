@@ -3,6 +3,7 @@
  *    is only opened by the recovery tool.
  *  - a DAY KEY holds one epoch's seed. It is what the vault app opens. Losing
  *    or exposing it is recoverable with the archival kit. */
+import { scryptAsync } from "@noble/hashes/scrypt";
 import { z } from "zod";
 import { PublicKey } from "@solana/web3.js";
 import { hex, unhex } from "../bytes";
@@ -56,8 +57,8 @@ export function identityOf(k: Identity) {
   return d;
 }
 /** What a key file's secrets are derived under. */
-export function descriptorOf(k: Identity & { salt: string }): Descriptor {
-  return { ...identityOf(k), salt: unhex(k.salt, 32) };
+export function descriptorOf(k: Identity & { salt: string; delaySecs: number }): Descriptor {
+  return { ...identityOf(k), salt: unhex(k.salt, 32), delaySecs: k.delaySecs };
 }
 /** Also proves the kit's master really creates the vault the kit names: the
  * identity is recomputed from the master, the salt and the waiting period. */
@@ -66,7 +67,7 @@ export function validateArchival(input: unknown): ArchivalKit {
   const d = descriptorOf(k);
   const master = unhex(k.master, 32);
   try {
-    if (hex(genesisVault(master, d, k.delaySecs).d.vaultId) !== k.vaultId)
+    if (hex(genesisVault(master, d).d.vaultId) !== k.vaultId)
       throw new Error("Recovery kit does not match its vault");
   } finally {
     master.fill(0);
@@ -80,15 +81,21 @@ export function validateDayKey(input: unknown): DayKey {
   return k;
 }
 
+/** scrypt cost. 2^17 x 8 x 128 bytes is 128 MiB per guess: each password an
+ * attacker tries needs that much memory, which is what makes guessing on
+ * graphics cards expensive. Fixed, and authenticated with the header. */
+const SCRYPT = { N: 131072, r: 8, p: 1 } as const;
 const envelopeSchema = z
   .object({
-    format: z.literal("bunker3-encrypted-v2"),
+    format: z.literal("bunker3-encrypted-v3"),
     /** In the clear and authenticated, so a page that expects a day key can
      * refuse a recovery kit without ever deriving a key from its password. */
     kind: z.enum(["archival", "day-key"]),
     aead: z.literal("AES-256-GCM"),
-    kdf: z.literal("PBKDF2-SHA256"),
-    iterations: z.literal(600000),
+    kdf: z.literal("scrypt"),
+    N: z.literal(SCRYPT.N),
+    r: z.literal(SCRYPT.r),
+    p: z.literal(SCRYPT.p),
     salt: z.string().regex(/^[0-9a-f]{32}$/),
     iv: z.string().regex(/^[0-9a-f]{24}$/),
     ciphertext: z.string().regex(/^[0-9a-f]+$/).max(4000),
@@ -97,40 +104,44 @@ const envelopeSchema = z
 type Kind = "archival" | "day-key";
 const header = (kind: Kind, salt: string, iv: string) =>
   ({
-    format: "bunker3-encrypted-v2",
+    format: "bunker3-encrypted-v3",
     kind,
     aead: "AES-256-GCM",
-    kdf: "PBKDF2-SHA256",
-    iterations: 600000,
+    kdf: "scrypt",
+    ...SCRYPT,
     salt,
     iv,
   }) as const;
 const aad = (kind: Kind, salt: string, iv: string) =>
-  new TextEncoder().encode("BUNKER3_KIT_TEST_V2:" + JSON.stringify(header(kind, salt, iv)));
-/** A floor, not a guarantee: these files are only as strong as the password. */
-export function passwordProblem(password: string): string | null {
-  if (password.length < 12) return "Use a password with at least 12 characters";
-  if (new Set(password).size < 6 || /^[0-9]+$/.test(password))
+  new TextEncoder().encode("BUNKER3_KIT_TEST_V3:" + JSON.stringify(header(kind, salt, iv)));
+/** The same password typed on another keyboard or system must give the same
+ * bytes, or a file with no reset could never be opened again. */
+const normalize = (password: string) => password.normalize("NFKC");
+/** A floor, not a guarantee: these files are only as strong as the password.
+ * The recovery kit protects everything for good, so its floor is higher. */
+export function passwordProblem(password: string, kind: Kind = "day-key"): string | null {
+  const p = normalize(password);
+  const [length, variety] = kind === "archival" ? [16, 8] : [12, 6];
+  if ([...p].length < length) return `Use a password with at least ${length} characters`;
+  if (new Set(p).size < variety || /^[0-9]+$/.test(p))
     return "That password is too easy to guess. Use several unrelated words.";
   return null;
 }
-async function key(password: string, salt: Uint8Array, creating = false) {
-  const problem = creating ? passwordProblem(password) : null;
+async function key(password: string, salt: Uint8Array, creating: Kind | null = null) {
+  const problem = creating ? passwordProblem(password, creating) : null;
   if (problem) throw new Error(problem);
-  const material = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(password),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
-  return crypto.subtle.deriveKey(
-    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations: 600000 },
-    material,
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
+  const raw = await scryptAsync(new TextEncoder().encode(normalize(password)), salt, {
+    ...SCRYPT,
+    dkLen: 32,
+  });
+  try {
+    return await crypto.subtle.importKey("raw", raw as BufferSource, "AES-GCM", false, [
+      "encrypt",
+      "decrypt",
+    ]);
+  } finally {
+    raw.fill(0);
+  }
 }
 export async function encryptFile(
   file: ArchivalKit | DayKey,
@@ -140,7 +151,7 @@ export async function encryptFile(
     file.kind === "archival" ? validateArchival(file) : validateDayKey(file);
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const k = await key(password, salt, true);
+  const k = await key(password, salt, file.kind);
   const plaintext = new TextEncoder().encode(JSON.stringify(canonical));
   try {
     const ciphertext = await crypto.subtle.encrypt(
@@ -207,5 +218,6 @@ export function download(name: string, content: string) {
   a.href = url;
   a.download = name;
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Some browsers ask before saving; the link must still work when they do.
+  setTimeout(() => URL.revokeObjectURL(url), 10 * 60 * 1000);
 }

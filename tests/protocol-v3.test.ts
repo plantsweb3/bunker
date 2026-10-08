@@ -46,6 +46,7 @@ const d: Descriptor = {
   chainTag: unhex(fixture.chainTag),
   programId: program.toBytes(),
   salt: unhex(fixture.salt),
+  delaySecs: fixture.delaySecs,
   vaultId: unhex(fixture.vaultId),
 };
 const master = unhex(fixture.master);
@@ -66,12 +67,13 @@ describe("Protocol 3 derivation", () => {
   });
   it("builds the 109-byte context in the specified order", () => {
     const c = context(d);
-    expect(c.length).toBe(109);
+    expect(c.length).toBe(113);
     expect(new TextDecoder().decode(c.slice(0, 12))).toBe("BUNKER-KDF-3");
     expect(c[12]).toBe(0);
     expect(hex(c.slice(13, 45))).toBe(fixture.chainTag);
     expect(hex(c.slice(45, 77))).toBe(fixture.programBytes);
-    expect(hex(c.slice(77))).toBe(fixture.salt);
+    expect(hex(c.slice(77, 109))).toBe(fixture.salt);
+    expect(new DataView(c.buffer, c.byteOffset).getUint32(109, true)).toBe(fixture.delaySecs);
     expect(() => context({ ...d, salt: new Uint8Array(31) })).toThrow();
   });
   it("separates roles, epochs, indices and vaults", () => {
@@ -97,6 +99,11 @@ describe("Protocol 3 derivation", () => {
     add(recoveryKey(master, other, 0n));
     const otherChain = { ...d, chainTag: new Uint8Array(32).fill(1) };
     add(recoveryKey(master, otherChain, 0n));
+    // The same master and salt with another waiting period is another vault
+    // with unrelated keys, so one recovery key can never sign for two vaults.
+    const otherDelay = { ...d, delaySecs: 0 };
+    add(recoveryKey(master, otherDelay, 0n));
+    add(epochSeed(master, otherDelay, 0n));
     expect(recoveryKey(master, d, 0n).length).toBe(1088);
     expect(seed0.length).toBe(32);
   });
@@ -250,7 +257,7 @@ describe("Protocol 3 authorities", () => {
     expect(announce.keys[3].pubkey.equals(spentAddress(program, vault, g.opRoot))).toBe(true);
     expect(announce.keys.map((k) => k.isWritable)).toEqual([true, false, true, true, false, false]);
     const recover = recoverIx(program, payer, unhex(fixture.recover.payload), g);
-    expect([recover.data[0], recover.keys.length]).toEqual([5, 8]);
+    expect([recover.data[0], recover.keys.length]).toEqual([5, 7]);
     const destination = new PublicKey(unhex(fixture.destination));
     const pending = { kind: 0 as const, mint: PublicKey.default, destination, amount: 1n, opensAt: 0n, deadline: 1n, epoch: 0n, digest: new Uint8Array(32) };
     const execute = executeIx(program, vault, pending);
@@ -264,7 +271,7 @@ describe("Protocol 3 vault identity", () => {
   it("is the hash of the creation data, and the address follows from it", () => {
     expect(hex(vaultIdOf(genesis))).toBe(fixture.vaultId);
     expect(vaultAddress(program, vaultIdOf(genesis)).toBase58()).toBe(fixture.vault);
-    expect(hex(genesisVault(master, d, genesis.delaySecs).d.vaultId)).toBe(fixture.vaultId);
+    expect(hex(genesisVault(master, d).d.vaultId)).toBe(fixture.vaultId);
   });
   it("changes with every creation parameter", () => {
     const other = new Uint8Array(32).fill(0xee);

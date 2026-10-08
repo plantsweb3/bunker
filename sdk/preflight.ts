@@ -28,7 +28,9 @@ export type PreflightFacts = {
   payerLamports: bigint;
   /** SOL only: current balance of the destination address. */
   destinationLamports: bigint;
-  /** SOL only: false when the address is a program or an account a program owns. */
+  /** False when the recipient address is a program or an account a program
+   * owns (a mint, a token account, another vault). For a token this is the
+   * wallet the tokens are for, not its token account. */
   destinationIsWallet: boolean;
   /** Token only: state of the recipient's associated token account. */
   tokenDestination: TokenDestination | null;
@@ -44,6 +46,10 @@ export function withdrawalBlocker(f: PreflightFacts): string | null {
     if (f.destinationLamports + f.amount < f.rent.empty)
       return `The recipient would hold less than the network minimum of ${sol(f.rent.empty)}, so this transfer would be rejected. Send at least ${sol(f.rent.empty - f.destinationLamports)} or choose an address that already holds SOL. Nothing was signed.`;
   } else {
+    // A token account made for something that is not a wallet (a mint, another
+    // token account, a program) would hold tokens nobody can move.
+    if (!f.destinationIsWallet)
+      return "That address is not a wallet: it is a program, a token mint or an account controlled by a program. Tokens sent for it may be unrecoverable. Use the recipient’s wallet address. Nothing was signed.";
     const d = f.tokenDestination;
     if (!d) return "The recipient token account could not be checked.";
     if (!d.exists) needed += f.rent.tokenAccount;
@@ -65,10 +71,11 @@ export async function withdrawalPreflight(
   asset: Asset,
   amount: bigint,
 ): Promise<void> {
-  const [payerLamports, destinationInfo, empty, proof, marker, tokenAccount] =
+  const [payerLamports, destinationInfo, recipientInfo, empty, proof, marker, tokenAccount] =
     await Promise.all([
       connection.getBalance(payer),
       connection.getParsedAccountInfo(destination),
+      connection.getAccountInfo(recipient),
       connection.getMinimumBalanceForRentExemption(0),
       connection.getMinimumBalanceForRentExemption(PROOF_ACCOUNT_SIZE),
       connection.getMinimumBalanceForRentExemption(SPENT_MARKER_SIZE),
@@ -85,7 +92,8 @@ export async function withdrawalPreflight(
     payerLamports: BigInt(payerLamports),
     destinationLamports: BigInt(info?.lamports ?? 0),
     destinationIsWallet:
-      !info || (!info.executable && info.owner.equals(SystemProgram.programId)),
+      !recipientInfo ||
+      (!recipientInfo.executable && recipientInfo.owner.equals(SystemProgram.programId)),
     tokenDestination: !asset.mint
       ? null
       : !info

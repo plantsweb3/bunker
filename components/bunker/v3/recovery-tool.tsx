@@ -39,6 +39,8 @@ function Page() {
     status: ReturnType<typeof recoveryFileStatus>;
   } | null>(null);
   const [recovered, setRecovered] = useState(false);
+  const [address, setAddress] = useState("");
+  const [found, setFound] = useState<VaultState | null>(null);
   useEffect(() => {
     fetch("/source/recovery-tool-manifest.json")
       .then((r) => (r.ok ? (r.json() as Promise<Manifest>) : null))
@@ -54,20 +56,32 @@ function Page() {
     b.setError("");
     b.setNotice("");
   };
+  /** Checking a file needs the network configuration, not a wallet. */
   function belongs(f: { program: string; genesis: string }) {
-    const { c, program } = b.live();
-    if (f.program !== program.toBase58() || f.genesis !== c.expectedGenesis)
+    const c = b.config;
+    if (!c?.custodyEnabled || !c.programId)
+      throw new Error(c?.releaseStatus ?? "Configuration unavailable");
+    if (f.program !== c.programId || f.genesis !== c.expectedGenesis)
       throw new Error("That file was made for a different network or program");
-    return program;
+    return new PublicKey(c.programId);
+  }
+  async function lookUp() {
+    const program = belongs({
+      program: b.config?.programId ?? "",
+      genesis: b.config?.expectedGenesis ?? "",
+    });
+    const { state } = await fetchVault(b.connection, program, new PublicKey(address.trim()));
+    setFound(state);
   }
   function networkCard() {
-    const { c, program } = b.live();
+    const c = b.config;
+    if (!c?.custodyEnabled || !c.programId) throw new Error("Configuration unavailable");
     const card: NetworkCard = {
       version: 3,
       kind: "network",
       network: c.network as "devnet" | "localnet",
       genesis: c.expectedGenesis,
-      program: program.toBase58(),
+      program: c.programId,
     };
     download(`bunker-test-network-card-${c.network}.json`, JSON.stringify(card, null, 2));
   }
@@ -83,26 +97,33 @@ function Page() {
     // The address is a hash of the request, so a Bunker already standing there
     // can only be this one, whoever created it.
     const exists = await b.connection.getAccountInfo(address, "confirmed");
-    if (!exists || exists.data.length === 0)
+    const fresh = !exists || exists.data.length === 0;
+    if (fresh)
       await b.transmit("Building your Bunker", [
         initializeIx(program, payer, genesisOf(request)),
       ]);
     // Read it back: never tell someone to deposit into a Bunker that is not
-    // exactly the one their recovery kit describes.
+    // exactly the one their recovery kit describes. The identity is a hash of
+    // the whole request and never changes; the keys do, once it is used.
     const { state } = await fetchVault(b.connection, program, address);
-    if (
-      hex(state.vaultId) !== request.vaultId ||
-      hex(state.opRoot) !== request.opRoot ||
-      hex(state.recRoot) !== request.recRoot ||
-      state.delaySecs !== request.delaySecs ||
-      state.epoch !== 0n
-    )
+    if (hex(state.vaultId) !== request.vaultId || state.delaySecs !== request.delaySecs)
       throw new Error(
         "The Bunker at this address does not match your creation request. Do not deposit. Make a new recovery kit.",
       );
+    if (
+      fresh &&
+      (hex(state.opRoot) !== request.opRoot || hex(state.recRoot) !== request.recRoot || state.epoch !== 0n)
+    )
+      throw new Error(
+        "The Bunker that was just built does not hold the keys in your creation request. Do not deposit. Make a new recovery kit.",
+      );
     setBuilt(request.vault);
     setRequest(null);
-    b.setNotice("Bunker built. Open it with the day key the tool saved.");
+    b.setNotice(
+      fresh
+        ? "Bunker built. Open it with the day key the tool saved."
+        : `This Bunker was already built (key generation ${state.epoch}). Nothing was sent. Open it with your current day key.`,
+    );
   }
   async function loadPacket(f: File | null) {
     const file = parseRecoveryFile(await readKeyFile(f));
@@ -134,7 +155,7 @@ function Page() {
     setPacket({ file, chain: after.state, status: recoveryFileStatus(file, after.state) });
     setRecovered(true);
     b.setNotice(
-      "Recovered. Every earlier day key is dead and any waiting withdrawal was cancelled. Open your Bunker with the new day key the tool saved.",
+      "Recovered. Every earlier day key is dead, and a withdrawal that was still waiting has been cancelled. Open your Bunker with the new day key the tool saved.",
     );
   }
   const can = b.enabled && !!b.wallet.address && !b.busy;
@@ -199,7 +220,7 @@ function Page() {
             <BIcon name="recovery-kit" size={17} />
             Download the tool
           </a>
-          <button className="button ghost" disabled={!b.enabled || !b.wallet.address} onClick={networkCard}>
+          <button className="button ghost" disabled={!b.enabled} onClick={networkCard}>
             Download network card
           </button>
         </div>
@@ -289,6 +310,36 @@ function Page() {
             new day key. Only the packet comes here. Anyone holding a packet
             can do exactly one thing with it: install the keys it names.
           </p>
+          <div className="inline-form">
+            <label className="field">
+              <span>Not sure of your key generation? Look it up by Bunker address</span>
+              <input
+                autoComplete="off"
+                spellCheck={false}
+                placeholder="Bunker address"
+                value={address}
+                onChange={(e) => {
+                  setAddress(e.target.value);
+                  setFound(null);
+                }}
+              />
+            </label>
+            <div className="actions">
+              <button
+                className="button ghost"
+                disabled={!b.enabled || !!b.busy || !address.trim()}
+                onClick={() => b.task("Looking up", lookUp)}
+              >
+                Look up
+              </button>
+            </div>
+            {found && (
+              <p className="micro">
+                Key generation <b>{found.epoch.toString()}</b>. Enter that number in the offline
+                tool. {found.pending ? "A withdrawal is waiting." : "No withdrawal is waiting."}
+              </p>
+            )}
+          </div>
           <FileField
             label="Recovery packet"
             disabled={!!b.busy}
@@ -323,7 +374,7 @@ function Page() {
                   <dt>Waiting withdrawal</dt>
                   <dd>
                     {pending
-                      ? `${pending.kind === 0 ? `${formatAmount(pending.amount, 9)} SOL` : `${pending.amount.toString()} base units of token ${pending.mint.toBase58()}`} to ${pending.destination.toBase58()}. It will be cancelled.`
+                      ? `${pending.kind === 0 ? `${formatAmount(pending.amount, 9)} SOL` : `${pending.amount.toString()} base units of token ${pending.mint.toBase58()}`} to ${pending.kind === 0 ? "" : "token account "}${pending.destination.toBase58()}. Recovery cancels it if it lands before the withdrawal is released.`
                       : "None"}
                   </dd>
                 </div>

@@ -372,7 +372,7 @@ export function recoverIx(
   program: PublicKey,
   payer: PublicKey,
   payload: Uint8Array,
-  current: { recRoot: Uint8Array; opRoot: Uint8Array },
+  current: { recRoot: Uint8Array },
 ) {
   const r = decodeRecover(payload);
   const vault = vaultAddress(program, r.vaultId);
@@ -383,7 +383,6 @@ export function recoverIx(
       meta(proofAddress(program, payer, sha256(recoverMessage(program, payload)))),
       meta(payer, true, true),
       meta(spentAddress(program, vault, current.recRoot), true),
-      meta(spentAddress(program, vault, current.opRoot), true),
       meta(spentAddress(program, vault, r.nextRecRoot)),
       meta(spentAddress(program, vault, r.nextOpRoot)),
       meta(SystemProgram.programId),

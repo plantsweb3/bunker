@@ -279,7 +279,7 @@ impl Env {
         };
         self.send(&[ix])
     }
-    fn recover_ix(&self, payload: &[u8], proof: Pubkey, rec: &[u8; 32], op: &[u8; 32], next_rec: &[u8; 32], next_op: &[u8; 32]) -> Instruction {
+    fn recover_ix(&self, payload: &[u8], proof: Pubkey, rec: &[u8; 32], next_rec: &[u8; 32], next_op: &[u8; 32]) -> Instruction {
         Instruction {
             program_id: self.program,
             accounts: vec![
@@ -287,7 +287,6 @@ impl Env {
                 AccountMeta::new_readonly(proof, false),
                 AccountMeta::new(self.payer.pubkey(), true),
                 AccountMeta::new(self.marker(rec), false),
-                AccountMeta::new(self.marker(op), false),
                 AccountMeta::new_readonly(self.marker(next_rec), false),
                 AccountMeta::new_readonly(self.marker(next_op), false),
                 AccountMeta::new_readonly(system(), false),
@@ -304,8 +303,7 @@ impl Env {
         let proof = self.stage(signer_tag, &message);
         let data = self.vault_data();
         let rec: [u8; 32] = data[120..152].try_into().unwrap();
-        let op: [u8; 32] = data[72..104].try_into().unwrap();
-        let ix = self.recover_ix(&payload, proof, &rec, &op, &next_rec, &next_op);
+        let ix = self.recover_ix(&payload, proof, &rec, &next_rec, &next_op);
         self.send(&[ix])
     }
 }
@@ -536,7 +534,7 @@ fn a_spent_operational_signature_cannot_be_replayed() {
 }
 
 #[test]
-fn recovery_cancels_a_pending_withdrawal_and_retires_both_roots() {
+fn recovery_cancels_a_pending_withdrawal_and_retires_only_the_root_that_signed() {
     let mut e = Env::new();
     e.init();
     let destination = Pubkey::new_unique();
@@ -550,7 +548,7 @@ fn recovery_cancels_a_pending_withdrawal_and_retires_both_roots() {
     assert_eq!((e.epoch(), e.op_index(), e.op_root()), (1, 0, root(10)));
     assert_eq!(&e.vault_data()[120..152], &root(101));
     assert!(e.spent(&root(100)), "used recovery root retired");
-    assert!(e.spent(&root(2)), "displaced operational root retired though never used");
+    assert!(!e.spent(&root(2)), "the displaced operational root signed nothing and is not marked");
     // The cancelled withdrawal cannot execute, even once its window would have opened.
     e.set_time(T0 + DAY);
     assert!(e.execute(destination).is_err());
@@ -570,7 +568,7 @@ fn recovery_works_when_idle_and_its_packet_is_bound_to_one_epoch() {
     let payload = e.recover_payload(0, root(101), root(10));
     let message = e.message(b"BUNKER3_RECOVER_", &payload);
     let proof = e.stage(100, &message);
-    let ix = e.recover_ix(&payload, proof, &root(100), &root(1), &root(101), &root(10));
+    let ix = e.recover_ix(&payload, proof, &root(100), &root(101), &root(10));
     e.send(&[ix.clone()]).unwrap();
     assert_eq!(e.epoch(), 1);
     assert!(e.send(&[ix]).is_err(), "the epoch-0 packet cannot apply to epoch 1");
@@ -603,7 +601,7 @@ fn proofs_do_not_cross_roles() {
     assert!(e.send(&[ix]).is_err());
     // A valid announcement proof submitted as a recovery.
     let announce_proof = e.stage(1, &e.message(b"BUNKER3_ANNOUNCE", &announce_payload));
-    let ix = e.recover_ix(&recover_payload, announce_proof, &root(100), &root(1), &root(101), &root(10));
+    let ix = e.recover_ix(&recover_payload, announce_proof, &root(100), &root(101), &root(10));
     assert!(e.send(&[ix]).is_err());
     assert_eq!((e.epoch(), e.pending()), (0, false));
 }

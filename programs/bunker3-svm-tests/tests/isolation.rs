@@ -186,7 +186,6 @@ impl World {
         let proof = self.stage(p, signer_tag, &message);
         let data = self.vault_data(p);
         let rec: [u8; 32] = data[120..152].try_into().unwrap();
-        let op: [u8; 32] = data[72..104].try_into().unwrap();
         let ix = Instruction {
             program_id: self.program,
             accounts: vec![
@@ -194,7 +193,6 @@ impl World {
                 AccountMeta::new_readonly(proof, false),
                 AccountMeta::new(p.payer.pubkey(), true),
                 AccountMeta::new(self.marker(p, &rec), false),
-                AccountMeta::new(self.marker(p, &op), false),
                 AccountMeta::new_readonly(self.marker(p, &next_rec), false),
                 AccountMeta::new_readonly(self.marker(p, &next_op), false),
                 AccountMeta::new_readonly(system(), false),
@@ -226,7 +224,7 @@ fn retiring_a_root_in_one_vault_does_not_retire_it_in_another() {
         let stranger = w.party(salt, copied, root(500), 0);
         w.init(&stranger, 0);
         w.recover(&stranger, 500, 0, root(501), root(502)).unwrap();
-        assert!(w.spent(&stranger, &copied) && !w.spent(&owner, &copied));
+        assert!(w.spent(&stranger, &root(500)) && !w.spent(&owner, &copied));
     }
     let destination = Pubkey::new_unique();
     w.announce(&owner, 1, 0, 0, destination, SOL, root(2)).unwrap();
@@ -351,7 +349,7 @@ fn prefunded_vault_and_marker_addresses_do_not_block() {
     w.announce(&p, 1, 0, 0, Pubkey::new_unique(), SOL, root(2)).unwrap();
     assert!(w.spent(&p, &root(1)));
     w.recover(&p, 100, 0, root(101), root(10)).unwrap();
-    assert!(w.spent(&p, &root(100)) && w.spent(&p, &root(2)));
+    assert!(w.spent(&p, &root(100)) && !w.spent(&p, &root(2)));
 }
 
 /// Only the marker derived for this vault and this root is accepted.
@@ -423,3 +421,152 @@ fn a_day_key_cannot_block_recovery_by_planting_the_packets_roots() {
         w.recover(&owner, 101, 1, root(102), root(20)).unwrap();
     }
 }
+
+/// The same attack one epoch ahead. The thief plants a root that a LATER
+/// recovery packet names. The current recovery must not retire it, or that
+/// later packet could never land and the vault would be left with no way to
+/// recover again.
+#[test]
+fn a_day_key_cannot_kill_a_future_recovery() {
+    // Packet 0 installs rec 101 / op 10; packet 1 installs rec 102 / op 20.
+    for planted in [root(102), root(20)] {
+        let mut w = World::new();
+        let owner = w.party(7, root(1), root(100), DAY as u32);
+        w.init(&owner, 10 * SOL);
+        let thief = Pubkey::new_unique();
+        w.announce(&owner, 1, 0, 0, thief, 9 * SOL, planted).unwrap();
+        w.set_time(T0 + 3600);
+        w.recover(&owner, 100, 0, root(101), root(10)).unwrap();
+        assert!(!w.spent(&owner, &planted), "a root that signed nothing must not be marked");
+        assert_eq!(w.lamports(&thief), 0);
+        // Epoch 1 is used normally, then recovered with the packet that names the planted root.
+        w.announce(&owner, 10, 1, 0, Pubkey::new_unique(), SOL, root(11)).unwrap();
+        w.recover(&owner, 101, 1, root(102), root(20)).unwrap();
+        let d = w.vault_data(&owner);
+        assert_eq!((&d[72..104], &d[120..152], d[112]), (&root(20)[..], &root(102)[..], 2));
+        // And epoch 2 works with the keys it installed.
+        w.announce(&owner, 20, 2, 0, Pubkey::new_unique(), SOL, root(21)).unwrap();
+        w.recover(&owner, 102, 2, root(103), root(30)).unwrap();
+    }
+}
+
+/// A recovery transaction names nothing that an announcement can change, so
+/// an announcement landing first cannot make it fail.
+#[test]
+fn recovery_does_not_depend_on_operational_progress() {
+    let mut w = World::new();
+    let owner = w.party(7, root(1), root(100), 0);
+    w.init(&owner, 10 * SOL);
+    // Build the recovery, then let three instant withdrawals land before it.
+    for (i, tag) in [(0u64, 1u32), (1, 2), (2, 3)] {
+        let to = Pubkey::new_unique();
+        w.announce(&owner, tag, 0, i, to, SOL, root(tag + 1)).unwrap();
+        w.execute(&owner, to).unwrap();
+    }
+    w.recover(&owner, 100, 0, root(101), root(10)).unwrap();
+    assert_eq!(w.vault_data(&owner)[112], 1);
+}
+
+/// Passing one account in two slots of an instruction never succeeds. Every
+/// pair of slots in `announce` and `recover` is tried, then the untouched
+/// instruction is shown to work, so the failures are not incidental.
+#[test]
+fn no_instruction_accepts_one_account_in_two_slots() {
+    let mut w = World::new();
+    let p = w.party(7, root(1), root(100), 0);
+    w.init(&p, 10 * SOL);
+    let destination = Pubkey::new_unique();
+    let mut a = vec![3u8, 1];
+    a.extend(p.id);
+    a.extend(CHAIN);
+    a.extend(0u64.to_le_bytes());
+    a.extend(0u64.to_le_bytes());
+    a.push(0);
+    a.extend([0u8; 32]);
+    a.extend(destination.to_bytes());
+    a.extend(SOL.to_le_bytes());
+    a.extend((T0 + 3600).to_le_bytes());
+    a.extend(root(2));
+    let message = w.message(&p, b"BUNKER3_ANNOUNCE", &a);
+    let proof = w.stage(&p, 1, &message);
+    let announce = Instruction {
+        program_id: w.program,
+        accounts: vec![
+            AccountMeta::new(p.vault, false),
+            AccountMeta::new_readonly(proof, false),
+            AccountMeta::new(p.payer.pubkey(), true),
+            AccountMeta::new(w.marker(&p, &root(1)), false),
+            AccountMeta::new_readonly(w.marker(&p, &root(2)), false),
+            AccountMeta::new_readonly(system(), false),
+        ],
+        data: [vec![2u8], a].concat(),
+    };
+    let mut r = vec![3u8, 2];
+    r.extend(p.id);
+    r.extend(CHAIN);
+    r.extend(0u64.to_le_bytes());
+    r.extend(root(101));
+    r.extend(root(10));
+    let message = w.message(&p, b"BUNKER3_RECOVER_", &r);
+    let proof = w.stage(&p, 100, &message);
+    let recover = Instruction {
+        program_id: w.program,
+        accounts: vec![
+            AccountMeta::new(p.vault, false),
+            AccountMeta::new_readonly(proof, false),
+            AccountMeta::new(p.payer.pubkey(), true),
+            AccountMeta::new(w.marker(&p, &root(100)), false),
+            AccountMeta::new_readonly(w.marker(&p, &root(101)), false),
+            AccountMeta::new_readonly(w.marker(&p, &root(10)), false),
+            AccountMeta::new_readonly(system(), false),
+        ],
+        data: [vec![5u8], r].concat(),
+    };
+    let before = w.vault_data(&p);
+    for good in [&announce, &recover] {
+        let n = good.accounts.len();
+        for from in 0..n {
+            for to in 0..n {
+                if from == to {
+                    continue;
+                }
+                let mut ix = good.clone();
+                ix.accounts[to].pubkey = good.accounts[from].pubkey;
+                // The harness cannot sign for another slot's account; the program
+                // must refuse a payer that has not signed.
+                ix.accounts[to].is_signer = false;
+                assert!(w.send(&p.payer, &[ix]).is_err(), "opcode {} slot {to} given the account of slot {from}", good.data[0]);
+                assert_eq!(w.vault_data(&p), before);
+            }
+        }
+    }
+    // Execute with the vault as its own destination, and close_proof with the proof as its own payer.
+    w.send(&p.payer, &[announce]).unwrap();
+    let own = Instruction {
+        program_id: w.program,
+        accounts: vec![AccountMeta::new(p.vault, false), AccountMeta::new(p.vault, false)],
+        data: vec![3u8],
+    };
+    assert!(w.send(&p.payer, &[own]).is_err());
+    w.execute(&p, destination).unwrap();
+    w.send(&p.payer, &[recover]).unwrap();
+    assert_eq!(w.vault_data(&p)[112], 1);
+}
+
+/// `stage` requires the system program in its third slot on every chunk.
+#[test]
+fn stage_requires_the_system_program_on_every_chunk() {
+    let mut w = World::new();
+    let p = w.party(7, root(1), root(100), 0);
+    let message = b"any message".to_vec();
+    let digest = hashv(&[&message]).to_bytes();
+    let bytes = key(1).derive::<32>().sign(&[&message]).as_bytes().to_vec();
+    let first = w.stage_ix(&p.payer.pubkey(), &digest, 0, &bytes[..600]);
+    w.send(&p.payer, &[first]).unwrap();
+    let mut second = w.stage_ix(&p.payer.pubkey(), &digest, 600, &bytes[600..]);
+    let good = second.clone();
+    second.accounts[2] = AccountMeta::new_readonly(Pubkey::new_unique(), false);
+    assert!(w.send(&p.payer, &[second]).is_err());
+    w.send(&p.payer, &[good]).unwrap();
+}
+

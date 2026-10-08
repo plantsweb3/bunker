@@ -4,17 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { LoaderCircle } from "lucide-react";
 import type { BunkerConfig } from "@/lib/bunker-config";
-import { createConnection, send } from "@/sdk/client";
+import { createConnection, send, UnconfirmedError } from "@/sdk/client";
 import { useWallet } from "../wallet";
 const friendly: [RegExp, string][] = [
   [
     /\b503\b|RPC unavailable|fetch failed|Failed to fetch/,
-    "The Solana connection is unavailable. Nothing was sent. Try again in a moment.",
+    "The Solana connection is unavailable. This step was not sent. Try again in a moment.",
   ],
-  [/User rejected|rejected the request/i, "Declined in your wallet. Nothing was sent."],
+  [/Load failed|NetworkError when attempting/, "The Solana connection is unavailable. This step was not sent. Try again in a moment."],
+  [/User rejected|rejected the request/i, "Declined in your wallet. This step was not sent. Earlier steps you approved stand."],
+  [/Simulation|would reject this step/, "The network would reject this step, so it was not sent. Most often the connected wallet is short of SOL for fees, or your Bunker changed in another tab. Refresh and try again."],
   [/Invalid public key input|Non-base58 character/, "That is not a valid Solana address."],
 ];
 export const errorText = (e: unknown) => {
+  // Sent, outcome unknown: never described as not sent.
+  if (e instanceof UnconfirmedError) return e.message;
   const m = e instanceof Error ? e.message : "The operation could not be completed.";
   return friendly.find(([pattern]) => pattern.test(m))?.[1] ?? m;
 };
@@ -143,6 +147,10 @@ export function FileField({
         type="file"
         accept=".json,application/json"
         disabled={disabled}
+        // Choosing the same file again after an error must count as a choice.
+        onClick={(e) => {
+          e.currentTarget.value = "";
+        }}
         onChange={(e) => onFile(e.target.files?.[0] ?? null)}
       />
     </label>

@@ -59,15 +59,10 @@ const none = (texts: string[], when: string) => {
 };
 async function vaultWith(delaySecs: number) {
   const master = crypto.getRandomValues(new Uint8Array(32));
-  const g = genesisVault(
-    master,
-    {
+  const g = genesisVault(master, {
       chainTag: new PublicKey(genesis).toBytes(),
       programId: PROGRAM.toBytes(),
-      salt: crypto.getRandomValues(new Uint8Array(32)),
-    },
-    delaySecs,
-  );
+      salt: crypto.getRandomValues(new Uint8Array(32)), delaySecs: delaySecs });
   const d: Descriptor = g.d;
   await send(initializeIx(PROGRAM, payer.publicKey, { salt: d.salt, chainTag: d.chainTag, opRoot: g.opRoot, recRoot: g.recRoot, delaySecs }));
   return { master, d, g, vault: vaultAddress(PROGRAM, d.vaultId) };

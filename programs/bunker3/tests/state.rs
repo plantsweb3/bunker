@@ -296,7 +296,7 @@ fn recover_installs_a_new_epoch_from_every_state() {
         let mut v = start.clone();
         let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
         let displaced = apply_recover(&mut v, &r).unwrap();
-        assert_eq!(displaced, (start.rec_root, Some(start.op_root)), "{label}");
+        assert_eq!(displaced, start.rec_root, "{label}");
         assert_eq!(
             (v.epoch, v.op_index, v.rec_root, v.op_root, v.pending.clone()),
             (1, 0, root(21), root(12), None),
@@ -380,13 +380,21 @@ fn an_operational_key_cannot_make_the_recovery_packet_fail() {
         apply_announce(&mut v, &a, root(99), NOW).unwrap();
         assert_eq!(v.op_root, planted);
         let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
-        let (old_rec, old_op) = apply_recover(&mut v, &r).unwrap();
-        // The planted root is installed, not retired.
-        assert_eq!((old_rec, old_op), (root(20), None), "{label}");
+        // Only the recovery root that signed is handed back for marking.
+        assert_eq!(apply_recover(&mut v, &r).unwrap(), root(20), "{label}");
         assert_eq!(
             (v.epoch, v.op_index, v.rec_root, v.op_root, v.pending.clone()),
             (1, 0, root(21), root(12), None),
             "{label}"
         );
     }
+}
+
+#[test]
+fn a_pending_record_of_an_unknown_kind_does_not_load() {
+    let mut d = [0u8; VAULT_LEN];
+    announced().pack(&mut d).unwrap();
+    assert!(Vault::unpack(&d).is_ok());
+    d[157] = 2;
+    assert!(Vault::unpack(&d).is_err());
 }

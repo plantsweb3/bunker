@@ -16,15 +16,12 @@ export function vectors() {
   const master = new Uint8Array(32).fill(0x42);
   const program = new PublicKey(new Uint8Array(32).fill(11));
   const delaySecs = 86_400;
-  const genesis = genesisVault(
-    master,
-    {
-      chainTag: new Uint8Array(32).fill(9),
-      programId: program.toBytes(),
-      salt: new Uint8Array(32).fill(7),
-    },
+  const genesis = genesisVault(master, {
+    chainTag: new Uint8Array(32).fill(9),
+    programId: program.toBytes(),
+    salt: new Uint8Array(32).fill(7),
     delaySecs,
-  );
+  });
   const { d } = genesis;
   const payer = new PublicKey(new Uint8Array(32).fill(5));
   const init = initializeIx(program, payer, {

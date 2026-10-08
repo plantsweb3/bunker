@@ -37,15 +37,22 @@ export function equal(a: Uint8Array, b: Uint8Array): boolean {
 export function parseAmount(s: string, decimals: number): bigint {
   if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18)
     throw new Error("Unsupported asset precision");
-  if (!/^(0|[1-9]\d*)(\.\d+)?$/.test(s))
-    throw new Error(
-      "Enter a positive amount without commas or exponent notation",
-    );
-  const [whole, fraction = ""] = s.split(".");
+  // Accept what people and phone keyboards actually type: surrounding spaces,
+  // a leading or trailing point, and a single comma as the decimal mark.
+  // Anything that could be read two ways (thousands separators, exponents,
+  // signs) is refused rather than guessed.
+  const typed = s.trim();
+  // "1,000" is a thousand to some people and one to others. Never guess.
+  if (/^\d+,\d{3}$/.test(typed))
+    throw new Error(`“${typed}” could mean two different amounts. Write it with a point, like 1000 or 1.000.`);
+  const t = typed.replace(/^(\d*),(\d*)$/, "$1.$2");
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(t) || /^0\d/.test(t))
+    throw new Error("Enter an amount like 1.5, with no thousands separators");
+  const [whole = "0", fraction = ""] = t.split(".");
   if (fraction.length > decimals)
     throw new Error(`Use at most ${decimals} decimal places`);
   const n =
-    BigInt(whole) * 10n ** BigInt(decimals) +
+    BigInt(whole || "0") * 10n ** BigInt(decimals) +
     BigInt(fraction.padEnd(decimals, "0") || "0");
   if (n <= 0n || n > 0xffffffffffffffffn)
     throw new Error("Amount is outside the supported range");

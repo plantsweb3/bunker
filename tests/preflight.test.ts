@@ -63,6 +63,12 @@ describe("Withdrawal preflight", () => {
     );
     expect(withdrawalBlocker({ ...base, payerLamports: needed })).toBeNull();
   });
+  it("refuses a token recipient that is not a wallet", () => {
+    // A mint address, a token account or a program pasted as the recipient:
+    // an associated account would be created for it and the tokens stranded.
+    expect(withdrawalBlocker({ ...token, destinationIsWallet: false })).toContain("not a wallet");
+    expect(withdrawalBlocker({ ...token, destinationIsWallet: false, tokenDestination: { exists: false } })).toContain("not a wallet");
+  });
   it("adds token-account rent when the recipient account does not exist", () => {
     const needed = rent.proof + rent.marker + FEE_BUFFER_LAMPORTS;
     const missing = { ...token, tokenDestination: { exists: false as const } };
