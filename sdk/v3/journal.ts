@@ -23,6 +23,8 @@ const entry = z
     payload: z.string().optional(),
     message: z.string().optional(),
     signature: z.string().optional(),
+    /** Token withdrawals only: the wallet that owns the destination token account. */
+    recipient: z.string().optional(),
   })
   .strict();
 export type JournalEntry = z.infer<typeof entry>;
@@ -47,11 +49,13 @@ export type SignedAnnouncement = {
   payload: Uint8Array;
   message: Uint8Array;
   signature: Uint8Array;
+  recipient?: string;
 };
 const saved = (e: JournalEntry): SignedAnnouncement => ({
   payload: unhex(e.payload!),
   message: unhex(e.message!),
   signature: unhex(e.signature!),
+  recipient: e.recipient,
 });
 /** What this browser knows about the vault's current operational key. */
 export function journalStatus(
@@ -81,6 +85,7 @@ export async function authorizeAnnouncement(
   d: Descriptor,
   chain: VaultState,
   withdrawal: Pick<Announce, "kind" | "mint" | "destination" | "amount" | "announceBy">,
+  recipient?: string,
 ): Promise<SignedAnnouncement> {
   return locked(k, async () => {
     if (chain.pending) throw new Error("A withdrawal is already pending");
@@ -109,7 +114,8 @@ export async function authorizeAnnouncement(
       payload: hex(signed.payload),
       message: hex(signed.message),
       signature: hex(signed.signature),
+      ...(recipient ? { recipient } : {}),
     });
-    return signed;
+    return { ...signed, recipient };
   });
 }
