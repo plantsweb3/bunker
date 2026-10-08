@@ -2,9 +2,14 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { PublicKey } from "@solana/web3.js";
 import { hex } from "../sdk/bytes";
 import { verify } from "../sdk/winternitz";
-import { genesisAuthorities } from "../sdk/v3/authority";
-import { Descriptor } from "../sdk/v3/derive";
-import { authorizeAnnouncement, journalKey, journalStatus } from "../sdk/v3/journal";
+import { genesisVault, operationalRoot } from "../sdk/v3/authority";
+import {
+  authorizeAnnouncement,
+  journalKey,
+  journalStatus,
+  readJournal,
+  safeJournalStatus,
+} from "../sdk/v3/journal";
 import {
   decryptArchival,
   decryptDayKey,
@@ -19,16 +24,27 @@ import { memoryBrowser } from "./memory-browser";
 afterEach(() => vi.unstubAllGlobals());
 const program = new PublicKey(new Uint8Array(32).fill(11));
 const genesis = new PublicKey(new Uint8Array(32).fill(9)).toBase58();
-const vaultId = new Uint8Array(32).fill(7);
+const salt = new Uint8Array(32).fill(7);
 const master = new Uint8Array(32).fill(0x42);
+const g = genesisVault(
+  master,
+  { chainTag: new PublicKey(genesis).toBytes(), programId: program.toBytes(), salt },
+  86_400,
+);
+const { d } = g;
+const vaultId = d.vaultId;
 const identity = {
   genesis,
   program: program.toBase58(),
   vault: vaultAddress(program, vaultId).toBase58(),
 };
-const base = { version: 3 as const, network: "localnet" as const, ...identity, vaultId: hex(vaultId) };
-const d: Descriptor = descriptorOf(base);
-const g = genesisAuthorities(master, d);
+const base = {
+  version: 3 as const,
+  network: "localnet" as const,
+  ...identity,
+  salt: hex(salt),
+  vaultId: hex(vaultId),
+};
 const chain = (over: Partial<VaultState> = {}): VaultState => ({
   vaultId,
   chainTag: d.chainTag,
@@ -46,8 +62,10 @@ const withdrawal = {
   mint: PublicKey.default,
   destination: new PublicKey(new Uint8Array(32).fill(3)),
   amount: 5n,
-  announceBy: 2_000_000_000n,
+  announceBy: BigInt(Math.floor(Date.now() / 1000)) + 3600n,
 };
+/** The chain as it honestly is at `opIndex` in epoch 0. */
+const at = (opIndex: bigint) => chain({ opIndex, opRoot: operationalRoot(g.seed, d, 0n, opIndex) });
 function browser() {
   const b = memoryBrowser();
   vi.stubGlobal("navigator", b.navigator);
@@ -93,7 +111,7 @@ describe("Protocol 3 signing journal", () => {
       authorizeAnnouncement(identity, g.seed, d, chain(), withdrawal),
     ).rejects.toThrow("save failed");
     vi.stubGlobal("localStorage", b.localStorage);
-    expect(JSON.parse(b.storage.get(journalKey(identity))!).status).toBe("reserved");
+    expect(JSON.parse(b.storage.get(journalKey(identity))!).entries[0].status).toBe("reserved");
     expect(journalStatus(identity, chain()).state).toBe("orphaned");
     await expect(
       authorizeAnnouncement(identity, g.seed, d, chain(), withdrawal),
@@ -104,8 +122,73 @@ describe("Protocol 3 signing journal", () => {
     await authorizeAnnouncement(identity, g.seed, d, chain(), withdrawal);
     expect(journalStatus(identity, chain({ opIndex: 1n })).state).toBe("unused");
     expect(journalStatus(identity, chain({ epoch: 1n })).state).toBe("unused");
-    const next = await authorizeAnnouncement(identity, g.seed, d, chain({ opIndex: 1n }), withdrawal);
+    const next = await authorizeAnnouncement(identity, g.seed, d, at(1n), withdrawal);
     expect(decodeAnnounce(next.payload).opIndex).toBe(1n);
+  });
+  it("never signs twice when the chain view goes forward and then back", async () => {
+    browser();
+    // The connection shows index 5, then 6, then 5 again (a lagging or lying node).
+    const first = await authorizeAnnouncement(identity, g.seed, d, at(5n), withdrawal);
+    await authorizeAnnouncement(identity, g.seed, d, at(6n), { ...withdrawal, amount: 6n });
+    const back = journalStatus(identity, at(5n));
+    expect(back.state).toBe("signed");
+    if (back.state === "signed")
+      expect(hex(back.announcement.signature)).toBe(hex(first.signature));
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, at(5n), { ...withdrawal, amount: 7n }),
+    ).rejects.toThrow("already signed");
+    // An index below everything signed, with no saved bytes, is refused outright.
+    expect(journalStatus(identity, at(4n)).state).toBe("behind");
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, at(4n), withdrawal),
+    ).rejects.toThrow("older state");
+    // So is an earlier epoch after a later one has been signed in.
+    const seed1 = new Uint8Array(32).fill(1);
+    const epoch1 = chain({ epoch: 1n, opRoot: operationalRoot(seed1, d, 1n, 0n) });
+    await authorizeAnnouncement(identity, seed1, d, epoch1, withdrawal);
+    expect(journalStatus(identity, at(7n)).state).toBe("behind");
+  });
+  it("remembers a used key after its signed bytes are no longer kept", async () => {
+    browser();
+    for (let i = 0n; i < 20n; i++)
+      await authorizeAnnouncement(identity, g.seed, d, at(i), withdrawal);
+    const j = readJournal(identity);
+    expect(j.entries.length).toBe(16);
+    expect(j.used).toEqual({ "0": "19" });
+    expect(journalStatus(identity, at(0n)).state).toBe("behind");
+    expect(journalStatus(identity, at(19n)).state).toBe("signed");
+    expect(journalStatus(identity, at(20n)).state).toBe("unused");
+  });
+  it("only signs for the key this day key derives, and bounds the deadline", async () => {
+    const b = browser();
+    // A vault view whose current root is not this seed's root for the tuple.
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, chain({ opIndex: 3n }), withdrawal),
+    ).rejects.toThrow("does not match");
+    await expect(
+      authorizeAnnouncement(identity, new Uint8Array(32).fill(9), d, chain(), withdrawal),
+    ).rejects.toThrow("does not match");
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, chain(), {
+        ...withdrawal,
+        announceBy: withdrawal.announceBy + 90_000n,
+      }),
+    ).rejects.toThrow("clock");
+    expect(b.storage.size).toBe(0);
+  });
+  it("reads the earlier single-entry format and refuses an unreadable journal", async () => {
+    const b = browser();
+    b.localStorage.setItem(
+      journalKey(identity),
+      JSON.stringify({ version: 3, epoch: "0", opIndex: "2", status: "reserved" }),
+    );
+    expect(journalStatus(identity, at(2n)).state).toBe("orphaned");
+    expect(journalStatus(identity, at(1n)).state).toBe("behind");
+    b.localStorage.setItem(journalKey(identity), "{not json");
+    expect(safeJournalStatus(identity, at(3n)).state).toBe("unreadable");
+    await expect(
+      authorizeAnnouncement(identity, g.seed, d, at(3n), withdrawal),
+    ).rejects.toThrow();
   });
   it("refuses while a withdrawal is pending, without reserving", async () => {
     const b = browser();
@@ -146,9 +229,14 @@ describe("Protocol 3 key files", () => {
   it("rejects a file whose vault address does not match its identity", async () => {
     const other = vaultAddress(program, new Uint8Array(32).fill(8)).toBase58();
     await expect(encryptFile({ ...day, vault: other }, password)).rejects.toThrow("does not match");
+    // A kit whose master does not create the vault it names is refused.
+    const wrong = hex(new Uint8Array(32).fill(0x43));
+    await expect(encryptFile({ ...archival, master: wrong }, password)).rejects.toThrow("does not match its vault");
+    await expect(encryptFile({ ...archival, delaySecs: 0 }, password)).rejects.toThrow("does not match its vault");
+    await expect(encryptFile(day, "123456789012")).rejects.toThrow("too easy");
+    await expect(encryptFile(day, "short")).rejects.toThrow("at least 12");
     await expect(encryptFile({ ...archival, delaySecs: 604_801 }, password)).rejects.toThrow();
     await expect(encryptFile({ ...archival, delaySecs: -1 }, password)).rejects.toThrow();
-    expect(await decryptArchival(await encryptFile({ ...archival, delaySecs: 0 }, password), password)).toMatchObject({ delaySecs: 0 });
   });
   it("detects tampering with the envelope", async () => {
     const e = JSON.parse(await encryptFile(day, password));

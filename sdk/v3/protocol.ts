@@ -26,6 +26,9 @@ const ROLE_RECOVERY = 2;
 const text = (s: string) => new TextEncoder().encode(s);
 export const ANNOUNCE_DOMAIN = text("BUNKER3_ANNOUNCE");
 export const RECOVER_DOMAIN = text("BUNKER3_RECOVER_");
+export const VAULT_ID_DOMAIN = text("BUNKER3_VAULT_ID");
+/** How far ahead of the chain clock an announcement's deadline may be. */
+export const MAX_ANNOUNCE_AHEAD_SECS = 86_400n;
 const ZERO = new Uint8Array(32);
 const isZero = (b: Uint8Array) => b.every((x) => x === 0);
 const same = (a: Uint8Array, b: Uint8Array) =>
@@ -43,6 +46,39 @@ const root32 = (b: Uint8Array, what: string) => {
   return b;
 };
 
+export type Genesis = {
+  salt: Uint8Array;
+  chainTag: Uint8Array;
+  opRoot: Uint8Array;
+  recRoot: Uint8Array;
+  delaySecs: number;
+};
+/** `salt || chain_tag || op_root || rec_root || delay_secs`: the data of
+ * `initialize`, and the preimage of the vault identity. */
+export function genesisData(g: Genesis): Uint8Array {
+  if (
+    !Number.isInteger(g.delaySecs) ||
+    g.delaySecs < MIN_DELAY_SECS ||
+    g.delaySecs > MAX_DELAY_SECS ||
+    isZero(root32(g.opRoot, "Operational root")) ||
+    isZero(root32(g.recRoot, "Recovery root")) ||
+    same(g.opRoot, g.recRoot)
+  )
+    throw new Error("Invalid vault parameters");
+  const delay = new Uint8Array(4);
+  new DataView(delay.buffer).setUint32(0, g.delaySecs, true);
+  return concat(
+    root32(g.salt, "Salt"),
+    root32(g.chainTag, "Chain tag"),
+    g.opRoot,
+    g.recRoot,
+    delay,
+  );
+}
+/** The vault identity: a hash of everything the vault is created with. The
+ * program computes the same value, so a vault's address fixes its creation
+ * parameters no matter who sends `initialize`. */
+export const vaultIdOf = (g: Genesis) => sha256(concat(VAULT_ID_DOMAIN, genesisData(g)));
 export const vaultAddress = (program: PublicKey, vaultId: Uint8Array) =>
   PublicKey.findProgramAddressSync([Buffer.from("bunker3"), vaultId], program)[0];
 export const proofAddress = (
@@ -54,10 +90,12 @@ export const proofAddress = (
     [Buffer.from("proof"), payer.toBytes(), digest],
     program,
   )[0];
-export function spentAddress(program: PublicKey, root: Uint8Array) {
+/** Markers belong to one vault; a root retired in one vault is untouched in
+ * every other. */
+export function spentAddress(program: PublicKey, vault: PublicKey, root: Uint8Array) {
   if (root.length !== 32 || isZero(root)) throw new Error("Missing commitment");
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("spent-v3"), root],
+    [Buffer.from("spent-v3"), vault.toBytes(), root],
     program,
   )[0];
 }
@@ -259,43 +297,16 @@ const ix = (
     keys,
     data: Buffer.from(concat(new Uint8Array([opcode]), data)),
   });
-export function initializeIx(
-  program: PublicKey,
-  payer: PublicKey,
-  v: {
-    vaultId: Uint8Array;
-    chainTag: Uint8Array;
-    opRoot: Uint8Array;
-    recRoot: Uint8Array;
-    delaySecs: number;
-  },
-) {
-  if (
-    !Number.isInteger(v.delaySecs) ||
-    v.delaySecs < MIN_DELAY_SECS ||
-    v.delaySecs > MAX_DELAY_SECS ||
-    same(v.opRoot, v.recRoot)
-  )
-    throw new Error("Invalid vault parameters");
-  const delay = new Uint8Array(4);
-  new DataView(delay.buffer).setUint32(0, v.delaySecs, true);
+export function initializeIx(program: PublicKey, payer: PublicKey, g: Genesis) {
   return ix(
     program,
     [
       meta(payer, true, true),
-      meta(vaultAddress(program, v.vaultId), true),
+      meta(vaultAddress(program, vaultIdOf(g)), true),
       meta(SystemProgram.programId),
-      meta(spentAddress(program, v.opRoot)),
-      meta(spentAddress(program, v.recRoot)),
     ],
     0,
-    concat(
-      root32(v.vaultId, "Vault id"),
-      root32(v.chainTag, "Chain tag"),
-      v.opRoot,
-      v.recRoot,
-      delay,
-    ),
+    genesisData(g),
   );
 }
 /** Two transactions' worth of instructions that upload a signature. */
@@ -326,14 +337,15 @@ export function announceIx(
   currentOpRoot: Uint8Array,
 ) {
   const a = decodeAnnounce(payload);
+  const vault = vaultAddress(program, a.vaultId);
   return ix(
     program,
     [
-      meta(vaultAddress(program, a.vaultId), true),
+      meta(vault, true),
       meta(proofAddress(program, payer, sha256(announceMessage(program, payload)))),
       meta(payer, true, true),
-      meta(spentAddress(program, currentOpRoot), true),
-      meta(spentAddress(program, a.nextOpRoot)),
+      meta(spentAddress(program, vault, currentOpRoot), true),
+      meta(spentAddress(program, vault, a.nextOpRoot)),
       meta(SystemProgram.programId),
     ],
     2,
@@ -363,16 +375,17 @@ export function recoverIx(
   current: { recRoot: Uint8Array; opRoot: Uint8Array },
 ) {
   const r = decodeRecover(payload);
+  const vault = vaultAddress(program, r.vaultId);
   return ix(
     program,
     [
-      meta(vaultAddress(program, r.vaultId), true),
+      meta(vault, true),
       meta(proofAddress(program, payer, sha256(recoverMessage(program, payload)))),
       meta(payer, true, true),
-      meta(spentAddress(program, current.recRoot), true),
-      meta(spentAddress(program, current.opRoot), true),
-      meta(spentAddress(program, r.nextRecRoot)),
-      meta(spentAddress(program, r.nextOpRoot)),
+      meta(spentAddress(program, vault, current.recRoot), true),
+      meta(spentAddress(program, vault, current.opRoot), true),
+      meta(spentAddress(program, vault, r.nextRecRoot)),
+      meta(spentAddress(program, vault, r.nextOpRoot)),
       meta(SystemProgram.programId),
     ],
     5,

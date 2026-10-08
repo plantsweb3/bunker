@@ -62,6 +62,8 @@ async function setup(page: Page, info: TestInfo, origin = "") {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   const password = "local integration test password 2026";
+  // Typed into the website; deliberately not the recovery kit's password.
+  const dayPassword = "local day key password for tests 2026";
   const save = async (trigger: () => Promise<void>, name: string) => {
     const download = page.waitForEvent("download");
     await trigger();
@@ -115,9 +117,19 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     );
     await tool.bringToFront();
     await tool.locator("#card").setInputFiles(card);
+    // The tool shows which network and program it is building for.
+    await expect(tool.locator("#card-echo")).toContainText(`Program: ${PROGRAM}`);
     await tool.locator("#password").fill(password);
     await tool.locator("#repeat").fill(password);
     await tool.locator("#kit-ack").check();
+    await tool.locator("#card-ack").check();
+    // The day key may not share the recovery kit's password.
+    await tool.locator("#day-password").fill(password);
+    await tool.locator("#day-repeat").fill(password);
+    await tool.locator("#create").click();
+    await expect(tool.locator("#build-status")).toContainText("different password");
+    await tool.locator("#day-password").fill(dayPassword);
+    await tool.locator("#day-repeat").fill(dayPassword);
     // The waiting period is off unless turned on AND acknowledged.
     await expect(tool.locator("#wait")).not.toBeChecked();
     if (wait) {
@@ -153,6 +165,8 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await tool.locator("#kit").setInputFiles(kit);
     await tool.locator("#kit-password").fill(password);
     await tool.locator("#epoch").fill(epoch);
+    await tool.locator("#new-day-password").fill(dayPassword);
+    await tool.locator("#new-day-repeat").fill(dayPassword);
     const made = await toolSaves(() => tool.locator("#recover").click(), 2);
     await page.bringToFront();
     return { packet: made("recovery-packet"), nextDay: made("day-key") };
@@ -163,7 +177,7 @@ async function setup(page: Page, info: TestInfo, origin = "") {
     await expect(page.getByText("Sealed", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Open with day key" }).click();
     await page.getByLabel("Day key", { exact: true }).setInputFiles(dayKey);
-    await page.getByLabel("Day key password", { exact: true }).fill(password);
+    await page.getByLabel("Day key password", { exact: true }).fill(dayPassword);
     await page.getByRole("checkbox").check();
     await page.getByRole("button", { name: "Unseal Bunker" }).click();
   };
@@ -373,6 +387,9 @@ test("passkey: save a day key to the device and unseal with it", async ({ page }
   await page.getByRole("button", { name: "Seal Bunker" }).click();
   await page.goto("http://localhost:5173/vault");
   await connect(page);
+  // The cross-device statement is required however the key is opened.
+  await expect(page.getByRole("button", { name: "Unseal with passkey" })).toBeDisabled();
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Unseal with passkey" }).click();
   await expect(page.getByText("Unsealed with your passkey.", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.locator(".vault-balance")).toContainText("1");
@@ -396,6 +413,7 @@ test("passkey: save a day key to the device and unseal with it", async ({ page }
   });
   await page.goto("http://localhost:5173/vault");
   await connect(page);
+  await page.getByRole("checkbox").check();
   await page.getByRole("button", { name: "Unseal with passkey" }).click();
   await expect(page.getByText("did not unlock the saved day key", { exact: false })).toBeVisible({ timeout: 15000 });
   await expect(page.getByText("Sealed", { exact: true })).toBeVisible();

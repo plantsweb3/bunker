@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <!-- No connection of any kind is permitted. The script is pinned by hash. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '__SCRIPT_HASH__'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src '__SCRIPT_HASH__'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'; webrtc 'block'">
 <meta name="referrer" content="no-referrer">
 <title>Bunker recovery tool (offline)</title>
 <style>
@@ -47,6 +47,8 @@ small{color:#839497;font-size:12px}
 <p>This file is the only place your recovery kit is ever opened. It cannot connect to anything: it reads files you give it and saves files you carry back to the website.</p>
 <div class="warn" id="online"><strong>This device is online.</strong> The tool will not send anything, but for a real Bunker you would open it on a device that is disconnected, or never connects.</div>
 <div class="note">Draft protocol, not reviewed. Do not use with real funds.</div>
+<div class="warn" id="served" hidden><strong>Save this page first.</strong> The recovery tool does not run from a website. Download the file, then open the saved copy from your device.</div>
+<div id="tool">
 <nav role="tablist">
 <button id="tab-build" role="tab" aria-selected="true">Build a new Bunker</button>
 <button id="tab-recover" role="tab" aria-selected="false">Recover or cancel</button>
@@ -55,8 +57,16 @@ small{color:#839497;font-size:12px}
 <h2>One kit, kept for good.</h2>
 <p>The recovery kit is created once and never changes. Whoever holds it and its password controls the Bunker.</p>
 <label>Network card (downloaded from the website)<input id="card" type="file" accept=".json,application/json"></label>
+<div class="box" id="card-box" hidden>
+<code id="card-echo" style="white-space:pre-wrap"></code>
+<label class="check"><input id="card-ack" type="checkbox"><span>These match what the Bunker website shows under “Network”. A Bunker built for a different program is a different Bunker.</span></label>
+</div>
 <label>Recovery password<input id="password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <label>Confirm recovery password<input id="repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<small>The recovery password is only ever typed into this tool. Never type it into a website.</small>
+<label>Day key password (a different one)<input id="day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<label>Confirm day key password<input id="day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<small>The day key password is the one you type on the Bunker website to open your Bunker.</small>
 <div class="box">
 <label class="check"><input id="wait" type="checkbox"><span><strong>Add a waiting period</strong> (optional). Off by default: withdrawals leave as soon as you approve them.</span></label>
 <div id="wait-fields" hidden>
@@ -82,10 +92,14 @@ small{color:#839497;font-size:12px}
 <p>A recovery packet replaces every key, kills every earlier day key and cancels a withdrawal that is still waiting. It never moves assets. Making the same packet twice gives the same file, so it is safe to repeat.</p>
 <label>Recovery kit<input id="kit" type="file" accept=".json,application/json"></label>
 <label>Recovery password<input id="kit-password" type="password" autocomplete="off" placeholder="At least 12 characters"></label>
+<div class="box" id="kit-box" hidden><code id="kit-echo" style="white-space:pre-wrap"></code></div>
 <label>Current key generation (shown on your Bunker page)<input id="epoch" type="text" inputmode="numeric" placeholder="0"></label>
+<label>Password for the new day key (not the recovery password)<input id="new-day-password" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
+<label>Confirm new day key password<input id="new-day-repeat" type="password" autocomplete="new-password" placeholder="At least 12 characters"></label>
 <div class="row"><button class="go" id="recover">Make recovery packet</button><button class="ghost" id="reissue">Only re-issue this generation’s day key</button></div>
 <div class="status" id="recover-status" role="status"></div>
 </section>
+</div>
 </main>
 <script>__SCRIPT__</script>
 </body>

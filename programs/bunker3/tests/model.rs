@@ -204,7 +204,7 @@ fn decoders_never_panic_and_accept_only_canonical_bytes() {
             v.pack(&mut again).unwrap();
             assert_eq!(again.to_vec(), bytes, "an accepted vault was not in canonical form");
         }
-        if let Ok(v) = new_vault(&bytes, 255) {
+        if let Ok(v) = new_vault([7; 32], &bytes, 255) {
             accepted += 1;
             assert!(v.delay_secs <= MAX_DELAY_SECS && v.op_root != v.rec_root);
         }

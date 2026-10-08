@@ -13,10 +13,14 @@ pub const ROLE_RECOVERY: u8 = 2;
 pub const VAULT_MAGIC: &[u8; 8] = b"BUNKER03";
 pub const ANNOUNCE_DOMAIN: &[u8; 16] = b"BUNKER3_ANNOUNCE";
 pub const RECOVER_DOMAIN: &[u8; 16] = b"BUNKER3_RECOVER_";
+pub const VAULT_ID_DOMAIN: &[u8; 16] = b"BUNKER3_VAULT_ID";
 /// A vault may be created with no waiting period. Zero means an announced
 /// withdrawal can execute immediately, including in the same transaction.
 pub const MAX_DELAY_SECS: u32 = 604_800;
 pub const EXECUTE_WINDOW_SECS: i64 = 604_800;
+/// A signed announcement that has not landed stops being usable at most this
+/// long after it could first have landed.
+pub const MAX_ANNOUNCE_AHEAD_SECS: i64 = 86_400;
 const ZERO: [u8; 32] = [0; 32];
 
 pub fn invalid() -> ProgramError {
@@ -122,11 +126,13 @@ impl Vault {
     }
 }
 
-/// `vault_id || chain_tag || op_root || rec_root || delay_secs`
-pub fn new_vault(data: &[u8], bump: u8) -> Result<Vault, ProgramError> {
+/// `data` is `salt || chain_tag || op_root || rec_root || delay_secs`.
+/// `vault_id` is the caller's hash of `VAULT_ID_DOMAIN || data`; the salt is
+/// not stored.
+pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, ProgramError> {
     require(data.len() == INIT_LEN)?;
     let v = Vault {
-        vault_id: arr(&data[..32]),
+        vault_id,
         chain_tag: arr(&data[32..64]),
         op_root: arr(&data[64..96]),
         op_index: 0,
@@ -224,7 +230,7 @@ pub fn apply_announce(
             && a.op_index == v.op_index,
     )?;
     require(v.pending.is_none())?;
-    require(now <= a.announce_by)?;
+    require(now <= a.announce_by && a.announce_by.saturating_sub(now) <= MAX_ANNOUNCE_AHEAD_SECS)?;
     require(a.next_op_root != v.op_root && a.next_op_root != v.rec_root)?;
     let opens_at = now
         .checked_add(v.delay_secs as i64)

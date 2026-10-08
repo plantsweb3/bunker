@@ -8,7 +8,7 @@ import { createConnection, send } from "@/sdk/client";
 import { useWallet } from "../wallet";
 const friendly: [RegExp, string][] = [
   [
-    /503|RPC unavailable|fetch failed|Failed to fetch/,
+    /\b503\b|RPC unavailable|fetch failed|Failed to fetch/,
     "The Solana connection is unavailable. Nothing was sent. Try again in a moment.",
   ],
   [/User rejected|rejected the request/i, "Declined in your wallet. Nothing was sent."],
