@@ -1387,7 +1387,7 @@ body {
   top: 92px;
   left: 50%;
   width: 1px;
-  height: 300px;
+  height: 150px;
   background: linear-gradient(#7dd3c755, transparent);
   box-shadow: 0 0 120px 40px #7dd3c70d;
 }
@@ -1957,6 +1957,94 @@ body {
   font: inherit;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.activity-log {
+  margin: 0 0 38px;
+  display: grid;
+  gap: 14px;
+}
+.activity-log .panel-head h2 {
+  font-size: 20px;
+  letter-spacing: -0.02em;
+}
+.activity-log ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #263135;
+}
+.activity-log li {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid #263135;
+  font-size: 13px;
+}
+.activity-log li > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+.activity-log b {
+  font-weight: 500;
+  font-size: 14px;
+}
+.activity-log li span {
+  color: #7f9197;
+}
+.activity-log li.failed b {
+  color: #d9a08f;
+}
+.activity-amounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+.activity-log code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  color: #d4e9eb;
+}
+.activity-log a {
+  color: #dfe9ea;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.sweep-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #263135;
+}
+.sweep-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #263135;
+}
+.sweep-list code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 13px;
+  color: #d4e9eb;
+}
+.button.bunker-mode {
+  border-color: #47686f;
+  color: var(--ice);
+}
+@media (max-width: 700px) {
+  .activity-log li {
+    grid-template-columns: 1fr auto;
+  }
+  .activity-amounts {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  .balance-panel > .actions .button.bunker-mode {
+    flex-basis: 100%;
+  }
 }
 .token-rows {
   list-style: none;

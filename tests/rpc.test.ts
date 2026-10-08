@@ -44,6 +44,38 @@ describe("RPC boundary", () => {
     expect((await POST(local("http://127.0.0.1:5176"))).status).toBe(403);
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
+  it("forwards only the read methods the app uses and refuses everything else", async () => {
+    vi.stubEnv("BUNKER_ENABLE_TEST_CUSTODY", "false");
+    const fetcher = vi
+      .fn()
+      .mockImplementation(() =>
+        Promise.resolve(Response.json({ jsonrpc: "2.0", id: 1, result: null })),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    const call = async (method: string) =>
+      (await (await POST(request({ ...read, method }))).json()) as {
+        error?: { code: number };
+      };
+    for (const method of [
+      "getBalance",
+      "getAccountInfo",
+      "getTokenAccountsByOwner",
+      "getSignaturesForAddress",
+      "getTransaction",
+    ])
+      expect((await call(method)).error, method).toBeUndefined();
+    expect(fetcher).toHaveBeenCalledTimes(5);
+    for (const method of [
+      "sendTransaction",
+      "simulateTransaction",
+      "requestAirdrop",
+      "getProgramAccounts",
+      "getBlock",
+      "getTokenLargestAccounts",
+    ])
+      expect((await call(method)).error?.code, method).toBe(-32601);
+    expect(fetcher).toHaveBeenCalledTimes(5);
+  });
   it("rejects batches, invalid JSON, cross-origin calls and oversized request bytes", async () => {
     vi.stubEnv("BUNKER_ENABLE_TEST_CUSTODY", "false");
     expect((await POST(request([read]))).status).toBe(400);

@@ -5,7 +5,7 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { RefreshCw, LockKeyhole } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { formatAmount, parseAmount, unhex } from "@/sdk/bytes";
-import { Asset, assets, depositIxs, withdrawalDestination } from "@/sdk/client";
+import { Asset, assets, depositIxs, explorer, withdrawalDestination } from "@/sdk/client";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddress,
@@ -13,6 +13,7 @@ import {
 import { mintLabel } from "@/sdk/known-mints";
 import { withdrawalPreflight } from "@/sdk/preflight";
 import { chainTime, fetchVault, formatDuration, vaultTokens } from "@/sdk/v3/chain";
+import { Activity, ACTIVITY_LABEL, fetchHistory } from "@/sdk/v3/history";
 import { authorizeAnnouncement, journalStatus, SignedAnnouncement } from "@/sdk/v3/journal";
 import { DayKey, decryptDayKey, descriptorOf } from "@/sdk/v3/kit";
 import {
@@ -47,7 +48,11 @@ type Loaded = {
   at: number;
 };
 const tokenName = (mint: string) => mintLabel(mint) ?? `${mint.slice(0, 4)}…${mint.slice(-4)}`;
-type Step = "idle" | "open" | "deposit" | "withdraw" | "review";
+type Step = "idle" | "open" | "deposit" | "withdraw" | "review" | "sweep";
+/** Left in the wallet by a sweep so it can still pay fees. */
+const SWEEP_KEEP_LAMPORTS = 20_000_000n;
+const signed = (n: bigint, decimals: number) =>
+  `${n > 0n ? "+" : "−"}${formatAmount(n < 0n ? -n : n, decimals)}`;
 const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
 function App() {
   const b = useBunker();
@@ -62,6 +67,9 @@ function App() {
   // "SOL" or a mint address.
   const [assetKey, setAssetKey] = useState("SOL");
   const [walletAssets, setWalletAssets] = useState<Asset[]>([]);
+  // Assets left out of a sweep, by key.
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const [history, setHistory] = useState<Activity[] | null>(null);
   // Passkey unlock: whether the device can do it, and what is saved here.
   const [canPasskey, setCanPasskey] = useState(false);
   const [passkey, setPasskey] = useState<PasskeyRecord | null>(null);
@@ -131,13 +139,66 @@ function App() {
     setFresh(false);
     setAmount("");
     setAssetKey("SOL");
+    setSkipped([]);
     setRecipient("");
     setAck(false);
     b.setError("");
   }
+  const loadWallet = () => {
+    if (b.wallet.address)
+      void assets(b.connection, b.wallet.address)
+        .then(setWalletAssets)
+        .catch(() => setWalletAssets([]));
+  };
+  async function loadHistory() {
+    const { program } = b.live();
+    if (!day) throw new Error("Open your Bunker first");
+    setHistory(await fetchHistory(b.connection, program, new PublicKey(day.vault)));
+  }
+  /** Bunker Mode: move what the wallet holds into the Bunker. */
+  async function sweep() {
+    const { payer } = b.live();
+    if (!day) throw new Error("Open your Bunker first");
+    const vaultKey = new PublicKey(day.vault);
+    // Read the wallet again: amounts must be what is there now.
+    const held = await assets(b.connection, payer);
+    const tokens = held.filter(
+      (a) => a.mint && a.amount > 0n && !a.frozen && !skipped.includes(a.mint),
+    );
+    const batches: Awaited<ReturnType<typeof depositIxs>>[] = [];
+    for (let i = 0; i < tokens.length; i += 3)
+      batches.push(
+        (
+          await Promise.all(
+            tokens.slice(i, i + 3).map((a) => depositIxs(payer, vaultKey, a, a.amount)),
+          )
+        ).flat(),
+      );
+    const total = batches.length + (skipped.includes("SOL") ? 0 : 1);
+    let moved = 0;
+    for (const ixs of batches)
+      await b.transmit(`Moving in · ${++moved} of ${total}`, ixs);
+    if (!skipped.includes("SOL")) {
+      // Last, so fees and token-account deposits above are already paid.
+      // Also leave this transfer's own fee, so the wallet ends on the reserve.
+      const lamports =
+        BigInt(await b.connection.getBalance(payer)) - SWEEP_KEEP_LAMPORTS - 5_000n;
+      if (lamports > 0n)
+        await b.transmit(`Moving in · ${++moved} of ${total}`, [
+          SystemProgram.transfer({ fromPubkey: payer, toPubkey: vaultKey, lamports }),
+        ]);
+    }
+    close();
+    await load(day);
+    setHistory(null);
+    b.setNotice(
+      "Bunker Mode on. What you selected is inside, and this wallet’s key cannot take it back out. Seal when you are done.",
+    );
+  }
   function seal() {
     setDay(null);
     setVault(null);
+    setHistory(null);
     close();
     b.setNotice("Bunker sealed. The day key is no longer in this browser tab.");
   }
@@ -661,6 +722,63 @@ function App() {
                     </button>
                   </div>
                 </div>
+              ) : step === "sweep" ? (
+                <div className="inline-form">
+                  <h2>Go Bunker Mode.</h2>
+                  <p className="modal-copy">
+                    Move what this wallet holds into your Bunker in one go.
+                    Once inside, it only comes out with your Bunker key.
+                  </p>
+                  <ul className="sweep-list">
+                    {walletAssets
+                      .filter((a) => a.amount > 0n && !a.frozen)
+                      .map((a) => {
+                        const id = a.mint ?? "SOL";
+                        const moving = a.mint
+                          ? a.amount
+                          : a.amount > SWEEP_KEEP_LAMPORTS
+                            ? a.amount - SWEEP_KEEP_LAMPORTS
+                            : 0n;
+                        return (
+                          <li key={a.key}>
+                            <label className="check-label">
+                              <Checkbox
+                                aria-label={`Move ${a.mint ? tokenName(a.mint) : "SOL"}`}
+                                checked={!skipped.includes(id)}
+                                onCheckedChange={(v) =>
+                                  setSkipped((old) =>
+                                    v === true ? old.filter((k) => k !== id) : [...old, id],
+                                  )
+                                }
+                              />
+                              <span>
+                                <b>{a.mint ? tokenName(a.mint) : "SOL"}</b>
+                              </span>
+                            </label>
+                            <code>{formatAmount(moving, a.decimals)}</code>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                  <p className="micro">
+                    {formatAmount(SWEEP_KEEP_LAMPORTS, 9)} SOL stays in the
+                    wallet for fees. SOL and classic SPL tokens only. One
+                    wallet approval per group of three tokens, then one for
+                    SOL.
+                  </p>
+                  <div className="actions">
+                    <button
+                      className="button light"
+                      disabled={!can || walletAssets.length === 0}
+                      onClick={() => b.task("Moving in", sweep)}
+                    >
+                      Move it all in
+                    </button>
+                    <button className="button ghost" onClick={close}>
+                      Back
+                    </button>
+                  </div>
+                </div>
               ) : step === "withdraw" ? (
                 <div className="inline-form">
                   <label className="field">
@@ -792,11 +910,7 @@ function App() {
                     onClick={() => {
                       close();
                       setStep("deposit");
-                      // Token balances of the paying wallet, for the asset list.
-                      if (b.wallet.address)
-                        void assets(b.connection, b.wallet.address)
-                          .then(setWalletAssets)
-                          .catch(() => setWalletAssets([]));
+                      loadWallet();
                     }}
                   >
                     <BIcon name="deposit" size={17} />
@@ -812,6 +926,19 @@ function App() {
                   >
                     <BIcon name="withdraw" size={17} />
                     Withdraw
+                  </button>
+                  <button
+                    className="button ghost bunker-mode"
+                    disabled={!can}
+                    onClick={() => {
+                      close();
+                      setStep("sweep");
+                      setWalletAssets([]);
+                      loadWallet();
+                    }}
+                  >
+                    <BIcon name="vault" size={17} />
+                    Bunker Mode
                   </button>
                 </div>
               )}
@@ -990,6 +1117,75 @@ function App() {
             </ol>
           </aside>
         </div>
+      )}
+      {day && vault && (
+        <section className="panel activity-log">
+          <div className="panel-head">
+            <h2>Activity</h2>
+            <button
+              className="text-button"
+              disabled={!!b.busy}
+              onClick={() => b.task("Reading activity", loadHistory)}
+            >
+              <RefreshCw size={14} />
+              {history ? "Refresh" : "Show activity"}
+            </button>
+          </div>
+          {history === null ? (
+            <p className="micro">
+              Everything that has moved in or out, read back from the chain.
+            </p>
+          ) : history.length === 0 ? (
+            <p className="micro">Nothing yet.</p>
+          ) : (
+            <ul>
+              {history.map((a) => {
+                const link = b.config ? explorer(a.signature, b.config.network) : null;
+                return (
+                  <li key={a.signature} className={a.failed ? "failed" : ""}>
+                    <div>
+                      <b>
+                        {ACTIVITY_LABEL[a.kind]}
+                        {a.failed ? " · failed" : ""}
+                      </b>
+                      <span>
+                        {a.time
+                          ? new Date(a.time * 1000).toLocaleString(undefined, {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })
+                          : "Time not reported"}
+                      </span>
+                    </div>
+                    <div className="activity-amounts">
+                      {!a.failed && a.sol !== 0n && a.kind !== "built" && (
+                        <code>{signed(a.sol, 9)} SOL</code>
+                      )}
+                      {!a.failed &&
+                        a.tokens.map((t) => (
+                          <code key={t.mint}>
+                            {signed(t.delta, t.decimals)} {tokenName(t.mint)}
+                          </code>
+                        ))}
+                    </div>
+                    {link ? (
+                      <a href={link} target="_blank" rel="noreferrer">
+                        Explorer
+                      </a>
+                    ) : (
+                      <code title={a.signature}>{a.signature.slice(0, 8)}…</code>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="micro">
+            Shows transactions that name this Bunker’s address. A token sent
+            straight to one of its token accounts from elsewhere appears in the
+            balance but not here.
+          </p>
+        </section>
       )}
       <div className="workspace-bottom">
         <div>
