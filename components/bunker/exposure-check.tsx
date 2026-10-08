@@ -23,16 +23,27 @@ import { mintLabel } from "@/sdk/known-mints";
 import {
   Exposure,
   ParsedTokenInfo,
+  permanentDelegate,
+  RAW_TOKEN_BYTES,
+  rawTokenInfo,
   TokenHolding,
   TOKEN_2022_PROGRAM_ID,
   summarizeExposure,
 } from "@/sdk/exposure";
+/** How many Token-2022 mints are looked up for issuer powers (100 per request). */
+const MINT_LOOKUPS = 300;
+class TooLarge extends Error {}
+/** A non-empty balance's amount in the token's units, when they are known. */
+const amountText = (amount: bigint, decimals: number | null) =>
+  decimals === null ? "amount not loaded" : formatAmount(amount, decimals);
 const SHOWN = 8;
 const brief = (s: string) => `${s.slice(0, 4)}…${s.slice(-4)}`;
 const plural = (n: number, one: string, many = `${one}s`) =>
   `${n.toLocaleString("en-US")} ${n === 1 ? one : many}`;
 function problem(e: unknown) {
   const m = e instanceof Error ? e.message : "";
+  if (e instanceof TooLarge)
+    return "This wallet has more token accounts than this check can read. Its SOL balance and tokens can still be moved by one signature.";
   if (/429|Too many requests/i.test(m))
     return "The Solana connection is busy. Wait a few seconds and try again.";
   if (/503|RPC unavailable|fetch failed|Failed to fetch/i.test(m))
@@ -74,6 +85,10 @@ export default function ExposureCheck() {
     setError("");
     setResult(null);
     try {
+      const tooLarge = (e: unknown) => /502|too large/i.test(e instanceof Error ? e.message : "");
+      // Fully parsed first. A wallet with thousands of token accounts is too
+      // large to read that way, so it is read again as the first bytes of each
+      // account, which is enough to count and classify but not to show amounts.
       const rows = (program: PublicKey) =>
         connection
           .getParsedTokenAccountsByOwner(owner, { programId: program })
@@ -82,15 +97,44 @@ export default function ExposureCheck() {
               account: t.pubkey.toBase58(),
               info: t.account.data.parsed?.info as ParsedTokenInfo,
             })),
-          );
+          )
+          .catch(async (e) => {
+            if (!tooLarge(e)) throw e;
+            const raw = await connection
+              .getTokenAccountsByOwner(owner, { programId: program }, {
+                dataSlice: { offset: 0, length: RAW_TOKEN_BYTES },
+              } as Parameters<typeof connection.getTokenAccountsByOwner>[2])
+              .catch((again) => {
+                throw tooLarge(again) ? new TooLarge() : again;
+              });
+            return raw.value.flatMap((t) => {
+              const info = rawTokenInfo(t.account.data, (b) => new PublicKey(b).toBase58());
+              return info ? [{ account: t.pubkey.toBase58(), info: info as ParsedTokenInfo }] : [];
+            });
+          });
       const [lamports, classic, token2022] = await Promise.all([
         connection.getBalance(owner),
         rows(TOKEN_PROGRAM_ID),
         rows(new PublicKey(TOKEN_2022_PROGRAM_ID)),
       ]);
+      // Token-2022 lets an issuer keep the power to move holders' tokens. That
+      // is recorded on the mint, so the mints of the balances held are read.
+      const mints = [
+        ...new Set(token2022.filter((t) => /^[1-9]/.test(t.info?.tokenAmount?.amount ?? "")).map((t) => t.info.mint)),
+      ].slice(0, MINT_LOOKUPS);
+      const issuers = new Map<string, string>();
+      for (let i = 0; i < mints.length; i += 100) {
+        const batch = mints.slice(i, i + 100);
+        const found = await connection.getMultipleParsedAccounts(batch.map((m) => new PublicKey(m)));
+        found.value.forEach((account, at) => {
+          const data = account?.data;
+          const delegate = data && "parsed" in data ? permanentDelegate(data.parsed?.info) : null;
+          if (delegate) issuers.set(batch[at], delegate);
+        });
+      }
       setResult({
         address: owner.toBase58(),
-        exposure: summarizeExposure(lamports, classic, token2022),
+        exposure: summarizeExposure(lamports, classic, token2022, issuers),
       });
       window.history.replaceState(null, "", `/check?a=${owner.toBase58()}`);
     } catch (e) {
@@ -255,7 +299,7 @@ export default function ExposureCheck() {
                   <p>
                     {e.approvals.length
                       ? `${plural(e.approvals.length, "token account has", "token accounts have")} an open approval. That address can move those tokens without asking this wallet again.`
-                      : "No open approvals on the token accounts this check can read. It does not see every way a token can be moved: some newer tokens let their issuer move them, and it cannot see what a wallet may sign next."}
+                      : "No open approvals on the token accounts this check can read. It cannot see what a wallet may sign next."}
                   </p>
                 </section>
                 <section className="check-card safe">
@@ -284,6 +328,20 @@ export default function ExposureCheck() {
                   <Holdings rows={e.approvals} approvals />
                 </div>
               )}
+              {e.issuerMovable.length > 0 && (
+                <div className="check-table">
+                  <h2>Balances the token’s issuer can move</h2>
+                  <p>
+                    {plural(e.issuerMovable.length, "token here was", "tokens here were")}{" "}
+                    created with a permanent delegate: an address chosen by the
+                    issuer that can move or burn the balance at any time,
+                    without this wallet signing anything. No wallet or vault
+                    can prevent that. Treat such a balance as held at the
+                    issuer’s discretion.
+                  </p>
+                  <Holdings rows={e.issuerMovable} issuer />
+                </div>
+              )}
               {e.movable.length > 0 && (
                 <div className="check-table">
                   <h2>Token balances a signature can move</h2>
@@ -296,7 +354,12 @@ export default function ExposureCheck() {
             {e.frozen > 0 && `${plural(e.frozen, "frozen balance")} excluded. `}
             {e.emptyAccounts > 0 &&
               `${plural(e.emptyAccounts, "empty token account")} ignored. `}
-            Only a short list of well-known tokens is named, matched by mint
+            {e.movable.some((t) => t.decimals === null) &&
+              "This wallet has too many token accounts to load amounts for; the counts are complete. "}
+            Token-2022 balances are checked for a permanent delegate only: a
+            token can also be frozen by its issuer, or carry transfer fees or
+            hooks, and this does not report those. Only a short list of
+            well-known tokens is named, matched by mint
             address; other names and all prices are left out because they can
             be spoofed. NFTs with custom programs, staked SOL and
             positions inside other protocols are not included.
@@ -327,9 +390,11 @@ export default function ExposureCheck() {
 function Holdings({
   rows,
   approvals = false,
+  issuer = false,
 }: {
   rows: TokenHolding[];
   approvals?: boolean;
+  issuer?: boolean;
 }) {
   const [all, setAll] = useState(false);
   const ordered = [
@@ -352,9 +417,14 @@ function Holdings({
             {approvals ? (
               <div className="holding-approval">
                 <span>
-                  {formatAmount(t.delegatedAmount, t.decimals)} approved to
+                  {t.decimals === null ? "Approved to" : `${formatAmount(t.delegatedAmount, t.decimals)} approved to`}
                 </span>
                 <code title={t.delegate ?? ""}>{brief(t.delegate ?? "")}</code>
+              </div>
+            ) : issuer ? (
+              <div className="holding-approval">
+                <span>Movable by</span>
+                <code title={t.issuer ?? ""}>{brief(t.issuer ?? "")}</code>
               </div>
             ) : (
               <span className="holding-support">
@@ -369,7 +439,7 @@ function Holdings({
                 )}
               </span>
             )}
-            <b>{formatAmount(t.amount, t.decimals)}</b>
+            <b>{amountText(t.amount, t.decimals)}</b>
           </li>
         ))}
       </ul>
