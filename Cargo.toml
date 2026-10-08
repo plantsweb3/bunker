@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
 members = ["programs/bunker3", "crates/bunker-lmots"]
+# The Solana version `solana-verify` builds the program with (docs/LAUNCH-RUNBOOK.md).
+# Keep it equal to SOLANA_VERSION in .github/workflows/ci.yml.
+[workspace.metadata.cli]
+solana = "4.3.0"
 [workspace.package]
 version = "0.1.0"
 edition = "2024"

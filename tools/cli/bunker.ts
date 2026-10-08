@@ -1,11 +1,8 @@
 // Bunker without the website (DRAFT, test networks only).
 //
-//   npx tsx tools/cli/bunker.ts status   --rpc URL --vault ADDRESS --program ID
-//   npx tsx tools/cli/bunker.ts withdraw --rpc URL --day-key FILE --fee-wallet FILE --to ADDRESS --amount 1.5 [--mint MINT]
-//   npx tsx tools/cli/bunker.ts resume   --rpc URL --day-key FILE --fee-wallet FILE
-//   npx tsx tools/cli/bunker.ts release  --rpc URL --day-key FILE --fee-wallet FILE
-//   npx tsx tools/cli/bunker.ts clear    --rpc URL --day-key FILE --fee-wallet FILE
-//   npx tsx tools/cli/bunker.ts recover  --rpc URL --packet FILE --fee-wallet FILE
+// From a checkout: `npx tsx tools/cli/bunker.ts <command> ...`. As the single
+// file built by scripts/build-cli.mjs, which needs only Node:
+// `node bunker-cli.mjs <command> ...`. Run it with no command for the list.
 //
 // The day key's password is asked for and never taken from the command line.
 // The fee wallet is an ordinary Solana keypair file; it pays fees and has no
@@ -61,10 +58,32 @@ async function ask(question: string, hidden = false): Promise<string> {
   return answer;
 }
 const COMMANDS = ["status", "withdraw", "resume", "release", "clear", "recover"];
+const USAGE = `Bunker without the website. DRAFT: test networks only.
+
+  status    --rpc URL --vault ADDRESS --program ID
+            Show a Bunker. Needs no key.
+  withdraw  --rpc URL --day-key FILE --fee-wallet FILE --to ADDRESS --amount 1.5 [--mint MINT]
+            Review, then sign and send a withdrawal.
+  resume    --rpc URL --day-key FILE --fee-wallet FILE
+            Finish a withdrawal that was signed but did not reach the network.
+  release   --rpc URL --day-key FILE --fee-wallet FILE
+            Release an announced withdrawal once its wait is over.
+  clear     --rpc URL --day-key FILE --fee-wallet FILE
+            Clear an announced withdrawal whose time to be released has passed.
+  recover   --rpc URL --packet FILE --fee-wallet FILE
+            Submit a recovery packet made by the offline recovery tool.
+
+URL is a Solana RPC endpoint. The day key's password is asked for, never
+passed on the command line. The fee wallet is an ordinary Solana keypair
+file: it pays network fees and has no power over a Bunker. The recovery
+kit is never used here.`;
 
 async function main() {
-  if (!COMMANDS.includes(command ?? ""))
-    fail(`Commands: ${COMMANDS.join(", ")}. See the top of tools/cli/bunker.ts.`);
+  if (command === undefined || command === "help" || command === "--help") {
+    console.log(USAGE);
+    process.exit(command === undefined ? 1 : 0);
+  }
+  if (!COMMANDS.includes(command)) fail(`Unknown command "${command}".\n\n${USAGE}`);
   if (command === "status") {
     // Read-only, so it needs no key file and no fee wallet.
     const connection = new Connection(need("rpc"), "confirmed");

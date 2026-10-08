@@ -159,8 +159,14 @@ try {
   // ── The program a user actually runs, with its prompts ───────────────────
   const feeWallet = join(dir, "fee-wallet.json");
   writeFileSync(feeWallet, JSON.stringify(Array.from(payer.secretKey)));
+  // BUNKER_CLI names the single-file build to test instead of the source.
+  const built = process.env.BUNKER_CLI;
+  const [bin, entry] = built ? ["node", [built]] : ["npx", ["tsx", "tools/cli/bunker.ts"]];
   const run = (args: string[], input: string) =>
-    spawnSync("npx", ["tsx", "tools/cli/bunker.ts", ...args], { input, encoding: "utf8", timeout: 90_000 });
+    spawnSync(bin, [...entry, ...args], { input, encoding: "utf8", timeout: 90_000 });
+  const help = run(["help"], "");
+  check(help.status === 0 && help.stdout.includes("withdraw  --rpc URL"), "help lists the commands");
+  check(run([], "").status === 1 && run(["drain"], "").stderr.includes("Unknown command"), "no command or an unknown one fails");
   const common = ["--rpc", RPC, "--day-key", path0, "--fee-wallet", feeWallet];
   const typed = run(["withdraw", ...common, "--to", to.toBase58(), "--amount", "0.125"], `${password}\nsign\n`);
   check(typed.status === 0 && typed.stdout.includes("Sent."), `command-line withdraw: ${typed.stdout}${typed.stderr}`);
@@ -174,7 +180,6 @@ try {
   check((await fetchVault(c, PROGRAM, a.vault)).state.opIndex === 3n, "no key used when declined");
   const status = run(["status", "--rpc", RPC, "--program", PROGRAM.toBase58(), "--vault", a.vault.toBase58()], "");
   check(status.status === 0 && status.stdout.includes("withdrawals announced 3"), `status: ${status.stdout}${status.stderr}`);
-  check(run([], "").stderr.includes("Commands:"), "usage");
 
   // ── A network other than the day key's is refused before anything is sent ─
   const elsewhere = sessionFor({ ...day, genesis: PublicKey.default.toBase58() }, RPC, payer, quiet);

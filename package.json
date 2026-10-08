@@ -23,10 +23,13 @@
     "test:chain": "tsx tests/chain-v3.ts",
     "test:alerts": "tsx tests/alerts-chain.ts",
     "test:cli": "tsx tests/cli-chain.ts",
+    "test:deploy": "tsx tests/deployment-chain.ts",
     "program:build": "cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy",
     "setup:local": "tsx scripts/setup-local.ts",
-    "source:bundle": "node scripts/bundle-source.mjs && node scripts/build-recovery-tool.mjs",
+    "source:bundle": "node scripts/bundle-source.mjs && node scripts/build-recovery-tool.mjs && node scripts/build-cli.mjs",
     "tool:build": "node scripts/build-recovery-tool.mjs",
+    "cli:build": "node scripts/build-cli.mjs",
+    "check:deployment": "tsx scripts/check-deployment.ts",
     "audit:dependencies": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {

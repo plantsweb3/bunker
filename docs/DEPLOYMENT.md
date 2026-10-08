@@ -58,4 +58,6 @@ A website rollback cannot undo a transaction. Because the program has no adminis
 
 ## Real-fund launch blockers
 
+[LAUNCH-RUNBOOK.md](LAUNCH-RUNBOOK.md) is the order of work from a reviewed release to real funds: freeze, reproducible build, immutable deployment, a check of that deployment from public data (`npm run check:deployment`), the source change that points the software at it, and what to do if something is wrong afterwards. It is a plan; none of it has been carried out.
+
 Complete [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md) with independent cryptographic and Solana program reviewers. Resolve findings and the open questions in [PROTOCOL.md](PROTOCOL.md), freeze a reviewed release, reproduce its binary, publish source-to-deployment verification, and carry out the upgrade-authority policy above. Distribute the offline recovery tool by a channel independent of the website. Test on real phones and wallet in-app browsers. Configure a dedicated RPC provider and edge rate limiting. The current repository is review material, not evidence that these are done. No audit has been commissioned.
