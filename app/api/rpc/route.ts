@@ -13,6 +13,7 @@ const reads = new Set([
   "getMinimumBalanceForRentExemption",
   "getSignatureStatuses",
   "getSignaturesForAddress",
+  "getTransaction",
   "getFeeForMessage",
 ]);
 export async function POST(request: Request) {
