@@ -112,6 +112,8 @@ jobs:
           # The verified tools above must be the ones used: nothing fetched here.
           ! grep -qi "downloading platform-tools\|Downloading https" /tmp/build.log
       - run: sha256sum target/deploy/bunker3.so | tee target/deploy/bunker3.so.sha256
+      # Test only: a program that forwards instructions, for the cross-program tests.
+      - run: cargo-build-sbf --manifest-path programs/bunker3-cpi-probe/Cargo.toml --sbf-out-dir target/deploy
       # The program as built by this pinned, verified toolchain, kept so its
       # hash does not rest on anyone's own machine.
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

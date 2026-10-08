@@ -1,6 +1,8 @@
 //! Runs the compiled protocol-3 program (`target/deploy/bunker3.so`) in an
 //! in-process Solana VM with a controllable clock. Build it first:
 //!   cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy
+//!   cargo-build-sbf --manifest-path programs/bunker3-cpi-probe/Cargo.toml --sbf-out-dir target/deploy
+//! (`npm run program:build` does both.)
 //! PUBLIC TEST KEYS ONLY. Nothing here is a deployment or an audit.
 use litesvm::{types::TransactionResult, LiteSVM};
 use solana_account::Account;
@@ -29,6 +31,18 @@ const COMPUTE_LIMIT: u32 = 800_000;
 
 fn system() -> Pubkey {
     Pubkey::default()
+}
+fn probe_id() -> Pubkey {
+    Pubkey::new_from_array([0xC1; 32])
+}
+/// The same instruction, sent to the forwarding program so that it reaches
+/// the vault program by cross-program invocation.
+fn through_probe(ix: &Instruction) -> Instruction {
+    Instruction {
+        program_id: probe_id(),
+        accounts: [vec![AccountMeta::new_readonly(ix.program_id, false)], ix.accounts.clone()].concat(),
+        data: ix.data.clone(),
+    }
 }
 fn token_program() -> Pubkey {
     Pubkey::from_str("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA").unwrap()
@@ -64,6 +78,10 @@ impl Env {
         let so = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/bunker3.so");
         svm.add_program_from_file(program, so)
             .expect("build bunker3.so first (see the header of this file)");
+        // A test-only program that forwards an instruction by cross-program invocation.
+        let probe = concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/deploy/bunker3_cpi_probe.so");
+        svm.add_program_from_file(probe_id(), probe)
+            .expect("build bunker3_cpi_probe.so first: cargo-build-sbf --manifest-path programs/bunker3-cpi-probe/Cargo.toml --sbf-out-dir target/deploy");
         let payer = Keypair::new();
         svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
         let mut env = Self { svm, program, payer, salt: common::SALT, id: [0; 32], chain: common::CHAIN, vault: Pubkey::default(), trusted: [[0; 32]; 4] };
@@ -1200,6 +1218,16 @@ fn verification_cost_is_bounded() {
     println!("announce at {} of {STEP_LIMIT} steps: {} compute units", steps(&best), meta.compute_units_consumed);
     assert!(meta.compute_units_consumed < 700_000, "{}", meta.compute_units_consumed);
     assert!(e.pending());
+
+    // The same for recovery, which checks one more marker.
+    let (next_rec, next_op) = (root(101), root(10));
+    let payload = e.recover_payload(0, next_rec, next_op);
+    let message = e.message(b"BUNKER3_RECOVER_", &payload);
+    let proof = e.stage_bytes(&common::sign_at_limit(&e.salt, 100, &message), &message);
+    let ix = e.recover_ix(&payload, proof, &root(100), &next_rec, &next_op);
+    let meta = e.send(&[ix]).unwrap();
+    println!("recover at {STEP_LIMIT} of {STEP_LIMIT} steps: {} compute units", meta.compute_units_consumed);
+    assert!(meta.compute_units_consumed < 700_000, "{}", meta.compute_units_consumed);
 }
 
 /// Anything that is not a well-formed signature of the one parameter set.
@@ -1321,4 +1349,446 @@ fn the_heaviest_client_transaction_fits_the_requested_compute_limit() {
     assert_eq!((token_amount(&e, &associated), e.pending(), e.spent(&root(1))), (100, false, true));
     // Room left for address searches that take more tries than these did.
     assert!(meta.compute_units_consumed < 700_000, "{}", meta.compute_units_consumed);
+}
+
+// ── Differential fuzzing of account handling ───────────────────────────────
+//
+// For each instruction, in a state where the honest instruction succeeds, many
+// damaged copies are sent to a copy of the VM: accounts swapped for each
+// other, for another vault's, for look-alikes owned by other programs, for
+// unrelated addresses; accounts dropped, repeated or added; writable flags
+// flipped; data bytes flipped, cut or extended. A damaged instruction may
+// fail. If it succeeds, every account that matters must end exactly as the
+// honest instruction leaves it. Fixed seed; not coverage-guided.
+
+struct Rng(u64);
+impl Rng {
+    fn next(&mut self) -> u64 {
+        self.0 ^= self.0 << 13;
+        self.0 ^= self.0 >> 7;
+        self.0 ^= self.0 << 17;
+        self.0
+    }
+    fn below(&mut self, n: usize) -> usize {
+        (self.next() % n as u64) as usize
+    }
+}
+type Snapshot = Vec<Option<(u64, Vec<u8>, Pubkey)>>;
+impl Env {
+    fn fork(&self) -> Env {
+        Env {
+            svm: self.svm.clone(),
+            program: self.program,
+            payer: self.payer.insecure_clone(),
+            salt: self.salt,
+            id: self.id,
+            chain: self.chain,
+            vault: self.vault,
+            trusted: self.trusted,
+        }
+    }
+    fn snapshot(&self, keys: &[Pubkey]) -> Snapshot {
+        keys.iter().map(|k| self.svm.get_account(k).map(|a| (a.lamports, a.data, a.owner))).collect()
+    }
+    fn plant(&mut self, key: Pubkey, owner: Pubkey, data: Vec<u8>) {
+        let lamports = self.svm.minimum_balance_for_rent_exemption(data.len()).max(1);
+        self.svm.set_account(key, Account { lamports, data, owner, executable: false, rent_epoch: 0 }).unwrap();
+    }
+}
+struct Case {
+    name: &'static str,
+    env: Env,
+    honest: Instruction,
+    /// Data bytes from this offset on are free-form for this instruction
+    /// (the signature bytes of `stage`), so they are not damaged.
+    data_limit: usize,
+}
+/// A second vault of the same program with a withdrawal pending, and
+/// look-alike accounts, to substitute into the first vault's instructions.
+fn decoys(e: &mut Env) -> Vec<Pubkey> {
+    let mut other = e.fork();
+    other.salt = [0x51; 32];
+    let own = |tag| common::root_in(&[0x51; 32], tag);
+    let ix = other.init_ix(own(1), own(100), 0);
+    other.send(&[ix]).unwrap();
+    let fund = system_instruction::transfer(&other.payer.pubkey(), &other.vault, 5 * SOL);
+    other.send(&[fund]).unwrap();
+    let mut w = other.sol(Pubkey::new_unique(), SOL, 0, 2);
+    w.next = own(2);
+    w.announce_by = i64::from_le_bytes(other.svm.get_sysvar::<Clock>().unix_timestamp.to_le_bytes()) + 600;
+    other.announce(1, &w).unwrap();
+    let other_vault = other.vault;
+    let other_markers = [other.marker(&own(1)), other.marker(&own(2)), other.marker(&own(100))];
+    e.svm = other.svm;
+    // (A vault that does not exist yet has no bytes to copy; use its shape.)
+    let vault_data = e.svm.get_account(&e.vault).map(|a| a.data).unwrap_or_else(|| [b"BUNKER03".to_vec(), vec![0; VAULT_LEN - 8]].concat());
+    // The other vault's own destination is deliberately not offered: naming
+    // that vault together with it is that vault's own valid release, which
+    // anyone may send, and not a damaged form of this one.
+    let mut out = vec![other_vault, system(), e.program, token_program(), e.payer.pubkey(), Pubkey::new_unique()];
+    out.extend(other_markers);
+    // Copies of this vault's bytes that the program does not own.
+    for owner in [system(), token_program(), Pubkey::new_unique()] {
+        let key = Pubkey::new_unique();
+        e.plant(key, owner, vault_data.clone());
+        out.push(key);
+    }
+    // A marker-shaped and a proof-shaped account owned by someone else.
+    let (fake_marker, fake_proof) = (Pubkey::new_unique(), Pubkey::new_unique());
+    e.plant(fake_marker, system(), b"BKSPENT3".to_vec());
+    e.plant(fake_proof, Pubkey::new_unique(), [b"BKPROOF3".to_vec(), vec![0; PROOF_LEN - 8]].concat());
+    out.extend([fake_marker, fake_proof]);
+    out
+}
+fn damage(rng: &mut Rng, honest: &Instruction, pool: &[Pubkey], data_limit: usize, signers: [&Pubkey; 2]) -> Instruction {
+    let mut ix = honest.clone();
+    for _ in 0..1 + rng.below(2) {
+        let n = ix.accounts.len();
+        match rng.below(9) {
+            // Another address in an account's place: from the pool, or from the instruction itself.
+            0..=2 if n > 0 => {
+                let at = rng.below(n);
+                // Where a signature is wanted, usually offer a real one from someone else.
+                ix.accounts[at].pubkey = if ix.accounts[at].is_signer && rng.below(3) > 0 { *signers[1] } else { pool[rng.below(pool.len())] };
+            }
+            3 if n > 1 => {
+                let (a, b) = (rng.below(n), rng.below(n));
+                let (ka, kb) = (ix.accounts[a].pubkey, ix.accounts[b].pubkey);
+                if !ix.accounts[a].is_signer && !ix.accounts[b].is_signer {
+                    ix.accounts[a].pubkey = kb;
+                    ix.accounts[b].pubkey = ka;
+                }
+            }
+            4 if n > 0 => {
+                let at = rng.below(n);
+                ix.accounts[at].is_writable = !ix.accounts[at].is_writable;
+            }
+            5 if n > 0 => {
+                ix.accounts.remove(rng.below(n));
+            }
+            6 => {
+                let extra = if rng.below(2) == 0 && n > 0 { ix.accounts[rng.below(n)].clone() } else { AccountMeta::new(pool[rng.below(pool.len())], false) };
+                let at = rng.below(n + 1);
+                ix.accounts.insert(at, AccountMeta { is_signer: false, ..extra });
+            }
+            7 => {
+                let limit = ix.data.len().min(data_limit);
+                if limit > 0 {
+                    let at = rng.below(limit);
+                    ix.data[at] ^= 1 << rng.below(8);
+                }
+            }
+            _ => {
+                if rng.below(2) == 0 && ix.data.len() > 1 && data_limit == usize::MAX {
+                    let keep = 1 + rng.below(ix.data.len() - 1);
+                    ix.data.truncate(keep);
+                } else if data_limit == usize::MAX {
+                    ix.data.push(rng.next() as u8);
+                }
+            }
+        }
+    }
+    // Two signatures exist: the fee payer's and a stranger's. Nothing else can
+    // be marked a signer.
+    for account in &mut ix.accounts {
+        account.is_signer &= signers.contains(&&account.pubkey);
+    }
+    ix
+}
+fn fuzz_cases() -> Vec<Case> {
+    let mut cases = Vec::new();
+    let all = usize::MAX;
+    // initialize: a vault that does not exist yet.
+    {
+        let mut e = Env::new();
+        let honest = e.init_ix(root(1), root(100), DAY as u32);
+        cases.push(Case { name: "initialize", env: e, honest, data_limit: all });
+    }
+    // stage: the second chunk of a signature.
+    {
+        let mut e = Env::new();
+        e.init();
+        let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+        let message = e.message(b"BUNKER3_ANNOUNCE", &e.announce_payload(&w));
+        let bytes = sign_in(&e.salt, 1, &message);
+        let digest = hashv(&[&message]).to_bytes();
+        let proof = e.proof(&digest);
+        let chunk = |offset: usize, bytes: &[u8]| Instruction {
+            program_id: e.program,
+            accounts: vec![AccountMeta::new(e.payer.pubkey(), true), AccountMeta::new(proof, false), AccountMeta::new_readonly(system(), false)],
+            data: [vec![1u8], digest.to_vec(), (offset as u16).to_le_bytes().to_vec(), bytes.to_vec()].concat(),
+        };
+        let (first, honest) = (chunk(0, &bytes[..600]), chunk(600, &bytes[600..]));
+        e.send(&[first]).unwrap();
+        cases.push(Case { name: "stage", env: e, honest, data_limit: 35 });
+    }
+    // announce: SOL, with the signature staged.
+    {
+        let mut e = Env::new();
+        e.init();
+        let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+        let payload = e.announce_payload(&w);
+        let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+        let proof = e.stage(1, &message);
+        let honest = e.announce_ix(&payload, proof, &root(1), &w.next);
+        cases.push(Case { name: "announce", env: e, honest, data_limit: all });
+    }
+    // execute (SOL) once the wait is over; expire once the window has closed;
+    // close_proof of the used proof.
+    {
+        let mut e = Env::new();
+        e.init();
+        let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+        let payload = e.announce_payload(&w);
+        let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+        let proof = e.stage(1, &message);
+        let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+        e.send(&[ix]).unwrap();
+        let close = Instruction {
+            program_id: e.program,
+            accounts: vec![AccountMeta::new(proof, false), AccountMeta::new(e.payer.pubkey(), true)],
+            data: vec![6u8],
+        };
+        cases.push(Case { name: "close_proof", env: e.fork(), honest: close, data_limit: all });
+        let mut open = e.fork();
+        open.set_time(T0 + DAY);
+        let honest = open.execute_ix(w.destination, vec![]);
+        cases.push(Case { name: "execute (SOL)", env: open, honest, data_limit: all });
+        e.set_time(T0 + DAY + WINDOW + 1);
+        let honest = Instruction { program_id: e.program, accounts: vec![AccountMeta::new(e.vault, false)], data: vec![4u8] };
+        cases.push(Case { name: "expire", env: e, honest, data_limit: all });
+    }
+    // recover, while a withdrawal is pending.
+    {
+        let mut e = Env::new();
+        e.init();
+        let w = e.sol(Pubkey::new_unique(), SOL, 0, 2);
+        e.announce(1, &w).unwrap();
+        let (next_rec, next_op) = (root(101), root(10));
+        let payload = e.recover_payload(0, next_rec, next_op);
+        let message = e.message(b"BUNKER3_RECOVER_", &payload);
+        let proof = e.stage(100, &message);
+        let honest = e.recover_ix(&payload, proof, &root(100), &next_rec, &next_op);
+        cases.push(Case { name: "recover", env: e, honest, data_limit: all });
+    }
+    // announce and execute for a token.
+    {
+        let mut e = Env::new();
+        e.init();
+        let (mint, source, destination, owner) = (Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique());
+        let vault = e.vault;
+        e.plant(mint, token_program(), mint_data(TOKEN_DECIMALS));
+        e.plant(source, token_program(), token_data(&mint, &vault, 900, false));
+        e.plant(destination, token_program(), token_data(&mint, &owner, 0, false));
+        let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination, amount: 100, announce_by: T0 + 3600, next: root(2) };
+        let payload = e.announce_payload(&w);
+        let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+        let proof = e.stage(1, &message);
+        let announce = e.announce_ix(&payload, proof, &root(1), &w.next);
+        cases.push(Case { name: "announce (token)", env: e.fork(), honest: announce.clone(), data_limit: all });
+        e.send(&[announce]).unwrap();
+        e.set_time(T0 + DAY);
+        let honest = e.execute_ix(
+            destination,
+            vec![AccountMeta::new(source, false), AccountMeta::new_readonly(mint, false), AccountMeta::new_readonly(token_program(), false)],
+        );
+        cases.push(Case { name: "execute (token)", env: e, honest, data_limit: all });
+    }
+    cases
+}
+
+#[test]
+fn a_damaged_instruction_fails_or_does_exactly_what_the_honest_one_does() {
+    let rounds: usize = std::env::var("FUZZ_ROUNDS").ok().and_then(|v| v.parse().ok()).unwrap_or(250);
+    let mut rng = Rng(0x00B0_0B1E_5EED_2026);
+    let (mut sent, mut accepted) = (0usize, 0usize);
+    for mut case in fuzz_cases() {
+        let mut pool = decoys(&mut case.env);
+        // Someone with a funded wallet and a real signature, and no rights here.
+        let stranger = Keypair::new();
+        case.env.svm.airdrop(&stranger.pubkey(), 10 * SOL).unwrap();
+        pool.push(stranger.pubkey());
+        pool.extend(case.honest.accounts.iter().map(|a| a.pubkey));
+        // Everything that matters: the instruction's own accounts and every decoy.
+        let mut watched = pool.clone();
+        watched.sort();
+        watched.dedup();
+        let mut honest = case.env.fork();
+        honest.send(&[case.honest.clone()]).unwrap_or_else(|e| panic!("{}: the honest instruction must succeed: {e:?}", case.name));
+        let expected = honest.snapshot(&watched);
+        assert_ne!(expected, case.env.snapshot(&watched), "{}: the honest instruction changes something", case.name);
+        let mut passed = 0usize;
+        for round in 0..rounds {
+            let ix = damage(&mut rng, &case.honest, &pool, case.data_limit, [&case.env.payer.pubkey(), &stranger.pubkey()]);
+            if ix == case.honest {
+                continue;
+            }
+            let mut trial = case.env.fork();
+            sent += 1;
+            // The fee payer always signs; the stranger signs when named as a signer.
+            let budget = Instruction {
+                program_id: Pubkey::from_str("ComputeBudget111111111111111111111111111111").unwrap(),
+                accounts: vec![],
+                data: [vec![2u8], COMPUTE_LIMIT.to_le_bytes().to_vec()].concat(),
+            };
+            let payer = trial.payer.insecure_clone();
+            let mut keys: Vec<&Keypair> = vec![&payer];
+            if ix.accounts.iter().any(|a| a.is_signer && a.pubkey == stranger.pubkey()) {
+                keys.push(&stranger);
+            }
+            trial.svm.expire_blockhash();
+            let tx = Transaction::new_signed_with_payer(&[budget, ix.clone()], Some(&payer.pubkey()), &keys, trial.svm.latest_blockhash());
+            if trial.svm.send_transaction(tx).is_ok() {
+                passed += 1;
+                // Accounts the damaged instruction named that the honest one did not.
+                let mut all = watched.clone();
+                all.extend(ix.accounts.iter().map(|a| a.pubkey));
+                all.sort();
+                all.dedup();
+                // Which of the two wallets paid is the sender's business: the
+                // two are compared by their sum. Everything else must match.
+                let wallets = [payer.pubkey(), stranger.pubkey()];
+                all.retain(|k| !wallets.contains(k));
+                let paid = |e: &Env| wallets.iter().map(|w| e.lamports(w)).sum::<u64>();
+                // Paying is allowed to anyone; being paid is not.
+                assert!(
+                    trial.lamports(&stranger.pubkey()) <= case.env.lamports(&stranger.pubkey()),
+                    "{} round {round}: a stranger's wallet gained from a damaged instruction",
+                    case.name
+                );
+                let (got, want) = (trial.snapshot(&all), honest.snapshot(&all));
+                let differing: Vec<&Pubkey> = all.iter().zip(got.iter().zip(&want)).filter(|(_, (g, w))| g != w).map(|(k, _)| k).collect();
+                assert!(
+                    // A second signature costs a second fee of 5,000 lamports.
+                    differing.is_empty() && paid(&trial) + 5_000 * (keys.len() as u64 - 1) == paid(&honest),
+                    "{} round {round}: a damaged instruction succeeded with a different result\ndiffering accounts {differing:?}\ninstruction accounts {:?}\ndata length {}",
+                    case.name,
+                    ix.accounts.iter().map(|a| (a.pubkey, a.is_signer, a.is_writable)).collect::<Vec<_>>(),
+                    ix.data.len()
+                );
+            }
+        }
+        accepted += passed;
+        println!("{}: {passed} damaged instructions accepted, all identical in effect", case.name);
+    }
+    println!("{sent} damaged instructions sent, {accepted} accepted");
+    assert!(sent > 1000 || rounds < 250);
+}
+
+/// Every instruction behaves the same when another program calls it: a whole
+/// life of a vault, with each instruction sent through a forwarding program.
+#[test]
+fn every_instruction_works_when_called_by_another_program() {
+    let mut e = Env::new();
+    let init = e.init_ix(root(1), root(100), DAY as u32);
+    e.send(&[through_probe(&init)]).unwrap();
+    let fund = system_instruction::transfer(&e.payer.pubkey(), &e.vault, 10 * SOL);
+    e.send(&[fund]).unwrap();
+    assert_eq!(&e.vault_data()[72..104], &root(1));
+
+    // stage, in two chunks, then announce with the costliest signature.
+    let destination = Pubkey::new_unique();
+    let w = e.sol(destination, 2 * SOL, 0, 2);
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let bytes = common::sign_at_limit(&e.salt, 1, &message);
+    let digest = hashv(&[&message]).to_bytes();
+    let proof = e.proof(&digest);
+    for offset in [0usize, 600] {
+        let chunk = Instruction {
+            program_id: e.program,
+            accounts: vec![AccountMeta::new(e.payer.pubkey(), true), AccountMeta::new(proof, false), AccountMeta::new_readonly(system(), false)],
+            data: [vec![1u8], digest.to_vec(), (offset as u16).to_le_bytes().to_vec(), bytes[offset..(offset + 600).min(bytes.len())].to_vec()].concat(),
+        };
+        e.send(&[through_probe(&chunk)]).unwrap();
+    }
+    let announce = e.announce_ix(&payload, proof, &root(1), &w.next);
+    let meta = e.send(&[through_probe(&announce)]).unwrap();
+    println!("announce through another program: {} of {COMPUTE_LIMIT} compute units", meta.compute_units_consumed);
+    assert!(e.pending() && e.spent(&root(1)));
+    assert_eq!(e.op_root(), root(2));
+
+    // close_proof, execute before and after the wait.
+    let close = Instruction {
+        program_id: e.program,
+        accounts: vec![AccountMeta::new(proof, false), AccountMeta::new(e.payer.pubkey(), true)],
+        data: vec![6u8],
+    };
+    e.send(&[through_probe(&close)]).unwrap();
+    let execute = e.execute_ix(destination, vec![]);
+    assert!(e.send(&[through_probe(&execute)]).is_err(), "still waiting");
+    // The caller cannot redirect the payment.
+    e.set_time(T0 + DAY);
+    let thief = Pubkey::new_unique();
+    assert!(e.send(&[through_probe(&e.execute_ix(thief, vec![]))]).is_err());
+    e.send(&[through_probe(&execute)]).unwrap();
+    assert_eq!((e.lamports(&destination), e.pending()), (2 * SOL, false));
+
+    // An announcement left to expire, then recovery.
+    let mut second = e.sol(Pubkey::new_unique(), SOL, 1, 3);
+    second.announce_by = T0 + DAY + 3600;
+    e.announce(2, &second).unwrap();
+    e.set_time(T0 + 3 * DAY + 1);
+    let expire = Instruction { program_id: e.program, accounts: vec![AccountMeta::new(e.vault, false)], data: vec![4u8] };
+    e.send(&[through_probe(&expire)]).unwrap();
+    assert!(!e.pending());
+    let (next_rec, next_op) = (root(101), root(10));
+    let payload = e.recover_payload(0, next_rec, next_op);
+    let message = e.message(b"BUNKER3_RECOVER_", &payload);
+    let proof = e.stage_bytes(&common::sign_at_limit(&e.salt, 100, &message), &message);
+    let recover = e.recover_ix(&payload, proof, &root(100), &next_rec, &next_op);
+    let meta = e.send(&[through_probe(&recover)]).unwrap();
+    println!("recover through another program: {} of {COMPUTE_LIMIT} compute units", meta.compute_units_consumed);
+    assert_eq!((e.epoch(), e.op_index(), e.op_root()), (1, 0, root(10)));
+    assert!(e.spent(&root(100)));
+}
+
+/// A token withdrawal released through another program: the vault program's
+/// own call into the token program is then two levels down.
+#[test]
+fn a_token_withdrawal_is_released_when_called_by_another_program() {
+    let mut e = Env::new();
+    e.init();
+    let (mint, source, destination, owner) = (Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique());
+    let vault = e.vault;
+    e.plant(mint, token_program(), mint_data(TOKEN_DECIMALS));
+    e.plant(source, token_program(), token_data(&mint, &vault, 900, false));
+    e.plant(destination, token_program(), token_data(&mint, &owner, 0, false));
+    let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination, amount: 100, announce_by: T0 + 3600, next: root(2) };
+    let payload = e.announce_payload(&w);
+    let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+    let proof = e.stage(1, &message);
+    let announce = e.announce_ix(&payload, proof, &root(1), &w.next);
+    e.send(&[through_probe(&announce)]).unwrap();
+    e.set_time(T0 + DAY);
+    let execute = e.execute_ix(
+        destination,
+        vec![AccountMeta::new(source, false), AccountMeta::new_readonly(mint, false), AccountMeta::new_readonly(token_program(), false)],
+    );
+    e.send(&[through_probe(&execute)]).unwrap();
+    assert_eq!((token_amount(&e, &destination), token_amount(&e, &source), e.pending()), (100, 800, false));
+}
+
+/// The clock moving backwards (a validator reporting an earlier time) never
+/// opens a withdrawal early or reopens a closed window.
+#[test]
+fn a_clock_that_goes_backwards_releases_nothing_early() {
+    let mut e = Env::new();
+    e.init();
+    let destination = Pubkey::new_unique();
+    let w = e.sol(destination, SOL, 0, 2);
+    e.announce(1, &w).unwrap();
+    for earlier in [T0 - 1, T0 - DAY, 0, -5, T0 + DAY - 1] {
+        e.set_time(earlier);
+        assert!(e.execute(destination).is_err(), "at {earlier}");
+        assert!(e.expire().is_err(), "at {earlier}");
+    }
+    assert!(e.pending() && e.lamports(&destination) == 0);
+    // Past the window, then back inside it: the record is still there and still
+    // pays only inside the window it was given.
+    e.set_time(T0 + DAY + WINDOW + 1);
+    assert!(e.execute(destination).is_err());
+    e.set_time(T0 + DAY + 5);
+    e.execute(destination).unwrap();
+    assert_eq!(e.lamports(&destination), SOL);
 }
