@@ -12,6 +12,7 @@ Automated tests do not establish cryptographic security and are not an audit.
 | `npm run program:build` | Compiles the program to `target/deploy/bunker3.so` |
 | `cd programs/bunker3-svm-tests && cargo test --locked` | The compiled program in an in-process Solana VM (LiteSVM) with the Clock sysvar set, so waiting periods and deadlines are tested to the second; plus the client's vectors against an independent Rust derivation |
 | `npm run test:chain` | Repeated create, withdraw, replay and recovery cycles on the local validator through the client. `CYCLES=40` sets the count. Prints a summary. |
+| `npm run test:alerts` | The alert watcher against the compiled program on the local validator, with Telegram replaced by a list: no alert for history before subscribing, one per event, none on a repeat pass, none after `/stop` |
 | `npm run test:e2e` | Browser, desktop and mobile. Always: routes, the content security policy on every page, release gate, demo, wallet check, mobile overflow. With the local validator running: the full custody flows below. |
 
 The VM suite is a standalone crate with its own lockfile so the VM's dependencies stay out of the program's. It needs `bunker3.so` built first. GitHub CI builds and tests the workspace and runs the browser suite against a production build; it does not run the VM suite, the chain cycles, or the custody browser cases, which need the Solana toolchain and a validator.
