@@ -1,0 +1,17 @@
+{
+  "durationSeconds": 8,
+  "fps": 24,
+  "width": 1280,
+  "height": 720,
+  "audio": false,
+  "source": "../source/hero-original.png",
+  "poster": "hero-poster.png",
+  "posterByteIdentical": true,
+  "method": "Deterministic local composite: fixed camera and architecture; seeded mist layer clipped to the left valley; narrow light emphasis only.",
+  "motion": "Periodic eight-second sine motion with squared-sine amplitude. Exact t=0 and t=8 render bytes match. No camera motion or generated frame morphing.",
+  "maximumCompositeOpacity": {
+    "mist": 0.15,
+    "light": 0.07
+  },
+  "reducedMotion": "Display hero-poster.png without autoplay. Gallery implements this."
+}
