@@ -208,7 +208,7 @@ These are trust assumptions, not program guarantees.
 
 ## Implementation status
 
-`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. `sdk/v3` is the TypeScript client: `derive.ts` (section 1.1), `protocol.ts` (encodings, vault parsing and instruction builders) and `authority.ts` (the fixed recovery packet and announcement signing from an epoch seed). Not yet written: the offline recovery tool as a separately distributed artefact, a durable signing journal for protocol 3, and a web interface.
+`programs/bunker3` implements sections 2 to 5: `src/state.rs` holds the layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers. `sdk/v3` is the TypeScript client: `derive.ts` (section 1.1), `protocol.ts` (encodings, vault parsing and instruction builders) and `authority.ts` (the fixed recovery packet and announcement signing from an epoch seed). `sdk/v3/kit.ts` defines the two key files (archival kit and day key), `sdk/v3/journal.ts` the operational signing journal, and `sdk/v3/chain.ts` the vault and clock reads. A draft web interface exists: `/recovery` (build a vault, recover, re-issue a day key) and the rebuilt `/vault` (open with a day key, deposit, announce, countdown, release, clear, seal). **The recovery tool currently runs in the same browser origin as the vault app; the specification requires it to be distributed and run separately, and that is not done.** SOL only in the interface; the program's classic SPL path has no interface yet.
 
 | Evidence | Where | Count |
 |---|---|---:|
@@ -222,6 +222,11 @@ The second suite covers: nothing leaving before `opens_at` and exactly once afte
 Each of the following checks was removed in turn and the suite confirmed to fail: the waiting period, signature verification, clearing the record on recovery, retiring the displaced operational root, the vault PDA check, clearing the record after execution, destination binding, and the next-root marker check.
 
 Measured on that VM with the 1,400,000-unit limit: `announce` about 594,000 compute units, `recover` about 639,000.
+
+| Signing journal and key files: one signature per key, racing tabs, an orphaned reservation, chain advance, file confusion and tampering | `tests/journal-v3.test.ts` | 10 |
+| Browser, against a local validator running this program: build, deposit, announce (state and balances asserted on-chain), countdown, cancel by recovery, dead old day key, announce with the new key, seal | `tests/browser/custody3.spec.ts` | 1 × desktop and mobile |
+
+The browser test cannot let 24 hours pass, so releasing after the wait is exercised only by the VM suite.
 
 The client and the Rust check share one author and one reading of this document; agreement between them shows consistency, not correctness of the design.
 

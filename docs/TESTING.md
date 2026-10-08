@@ -27,6 +27,8 @@ cd programs/bunker3-svm-tests && cargo test --locked
 
 `npm test` also runs the TypeScript client tests (`tests/protocol-v3.test.ts`) and checks that `npx tsx scripts/v3-vectors.ts` reproduces `fixtures/bunker-v3.json` exactly. The VM suite re-derives those vectors independently in Rust and drives the compiled program with the client's bytes.
 
+With `target/deploy/bunker3.so` built, `scripts/local-validator.sh` also loads the draft program at the fixed test address `k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn`, and `tests/browser/custody3.spec.ts` drives the protocol 3 app against it (it skips otherwise).
+
 The first command exercises the state machine directly. The last loads `target/deploy/bunker3.so` into an in-process Solana VM (LiteSVM) and sets the Clock sysvar to test the waiting period and deadlines to the second. That crate is deliberately outside the workspace and has its own lockfile so the VM's dependency tree stays out of the program's. GitHub CI builds and tests the workspace; it does not run the VM suite.
 
 ## Protocol 2 reproduction
