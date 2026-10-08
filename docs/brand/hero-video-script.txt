@@ -3,7 +3,7 @@ Historical creative script supplied with the brand kit; not a product security c
 BUNKER — BUILT FOR WHAT’S NEXT
 Hero film script • 35 seconds • 16:9 master • 7 October 2026
 Creative: architectural, restrained, cinematic. A monumental concrete bunker embedded in dark alpine rock, with a small glacier-teal doorway, stays centered throughout the main reveal. Match the supplied moodboard’s natural landscape, heavy architecture and restrained light.
-Status: script only. Product language reflects the prior conversation's devnet-first, in-development scope.
+Status: script only. Product language reflects an early, in-development scope that the product has since left behind.
 
 TIMED SCRIPT
 
@@ -53,7 +53,7 @@ Calm, low-register, authoritative voice. Approximately 110–120 spoken words pe
 CLAIM BASIS & PRODUCTION NOTES
 • Standard keypair wallet addresses are Ed25519 public keys; this does not mean a visible public key is a current private-key compromise. Solana also supports other account addresses, including PDAs.
 • The future quantum threat is a preparation issue, not evidence of an observed break of Solana wallet keys. No countdown or claimed attack date is supported here.
-• Separate hash-based withdrawal authorization is the proposed Bunker design from the referenced conversation. Implementation, audits, deployment and real-fund readiness were not verified for this kit. Keep the future-tense narration and development status.
+• Separate hash-based withdrawal authorization was the proposed Bunker design at the time of writing. Implementation, audits, deployment and real-fund readiness were not verified for this kit. Keep the future-tense narration and development status.
 • A PDA's lack of a private key does not by itself make a vault secure. Program authorization and implementation determine who can withdraw. The concept does not claim to make Solana consensus, token issuers, bridges or the user's device post-quantum secure.
 • The linked Justin Drake X post could not be retrieved on 7 October 2026. This script neither quotes it nor attributes an endorsement to him; its engagement count was not verified.
 

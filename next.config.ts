@@ -30,6 +30,8 @@ const nextConfig: NextConfig = {
         { key: "X-Frame-Options", value: "DENY" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
         { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      // Another site that opens this one gets no handle on its window.
+      { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
       ] },
       ...UNPROXIED.map((source) => ({ source, headers: locked })),
       // The recovery tool and anything else under /source is for download. It

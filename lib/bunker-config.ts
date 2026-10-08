@@ -14,11 +14,12 @@ export function configFromEnv(
   env: Record<string, string | undefined>,
 ): BunkerConfig {
   const mode = env.BUNKER_TEST_NETWORK;
-  // Mirrors lib/alerts/config.ts: every piece present, or alerts are off.
+  // The same conditions as lib/alerts/config.ts: every piece present and
+  // well formed, or alerts are off and not advertised.
   const alertsBot =
     env.TELEGRAM_BOT_TOKEN &&
-    env.TELEGRAM_WEBHOOK_SECRET &&
-    env.CRON_SECRET &&
+    (env.TELEGRAM_WEBHOOK_SECRET ?? "").length >= 24 &&
+    (env.CRON_SECRET ?? "").length >= 24 &&
     env.KV_REST_API_URL &&
     env.KV_REST_API_TOKEN &&
     /^[A-Za-z0-9_]{5,32}$/.test(env.TELEGRAM_BOT_USERNAME ?? "")

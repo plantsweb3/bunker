@@ -107,21 +107,23 @@ const faq: [string, React.ReactNode][] = [
   [
     "What if Bunker goes away?",
     <>
-      A vault is controlled by an on-chain program with no administrator, not
-      by this website. The code that builds a withdrawal is{" "}
+      A vault is controlled by an on-chain program, not by this website, and
+      the program gives nobody an administrator role over a vault. Whether the
+      program itself can be upgraded, and by whom, is not decided yet and will
+      be published before real funds are accepted. The code that builds a withdrawal is{" "}
       <a href={REPO} target="_blank" rel="noreferrer">
         public
       </a>
-      . The recovery tool is a file you keep and runs without this site. A
-      way to submit a withdrawal without this site is on the list before
-      mainnet.
+      . The recovery tool is a file you keep and runs without this site.
+      Withdrawing without this site is not possible yet; it is a requirement
+      before real funds are accepted.
     </>,
   ],
   [
     "What does it cost?",
     <>
       The pre-release is free to explore. The custody program has no fee and no
-      administrator key. You pay ordinary Solana network fees and account rent
+      administrator role. You pay ordinary Solana network fees and account rent
       from your own wallet. Pricing for anything beyond that has not been set.
     </>,
   ],
@@ -309,8 +311,8 @@ export default function Home() {
               ],
               [
                 "simulation",
-                "It only does three things",
-                "Create, deposit, withdraw. No trading, no approvals, no calls to other programs. Less to get wrong.",
+                "It does very little",
+                "Hold, withdraw, replace keys. No trading, no approvals, and no calls to any program except Solana’s own system and token programs. Less to get wrong.",
               ],
             ].map(([icon, title, body]) => {
               return (

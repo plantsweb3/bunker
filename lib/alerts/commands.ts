@@ -41,10 +41,15 @@ export async function handleUpdate(
   } catch {
     return reply(`That is not a Bunker on this network.\n\n${FOOTER}`);
   }
-  const ok = await deps.store.subscribe(chat, vault.toBase58(), snapshot);
+  const result = await deps.store.subscribe(chat, vault.toBase58(), snapshot);
+  const refused = `(${short(vault.toBase58())} was not added.)`;
   return reply(
-    ok
+    result === "ok"
       ? WELCOME(vault.toBase58())
-      : `You can watch up to ${MAX_VAULTS_PER_CHAT} Bunkers. Send /stop to clear them, then try again.\n(${short(vault.toBase58())} was not added.)`,
+      : result === "chat-limit"
+        ? `You can watch up to ${MAX_VAULTS_PER_CHAT} Bunkers. Send /stop to clear them, then try again.\n${refused}`
+        : result === "vault-limit"
+          ? `This Bunker already has as many watchers as alerts allow.\n${refused}`
+          : `Alerts are at capacity and cannot take another Bunker right now. You are not being watched for this one; check your Bunker page directly.\n${refused}`,
   );
 }

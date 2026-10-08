@@ -45,7 +45,7 @@ CTA: Explore Bunker.
 Product status on the end card: Devnet first · In development.
 
 COPY SCOPE
-The supplied moodboard contains example claims such as audited, quantum-ready and secured balances. Those claims are not treated as verified product facts. The script describes the prior conversation's proposed separate hash-based authorization design in development. Mainnet readiness, deployed features and audits were not independently verified.
+The supplied moodboard contains example claims such as audited, quantum-ready and secured balances. Those claims are not treated as verified product facts. The script describes a proposed separate hash-based authorization design in development. Mainnet readiness, deployed features and audits were not independently verified.
 
 PRODUCTION
 The flat mark and custom wordmark were authored as precise path geometry and exported to transparent PNGs. The two social visuals were made with the built-in image_gen tool using the supplied moodboard and final logo as references. The prompt set is in source/generation-prompts.json. Source SVGs are included for clean future exports.

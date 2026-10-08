@@ -78,8 +78,9 @@ export function summarizeExposure(
   return {
     lamports: BigInt(lamports),
     movable,
-    // A frozen account cannot be moved by its delegate either.
-    approvals: movable.filter((t) => t.delegate && t.delegatedAmount > 0n),
+    // A frozen account cannot be moved by its delegate either. An approval on
+    // an account that is empty today still applies to whatever arrives later.
+    approvals: all.filter((t) => !t.frozen && t.delegate && t.delegatedAmount > 0n),
     supported: movable.filter((t) => t.program === "classic"),
     unsupported: movable.filter((t) => t.program === "token-2022"),
     frozen: held.length - movable.length,

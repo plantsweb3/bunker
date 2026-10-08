@@ -160,6 +160,13 @@ test("paths outside the page policy still cannot run anything", async ({ request
     const r = await request.get(path);
     expect(r.headers()["content-security-policy"], path).toContain("default-src 'none'");
   }
+  // Paths that merely start like a static file are ordinary pages and get the page policy.
+  for (const path of ["/favicon.icoX", "/robots.txtfoo", "/sitemap.xmlx/y"]) {
+    const r = await request.get(path);
+    expect(r.status(), path).toBe(404);
+    expect(r.headers()["content-security-policy"], path).toContain("'strict-dynamic'");
+  }
+  expect((await request.get("/")).headers()["cross-origin-opener-policy"]).toBe("same-origin");
   // The recovery tool is handed over as a download and never runs on this origin.
   const tool = await request.get("/source/bunker-recovery-tool.html");
   expect(tool.status()).toBe(200);

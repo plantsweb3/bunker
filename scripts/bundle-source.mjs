@@ -31,8 +31,9 @@ const SKIP_DIRS = new Set([
 const SKIP_FILES = [/^\.DS_Store$/, /\.log$/, /\.tmp$/, /\.tmp\./, /\.tsbuildinfo$/];
 // Must never be published. Finding one inside a published directory is an error.
 const FORBIDDEN = [
-  /^\.env(?!\.example$)/, /-keypair\.json$/, /^id\.json$/, /\.pem$/, /\.key$/,
-  /\.recovery\.json$/, /^bunker-(?:devnet|test)-.+\.json$/,
+  /^\.env(?!\.example$)/, /keypair.*\.json$/i, /^id\.json$/, /\.pem$/, /\.key$/, /\.p12$/, /\.pfx$/,
+  /^id_(rsa|ed25519|ecdsa)/, /\.recovery\.json$/, /^bunker-(?:devnet|test)-.+\.json$/,
+  /RECOVERY-KIT/i, /day-key/i,
 ];
 const files = [];
 async function add(path, entry) {
@@ -44,6 +45,9 @@ async function add(path, entry) {
     return;
   }
   if (!entry.isFile() || SKIP_FILES.some((p) => p.test(name))) return;
+  // A registry credential file is only expected, and checked, at the root.
+  if (name === '.npmrc' && path !== '.npmrc')
+    throw new Error(`Refusing to publish ${path}: a nested .npmrc may hold registry credentials.`);
   if (FORBIDDEN.some((p) => p.test(name)))
     throw new Error(`Refusing to publish ${path}: it looks like key material. Move it out of the source tree.`);
   files.push(path);

@@ -26,6 +26,6 @@ export function proxy(request: NextRequest) {
 // one by one left new routes without it; exclude only non-document paths.
 export const config = {
   matcher: [
-    "/((?!api/|_next/|brand/|assets/|source/|favicon\\.ico|sitemap\\.xml|robots\\.txt|.*opengraph-image).*)",
+    "/((?!api/|_next/|brand/|assets/|source/|favicon\\.ico$|sitemap\\.xml$|robots\\.txt$|.*opengraph-image).*)",
   ],
 };

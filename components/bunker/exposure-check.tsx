@@ -255,7 +255,7 @@ export default function ExposureCheck() {
                   <p>
                     {e.approvals.length
                       ? `${plural(e.approvals.length, "token account has", "token accounts have")} an open approval. That address can move those tokens without asking this wallet again.`
-                      : "No open token approvals. No other address can move this wallet’s tokens without a new signature."}
+                      : "No open approvals on the token accounts this check can read. It does not see every way a token can be moved: some newer tokens let their issuer move them, and it cannot see what a wallet may sign next."}
                   </p>
                 </section>
                 <section className="check-card safe">
