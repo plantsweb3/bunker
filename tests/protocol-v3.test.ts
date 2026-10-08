@@ -325,3 +325,25 @@ describe("Protocol 3 vault identity", () => {
     expect(() => spentAddress(program, a, new Uint8Array(32))).toThrow();
   });
 });
+describe("Refusal codes", () => {
+  it("has a sentence for every code the program defines, and for no other", async () => {
+    const { REFUSALS } = await import("../sdk/v3/refusals");
+    const source = readFileSync("programs/bunker3/src/state.rs", "utf8");
+    const body = /pub enum Refusal \{([\s\S]*?)\n\}/.exec(source)![1];
+    const codes = [...body.matchAll(/=\s*(\d+),/g)].map((m) => Number(m[1])).sort((a, b) => a - b);
+    expect(codes.length).toBeGreaterThan(15);
+    expect(Object.keys(REFUSALS).map(Number).sort((a, b) => a - b)).toEqual(codes);
+    for (const text of Object.values(REFUSALS)) expect(text.length).toBeGreaterThan(20);
+  });
+  it("finds the code in the ways a failure is reported", async () => {
+    const { refusalText, REFUSALS } = await import("../sdk/v3/refusals");
+    expect(refusalText('The network would reject this step ({"InstructionError":[1,{"Custom":121}]}). This step was not sent.')).toBe(REFUSALS[121]);
+    expect(refusalText('Transaction failed: {"InstructionError":[2,{"Custom": 124}]}')).toBe(REFUSALS[124]);
+    expect(refusalText("InstructionError(1, Custom(111))")).toBe(REFUSALS[111]);
+    // An unknown code or an ordinary error is left to the general wording.
+    expect(refusalText('{"InstructionError":[0,{"Custom":9999}]}')).toBeNull();
+    expect(refusalText('{"InstructionError":[0,"InvalidArgument"]}')).toBeNull();
+    expect(refusalText("fetch failed")).toBeNull();
+  });
+});
+

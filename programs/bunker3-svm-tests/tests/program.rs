@@ -1061,3 +1061,68 @@ fn a_token_withdrawal_is_instant_only_to_a_trusted_wallets_associated_account() 
     e.send(&[ix]).unwrap();
     assert_eq!(token_amount(&e, &other_account_of_wallet), 100);
 }
+
+/// The compiled program returns the documented refusal code for each outcome a
+/// person can act on, so a client can say why instead of "it failed".
+#[test]
+fn the_program_says_why_it_refused() {
+    fn code(r: TransactionResult) -> String {
+        format!("{:?}", r.expect_err("expected a refusal").err)
+    }
+    let refused = |r: TransactionResult, n: u32, what: &str| {
+        let got = code(r);
+        assert!(got.contains(&format!("Custom({n})")), "{what}: expected code {n}, got {got}");
+    };
+    let mut e = Env::new();
+    e.init();
+    let destination = Pubkey::new_unique();
+    let r = e.execute(destination);
+    refused(r, 120, "nothing pending");
+    let r = e.expire();
+    refused(r, 120, "nothing to clear");
+    // A key generation the vault is not on.
+    let r = e.recover(100, 1, 101, 10);
+    refused(r, 140, "a packet for another generation");
+    // A deadline already passed, and one too far ahead.
+    let mut late = e.sol(destination, SOL, 0, 2);
+    late.announce_by = T0 - 1;
+    let r = e.announce(1, &late);
+    refused(r, 112, "announced too late");
+    let mut far = e.sol(destination, SOL, 0, 2);
+    far.announce_by = T0 + 2 * DAY;
+    let r = e.announce(1, &far);
+    refused(r, 113, "deadline too far ahead");
+    // An announcement lands; then the waiting-state refusals.
+    let w = e.sol(destination, SOL, 0, 2);
+    e.announce(1, &w).unwrap();
+    let r = e.execute(destination);
+    refused(r, 121, "before the wait is over");
+    let r = e.expire();
+    refused(r, 130, "not expired yet");
+    let again = e.sol(destination, SOL, 1, 3);
+    let r = e.announce(2, &again);
+    refused(r, 111, "one already pending");
+    let stale = e.sol(destination, SOL, 0, 3);
+    let r = e.announce(2, &stale);
+    refused(r, 110, "an index already used");
+    e.set_time(T0 + DAY);
+    let r = e.execute(Pubkey::new_unique());
+    refused(r, 123, "a destination that was not announced");
+    e.set_time(T0 + DAY + WINDOW + 1);
+    let r = e.execute(destination);
+    refused(r, 122, "past the window");
+    e.expire().unwrap();
+    // A next root that has already signed.
+    let mut reuse = e.sol(destination, SOL, 1, 1);
+    reuse.announce_by = T0 + DAY + WINDOW + 3600;
+    let r = e.announce(2, &reuse);
+    refused(r, 114, "a next root that already signed");
+    // More than the vault can pay while keeping its reserve.
+    let mut all = e.sol(destination, 0, 1, 3);
+    all.amount = e.lamports(&e.vault);
+    all.announce_by = T0 + DAY + WINDOW + 3600;
+    e.announce(2, &all).unwrap();
+    e.set_time(T0 + 3 * DAY + WINDOW);
+    let r = e.execute(destination);
+    refused(r, 124, "below the rent reserve");
+}

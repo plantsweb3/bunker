@@ -64,10 +64,11 @@ fn unspent(
 ) -> Result<u8, ProgramError> {
     let (expected, bump) =
         Pubkey::find_program_address(&[SPENT_SEED, vault.as_ref(), root], id);
-    require(
-        account.key == &expected
-            && account.owner == &system_program::id()
-            && account.data_is_empty(),
+    require(account.key == &expected)?;
+    // A marker that exists means this root has already signed.
+    need(
+        account.owner == &system_program::id() && account.data_is_empty(),
+        Refusal::NextRootUnusable,
     )?;
     Ok(bump)
 }
@@ -154,9 +155,10 @@ fn verify_proof(
 ) -> ProgramResult {
     owned(proof, id, PROOF_LEN, PROOF_MAGIC)?;
     let d = proof.try_borrow_data()?;
-    require(
+    need(
         u16::from_le_bytes(d[72..74].try_into().unwrap()) as usize == SIGNATURE_LEN
             && d[40..72] == *digest,
+        Refusal::ProofNotReady,
     )?;
     let signature: &WinternitzSignature<32> = (&d[74..]).try_into().map_err(|_| invalid())?;
     if !signature.verify(message, &WinternitzRoot::new(*root)) {
@@ -189,7 +191,7 @@ fn initialize(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResu
     // account first can only create exactly the vault its owner derived.
     let vault_id = hashv(&[VAULT_ID_DOMAIN, data]).to_bytes();
     let (expected, bump) = Pubkey::find_program_address(&[VAULT_SEED, &vault_id], id);
-    require(vault.key == &expected)?;
+    need(vault.key == &expected, Refusal::WrongVaultAddress)?;
     let v = new_vault(vault_id, data, bump)?;
     create(
         payer,
@@ -265,13 +267,15 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
         let mint = next_account_info(it)?;
         // A classic mint can never be closed or change owner, so what is
         // checked here still holds at execution.
-        require(mint.key.to_bytes() == a.mint && mint.owner == &spl_token::id())?;
-        let m = spl_token::state::Mint::unpack(&mint.try_borrow_data()?)?;
-        require(m.decimals == a.decimals)?;
+        require(mint.key.to_bytes() == a.mint)?;
+        need(mint.owner == &spl_token::id(), Refusal::MintNotSupported)?;
+        let m = spl_token::state::Mint::unpack(&mint.try_borrow_data()?)
+            .map_err(|_| Refusal::MintNotSupported)?;
+        need(m.decimals == a.decimals, Refusal::WrongDecimals)?;
     }
     let mut v = load_vault(id, vault)?;
     for reserved in [vault.key, proof.key, spent.key, next_spent.key] {
-        require(a.destination != reserved.to_bytes())?;
+        need(a.destination != reserved.to_bytes(), Refusal::DestinationNotAllowed)?;
     }
     unspent(id, vault.key, next_spent, &a.next_op_root)?;
     let message: &[&[u8]] = &[ANNOUNCE_DOMAIN, id.as_ref(), vault.key.as_ref(), data];
@@ -293,18 +297,21 @@ fn execute(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     let destination = next_account_info(it)?;
     let mut v = load_vault(id, vault)?;
     let p = check_execute(&v, Clock::get()?.unix_timestamp)?;
-    require(
-        destination.is_writable
-            && destination.key.to_bytes() == p.destination
-            && destination.key != vault.key,
+    need(
+        destination.key.to_bytes() == p.destination && destination.key != vault.key,
+        Refusal::WrongDestination,
     )?;
+    require(destination.is_writable)?;
     if p.kind == 0 {
         require(accounts.len() == 2)?;
         let remaining = vault
             .lamports()
             .checked_sub(p.amount)
             .ok_or(ProgramError::InsufficientFunds)?;
-        require(remaining >= Rent::get()?.minimum_balance(VAULT_LEN))?;
+        need(
+            remaining >= Rent::get()?.minimum_balance(VAULT_LEN),
+            Refusal::BelowRentReserve,
+        )?;
         let received = destination
             .lamports()
             .checked_add(p.amount)
@@ -317,7 +324,7 @@ fn execute(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
         let mint_account = next_account_info(it)?;
         let token = next_account_info(it)?;
         let mint = Pubkey::new_from_array(p.mint);
-        require(
+        need(
             token.key == &spl_token::id()
                 && mint_account.key == &mint
                 && mint_account.owner == &spl_token::id()
@@ -325,16 +332,20 @@ fn execute(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
                 && destination.owner == &spl_token::id()
                 && source.is_writable
                 && source.key != destination.key,
+            Refusal::WrongTokenAccounts,
         )?;
-        let src = spl_token::state::Account::unpack(&source.try_borrow_data()?)?;
-        let dst = spl_token::state::Account::unpack(&destination.try_borrow_data()?)?;
-        let m = spl_token::state::Mint::unpack(&mint_account.try_borrow_data()?)?;
-        require(
+        let wrong = |_| ProgramError::from(Refusal::WrongTokenAccounts);
+        let src = spl_token::state::Account::unpack(&source.try_borrow_data()?).map_err(wrong)?;
+        let dst =
+            spl_token::state::Account::unpack(&destination.try_borrow_data()?).map_err(wrong)?;
+        let m = spl_token::state::Mint::unpack(&mint_account.try_borrow_data()?).map_err(wrong)?;
+        need(
             src.owner == *vault.key
                 && src.mint == mint
                 && dst.mint == mint
                 && src.delegate.is_none()
                 && src.close_authority.is_none(),
+            Refusal::WrongTokenAccounts,
         )?;
         invoke_signed(
             &spl_token::instruction::transfer_checked(
