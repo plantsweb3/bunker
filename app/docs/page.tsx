@@ -34,17 +34,21 @@ export default function Page() {
         <p>
           Download the recovery tool from the{" "}
           <Link href="/recovery">recovery page</Link>. It is a single file
-          whose own security policy forbids every network connection. In it
-          you choose a password and whether to add a waiting period, and it
-          saves three files: the recovery kit, your first day key, and a
-          creation request. Only the creation request, which holds two public
-          commitments and nothing secret, is uploaded to the site to create
-          the vault on-chain.
+          whose own security policy forbids every network connection, and it
+          only runs from the copy you saved, never from the website. In it
+          you choose two passwords, one for the recovery kit and a different
+          one for the day key, and whether to add a waiting period. It saves
+          three files: the recovery kit, your first day key, and a creation
+          request. Only the creation request, which holds public commitments
+          and nothing secret, is uploaded to the site to create the vault
+          on-chain. The recovery kit’s password is never typed into a
+          website.
         </p>
         <p>
-          The key files are encrypted with AES-256-GCM under a key derived
-          from your password with PBKDF2-SHA256, 600,000 iterations. There is
-          no reset. The tool makes you re-open the saved kit before it
+          Each key file is encrypted with AES-256-GCM under a key derived
+          from its password with PBKDF2-SHA256, 600,000 iterations. There is
+          no reset. The Bunker’s address is computed from its keys and its
+          waiting period, so nobody else can create it with different ones. The tool makes you re-open the saved kit before it
           continues.
         </p>
       </section>
