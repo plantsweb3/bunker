@@ -15,6 +15,7 @@ import { createInterface } from "node:readline";
 import { Connection, Keypair, PublicKey } from "@solana/web3.js";
 import { fetchVault } from "../../sdk/v3/chain";
 import { parseRecoveryFile } from "../../sdk/v3/requests";
+import { refusalText } from "../../sdk/v3/refusals";
 import {
   clearExpired,
   describe,
@@ -97,4 +98,7 @@ async function main() {
 }
 main()
   .then(() => rl.close())
-  .catch((e) => fail(e instanceof Error ? e.message : "Failed"));
+  .catch((e) => {
+    const message = e instanceof Error ? e.message : "Failed";
+    fail(refusalText(message) ?? message);
+  });

@@ -494,3 +494,88 @@ fn the_trusted_list_is_stored_canonically() {
     d[287 + 64..287 + 96].copy_from_slice(&root(70));
     assert!(Vault::unpack(&d).is_err(), "a duplicate written into the account");
 }
+
+/// Each refusal a person can act on has its own code, and the codes are fixed.
+#[test]
+fn refusals_say_why() {
+    use solana_program_error::ProgramError;
+    fn code<T: std::fmt::Debug>(r: Result<T, ProgramError>) -> u32 {
+        match r {
+            Err(ProgramError::Custom(n)) => n,
+            other => panic!("expected a refusal code, got {other:?}"),
+        }
+    }
+    // The numbers are an interface: clients turn them into sentences.
+    assert_eq!(
+        [
+            Refusal::NotThisVault as u32,
+            Refusal::KeyNotCurrent as u32,
+            Refusal::WithdrawalPending as u32,
+            Refusal::AnnouncedTooLate as u32,
+            Refusal::DeadlineTooFar as u32,
+            Refusal::NextRootUnusable as u32,
+            Refusal::MintNotSupported as u32,
+            Refusal::WrongDecimals as u32,
+            Refusal::DestinationNotAllowed as u32,
+            Refusal::NothingPending as u32,
+            Refusal::NotYetOpen as u32,
+            Refusal::WindowClosed as u32,
+            Refusal::WrongDestination as u32,
+            Refusal::BelowRentReserve as u32,
+            Refusal::WrongTokenAccounts as u32,
+            Refusal::NotExpired as u32,
+            Refusal::WrongGeneration as u32,
+            Refusal::ProofNotReady as u32,
+            Refusal::BadCreation as u32,
+            Refusal::WrongVaultAddress as u32,
+        ],
+        [101, 110, 111, 112, 113, 114, 116, 117, 118, 120, 121, 122, 123, 124, 125, 130, 140, 150, 160, 161]
+    );
+    // Announcing.
+    let announce = |edit: &dyn Fn(&mut Vec<u8>), state: &Vault, now: i64| {
+        let mut d = announce_bytes(&vault(), root(11));
+        edit(&mut d);
+        let mut v = state.clone();
+        decode_announce(&d).and_then(|a| apply_announce(&mut v, &a, root(99), now, false))
+    };
+    let fresh = vault();
+    assert_eq!(code(announce(&|d| d[2] ^= 1, &fresh, NOW)), 101, "another vault");
+    assert_eq!(code(announce(&|d| d[34] ^= 1, &fresh, NOW)), 101, "another network");
+    assert_eq!(code(announce(&|d| d[74] = 1, &fresh, NOW)), 110, "a key that is not current");
+    assert_eq!(code(announce(&|d| d[66] = 1, &fresh, NOW)), 110, "another key generation");
+    assert_eq!(code(announce(&|_| {}, &announced(), NOW)), 110, "the same key again");
+    let mut busy = announced();
+    busy.op_index = 0;
+    assert_eq!(code(announce(&|_| {}, &busy, NOW)), 111, "one already pending");
+    assert_eq!(code(announce(&|_| {}, &fresh, NOW + 3601)), 112, "after its deadline");
+    let far = |d: &mut Vec<u8>| d[155..163].copy_from_slice(&(NOW + MAX_ANNOUNCE_AHEAD_SECS + 1).to_le_bytes());
+    assert_eq!(code(announce(&far, &fresh, NOW)), 113, "a deadline too far ahead");
+    assert_eq!(code(announce(&|d| d[163..195].copy_from_slice(&root(10)), &fresh, NOW)), 114, "next root is the current one");
+    assert_eq!(code(announce(&|d| d[163..195].copy_from_slice(&root(20)), &fresh, NOW)), 114, "next root is the recovery root");
+    // Releasing and clearing.
+    assert_eq!(code(check_execute(&fresh, NOW)), 120);
+    let waiting = announced();
+    let p = waiting.pending.clone().unwrap();
+    assert_eq!(code(check_execute(&waiting, p.opens_at - 1)), 121);
+    assert_eq!(code(check_execute(&waiting, p.deadline + 1)), 122);
+    assert_eq!(code(apply_expire(&mut fresh.clone(), NOW)), 120);
+    assert_eq!(code(apply_expire(&mut waiting.clone(), p.deadline)), 130);
+    // Recovering.
+    let recover = |edit: &dyn Fn(&mut Vec<u8>)| {
+        let mut d = recover_bytes(&fresh, root(21), root(12));
+        edit(&mut d);
+        decode_recover(&d).and_then(|r| apply_recover(&mut fresh.clone(), &r))
+    };
+    assert_eq!(code(recover(&|d| d[2] ^= 1)), 101);
+    assert_eq!(code(recover(&|d| d[66] = 1)), 140);
+    assert_eq!(code(recover(&|d| d[74..106].copy_from_slice(&root(20)))), 114);
+    // Creating.
+    let mut data = Vec::new();
+    data.extend(root(1));
+    data.extend(root(2));
+    data.extend(root(10));
+    data.extend(root(10));
+    data.extend(DAY.to_le_bytes());
+    data.extend([0u8; 128]);
+    assert_eq!(code(new_vault(root(1), &data, 250)), 160);
+}

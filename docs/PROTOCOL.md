@@ -149,6 +149,33 @@ Opcode is the first byte of instruction data. Any account count, data length, ve
 
 In `announce` and `recover` the payer signs only to fund the spent markers. It has no authority over the vault.
 
+### Refusal codes
+
+Malformed input (a wrong length, a wrong account, an unknown opcode) fails with a generic program error. A refusal that a person can act on fails with one of these custom codes, which are part of the program's interface and do not change. A failed signature check is `MissingRequiredSignature`.
+
+| Code | Meaning |
+|---:|---|
+| 101 | The payload names another vault or another chain tag |
+| 110 | The epoch or index is not the vault's current one |
+| 111 | A withdrawal is already pending |
+| 112 | The announcement landed after `announce_by` |
+| 113 | `announce_by` is more than 86,400 seconds ahead |
+| 114 | A next root equals a current root or already has a marker |
+| 116 | The mint is not a classic SPL mint |
+| 117 | The mint's decimals are not the signed ones |
+| 118 | The destination is an account the instruction itself uses |
+| 120 | No pending withdrawal (or one from an earlier epoch) |
+| 121 | `now < opens_at` |
+| 122 | `now > deadline` |
+| 123 | The destination supplied is not the recorded one |
+| 124 | The vault would fall below its rent reserve |
+| 125 | The token accounts supplied do not fit the record |
+| 130 | The record has not passed its deadline |
+| 140 | The recovery packet is for another epoch |
+| 150 | The proof account is incomplete or holds another message |
+| 160 | The creation data is not acceptable |
+| 161 | The account is not the address the creation data derives |
+
 ### 4.0 `initialize` — data: `salt (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4) || trusted (4 x 32)`
 
 Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, the trusted list in canonical form (used slots first, unused slots zero, no duplicates), and the vault account to be the address derived from `vault_id = SHA-256("BUNKER3_VAULT_ID" || data)` (§1.2). Creates the vault with that `vault_id`, `op_index = 0`, `epoch = 0`, `pending = 0`. The salt is not stored. A prefunded address must not block creation, no wallet key gains any authority over the vault, and a second `initialize` for an existing vault fails. Because the address fixes the data, creation is safe to race: a stranger who sends the same data first has created the owner's vault, and one who sends different data has created a vault at a different address.
@@ -273,8 +300,8 @@ These are trust assumptions, not program guarantees.
 
 | Evidence | Where | Count |
 |---|---|---:|
-| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 23 |
-| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 24 |
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 24 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 25 |
 | Isolation, on the same VM: a stolen day key paying trusted wallets at once and a stranger only after a cancellable wait, a malformed trusted list, a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 15 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
 | The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |

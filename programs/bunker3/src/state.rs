@@ -35,6 +35,68 @@ const ZERO: [u8; 32] = [0; 32];
 pub fn invalid() -> ProgramError {
     ProgramError::InvalidInstructionData
 }
+/// Why the program refused something, as a custom error code a client can
+/// turn into a sentence. The numbers are part of the program's interface and
+/// do not change. Malformed input (wrong lengths, wrong accounts, a bad
+/// opcode) keeps the generic errors; these are the refusals a person can act on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Refusal {
+    /// The payload names another vault or another network.
+    NotThisVault = 101,
+    /// The key that signed is not the vault's current one: it was already
+    /// used, or the keys were replaced.
+    KeyNotCurrent = 110,
+    /// A withdrawal is already pending.
+    WithdrawalPending = 111,
+    /// The announcement landed after the deadline it was signed with.
+    AnnouncedTooLate = 112,
+    /// The announcement's deadline is more than a day ahead.
+    DeadlineTooFar = 113,
+    /// A next root equals a current root or has already signed.
+    NextRootUnusable = 114,
+    /// The mint is not a classic SPL mint.
+    MintNotSupported = 116,
+    /// The mint's decimal places are not the ones that were signed.
+    WrongDecimals = 117,
+    /// The destination is one of the accounts the instruction itself uses.
+    DestinationNotAllowed = 118,
+    /// There is no pending withdrawal.
+    NothingPending = 120,
+    /// The waiting period is not over.
+    NotYetOpen = 121,
+    /// The withdrawal was not released in time; it can only be cleared.
+    WindowClosed = 122,
+    /// The destination supplied is not the one that was announced.
+    WrongDestination = 123,
+    /// The vault would be left below its own rent reserve.
+    BelowRentReserve = 124,
+    /// The token accounts supplied do not fit the announced withdrawal.
+    WrongTokenAccounts = 125,
+    /// The pending withdrawal has not passed its deadline yet.
+    NotExpired = 130,
+    /// The recovery packet is for another key generation.
+    WrongGeneration = 140,
+    /// The uploaded signature is incomplete or is for another message.
+    ProofNotReady = 150,
+    /// The creation data is not acceptable.
+    BadCreation = 160,
+    /// The account is not the address this creation data derives.
+    WrongVaultAddress = 161,
+}
+impl From<Refusal> for ProgramError {
+    fn from(r: Refusal) -> Self {
+        ProgramError::Custom(r as u32)
+    }
+}
+/// Fails with `reason` unless `condition` holds.
+pub fn need(condition: bool, reason: Refusal) -> Result<(), ProgramError> {
+    if condition {
+        Ok(())
+    } else {
+        Err(reason.into())
+    }
+}
 pub fn require(condition: bool) -> Result<(), ProgramError> {
     if condition {
         Ok(())
@@ -184,12 +246,13 @@ pub fn new_vault(vault_id: [u8; 32], data: &[u8], bump: u8) -> Result<Vault, Pro
         bump,
         trusted: read_trusted(&data[132..INIT_LEN]),
     };
-    require(trusted_is_canonical(&v.trusted))?;
-    require(
-        v.op_root != ZERO
+    need(
+        trusted_is_canonical(&v.trusted)
+            && v.op_root != ZERO
             && v.rec_root != ZERO
             && v.op_root != v.rec_root
             && v.delay_secs <= MAX_DELAY_SECS,
+        Refusal::BadCreation,
     )?;
     Ok(v)
 }
@@ -277,15 +340,18 @@ pub fn apply_announce(
     now: i64,
     to_trusted: bool,
 ) -> Result<[u8; 32], ProgramError> {
-    require(
-        a.vault_id == v.vault_id
-            && a.chain_tag == v.chain_tag
-            && a.epoch == v.epoch
-            && a.op_index == v.op_index,
+    need(a.vault_id == v.vault_id && a.chain_tag == v.chain_tag, Refusal::NotThisVault)?;
+    need(a.epoch == v.epoch && a.op_index == v.op_index, Refusal::KeyNotCurrent)?;
+    need(v.pending.is_none(), Refusal::WithdrawalPending)?;
+    need(now <= a.announce_by, Refusal::AnnouncedTooLate)?;
+    need(
+        a.announce_by.saturating_sub(now) <= MAX_ANNOUNCE_AHEAD_SECS,
+        Refusal::DeadlineTooFar,
     )?;
-    require(v.pending.is_none())?;
-    require(now <= a.announce_by && a.announce_by.saturating_sub(now) <= MAX_ANNOUNCE_AHEAD_SECS)?;
-    require(a.next_op_root != v.op_root && a.next_op_root != v.rec_root)?;
+    need(
+        a.next_op_root != v.op_root && a.next_op_root != v.rec_root,
+        Refusal::NextRootUnusable,
+    )?;
     let wait = if to_trusted { 0 } else { v.delay_secs };
     let opens_at = now
         .checked_add(wait as i64)
@@ -315,14 +381,16 @@ pub fn apply_announce(
 /// Returns the record to execute. Does not clear it; the caller clears it only
 /// after the transfer has succeeded in the same instruction.
 pub fn check_execute(v: &Vault, now: i64) -> Result<Pending, ProgramError> {
-    let p = v.pending.clone().ok_or(ProgramError::InvalidArgument)?;
-    require(p.epoch == v.epoch && now >= p.opens_at && now <= p.deadline)?;
+    let p = v.pending.clone().ok_or(Refusal::NothingPending)?;
+    need(p.epoch == v.epoch, Refusal::NothingPending)?;
+    need(now >= p.opens_at, Refusal::NotYetOpen)?;
+    need(now <= p.deadline, Refusal::WindowClosed)?;
     Ok(p)
 }
 
 pub fn apply_expire(v: &mut Vault, now: i64) -> Result<(), ProgramError> {
-    let p = v.pending.as_ref().ok_or(ProgramError::InvalidArgument)?;
-    require(now > p.deadline)?;
+    let p = v.pending.as_ref().ok_or(Refusal::NothingPending)?;
+    need(now > p.deadline, Refusal::NotExpired)?;
     v.pending = None;
     Ok(())
 }
@@ -339,8 +407,12 @@ pub fn apply_expire(v: &mut Vault, now: i64) -> Result<(), ProgramError> {
 /// neither checked nor marked: a signature made under it names the epoch being
 /// left and can never be accepted again.
 pub fn apply_recover(v: &mut Vault, r: &Recover) -> Result<[u8; 32], ProgramError> {
-    require(r.vault_id == v.vault_id && r.chain_tag == v.chain_tag && r.epoch == v.epoch)?;
-    require(r.next_rec_root != v.rec_root && r.next_op_root != v.rec_root)?;
+    need(r.vault_id == v.vault_id && r.chain_tag == v.chain_tag, Refusal::NotThisVault)?;
+    need(r.epoch == v.epoch, Refusal::WrongGeneration)?;
+    need(
+        r.next_rec_root != v.rec_root && r.next_op_root != v.rec_root,
+        Refusal::NextRootUnusable,
+    )?;
     let displaced = v.rec_root;
     v.epoch = v
         .epoch

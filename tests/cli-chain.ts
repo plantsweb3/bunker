@@ -11,6 +11,7 @@ import { genesisVault, recoveryPacket } from "../sdk/v3/master";
 import { epochSeed } from "../sdk/v3/derive";
 import { fetchVault } from "../sdk/v3/chain";
 import { DayKey, encryptFile } from "../sdk/v3/kit";
+import { refusalText } from "../sdk/v3/refusals";
 import { initializeIx, vaultAddress } from "../sdk/v3/protocol";
 import {
   describe,
@@ -119,7 +120,9 @@ try {
   const thief = Keypair.generate().publicKey;
   check((await withdraw(sB, dayB, pathB, await review(sB, dayB, { to: thief.toBase58(), amount: "2" }))).startsWith("Announced."), "announced");
   check((await c.getBalance(thief)) === 0, "nothing moved at announcement");
-  await rejects(() => release(sB, b.vault), "", "release before the wait is over");
+  // The program's own reason comes back, and has a sentence.
+  await rejects(() => release(sB, b.vault), '"Custom":121', "release before the wait is over");
+  check(refusalText('{"InstructionError":[0,{"Custom":121}]}') === "The waiting period is not over yet.", "refusal sentence");
   await rejects(() => review(sB, dayB, { to: thief.toBase58(), amount: "0.1" }), "already pending", "second withdrawal while one waits");
   // The packet comes from the offline tool; here it is built the same way.
   const packet = recoveryPacket(b.master, b.g.d, 0n);

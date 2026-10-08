@@ -5,6 +5,7 @@ import { PublicKey, TransactionInstruction } from "@solana/web3.js";
 import { LoaderCircle } from "lucide-react";
 import type { BunkerConfig } from "@/lib/bunker-config";
 import { createConnection, send, UnconfirmedError } from "@/sdk/client";
+import { refusalText } from "@/sdk/v3/refusals";
 import { useWallet } from "../wallet";
 const friendly: [RegExp, string][] = [
   [
@@ -20,6 +21,9 @@ export const errorText = (e: unknown) => {
   // Sent, outcome unknown: never described as not sent.
   if (e instanceof UnconfirmedError) return e.message;
   const m = e instanceof Error ? e.message : "The operation could not be completed.";
+  // The program's own reason, when it gave one, beats any general wording.
+  const refusal = refusalText(m);
+  if (refusal) return refusal;
   return friendly.find(([pattern]) => pattern.test(m))?.[1] ?? m;
 };
 /** Config, connection, wallet and a single-flight task runner shared by the
