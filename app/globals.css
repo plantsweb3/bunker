@@ -1894,6 +1894,158 @@ body {
     display: none;
   }
 }
+
+/* ───────── Protocol 3 app: waiting period, inline forms, recovery tool ───────── */
+.door-plate dl {
+  flex-wrap: wrap;
+  gap: 14px 28px;
+}
+.pending-panel {
+  margin: 24px 0 0;
+  display: grid;
+  gap: 20px;
+  border-color: #6a5a34;
+  background: linear-gradient(180deg, #221d12, #15130f);
+}
+.pending-panel.phase-open {
+  border-color: #4f8f86;
+  background: linear-gradient(180deg, #14272a, #0f1719);
+}
+.pending-panel.phase-expired {
+  border-color: #5b4039;
+  background: #1d1513;
+}
+.pending-panel h2 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.pending-clock {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  color: #d9c08f;
+}
+.phase-open .pending-clock {
+  color: var(--ice);
+}
+.pending-clock > div {
+  display: grid;
+  gap: 4px;
+}
+.pending-clock .mono {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+}
+.pending-clock strong {
+  font-family: "Space Grotesk", "Inter", sans-serif;
+  font-size: clamp(40px, 6vw, 68px);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  color: #f5f7f6;
+}
+.inline-form {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+  padding-top: 22px;
+  border-top: 1px solid #263135;
+}
+.inline-form h2 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+.inline-form .field {
+  margin: 0;
+}
+.leave-steps {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+}
+.leave-steps li {
+  display: flex;
+  gap: 14px;
+  padding: 14px 0;
+  border-top: 1px solid #263135;
+  color: var(--ice);
+}
+.leave-steps li:first-child {
+  border-top: 0;
+}
+.leave-steps div {
+  display: grid;
+  gap: 3px;
+  font-size: 13px;
+}
+.leave-steps b {
+  font-weight: 500;
+  color: #eef2f1;
+}
+.leave-steps span {
+  color: #93a3a8;
+  line-height: 1.5;
+}
+.tool-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 26px 0 0;
+  border-bottom: 1px solid #29393f;
+}
+.tool-tabs button {
+  padding: 14px 18px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: #93a3a8;
+  font-size: 14px;
+}
+.tool-tabs button[aria-selected="true"] {
+  color: #fff;
+  border-bottom-color: var(--ice);
+}
+.tool-panel {
+  max-width: 720px;
+  margin: 24px 0 60px;
+  display: grid;
+  gap: 18px;
+}
+.tool-panel h2 {
+  font-size: 24px;
+  letter-spacing: -0.025em;
+}
+.tool-panel .field {
+  margin: 0;
+}
+.tool-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #b4bec1;
+}
+.tool-steps strong {
+  color: #eef2f1;
+  font-weight: 500;
+}
+.recovery-page .vault-heading {
+  padding-bottom: 22px;
+}
+@media (max-width: 700px) {
+  .tool-tabs button {
+    flex: 1;
+    padding: 13px 8px;
+    font-size: 13px;
+  }
+  .pending-clock strong {
+    font-size: 44px;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .bunker-door {
     display: none;
