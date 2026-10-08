@@ -117,10 +117,14 @@ export default function Page() {
         <p>
           <strong>If the day key or its password was on that device,</strong>{" "}
           act now. Whoever has them can announce a withdrawal, and if your
-          Bunker has no waiting period it leaves at once. From a clean device,
-          use your recovery kit in the offline tool to install new keys, which
-          kills the stolen day key and cancels a withdrawal that is still
-          waiting. If the recovery kit itself was on that device, withdraw
+          Bunker has no waiting period it leaves at once. The fastest stop is
+          your cancel file: from any device, upload it on the{" "}
+          <Link href="/recovery">recovery page</Link>. That kills the stolen
+          day key and cancels a withdrawal that is still waiting, and it does
+          not need your recovery kit. Afterwards, use the recovery kit in the
+          offline tool to make a new day key. No cancel file? Use the recovery
+          kit in the offline tool to make a recovery packet, which does the
+          same. If the recovery kit itself was on that device, withdraw
           everything immediately instead.
         </p>
         <p>
