@@ -867,13 +867,13 @@ function App() {
                 )}
                 {phase !== "expired" && (
                   <Link className="button ghost" href="/recovery">
-                    Not you? Cancel with your recovery kit
+                    Not you? Stop it with your cancel file
                   </Link>
                 )}
               </div>
               <p className="micro">
                 {phase === "waiting"
-                  ? "Nothing has left your Bunker. Cancelling installs new keys and is done in the recovery tool."
+                  ? "Nothing has left your Bunker. Your cancel file stops this at once; so does a recovery packet made with your recovery kit. Either one retires this day key."
                   : phase === "open"
                     ? "Anyone can submit the release; it can only go to the address above."
                     : "Nothing moved. Clear it to announce a new withdrawal."}
@@ -1525,7 +1525,7 @@ function App() {
                 <BIcon name="alert" size={18} />
                 <div>
                   <b>Cancel if it wasn’t you</b>
-                  <span>During a wait, your recovery kit installs new keys.</span>
+                  <span>During a wait, your cancel file stops it and retires this day key.</span>
                 </div>
               </li>
               <li>
