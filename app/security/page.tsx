@@ -100,8 +100,8 @@ export default function Page() {
             offline tool starts on a 24-hour wait for any address you have not
             listed as trusted, and lets you turn the wait off. Without it
             there is no time to react. A trusted address is only as safe as
-            the wallet behind it: list a hardware wallet or an exchange
-            deposit address, not the wallet you connect to websites.
+            the wallet behind it: list a hardware wallet, not the wallet you
+            connect to websites.
           </li>
           <li>
             <strong>Loss of the recovery kit or its password.</strong> There is

@@ -146,6 +146,18 @@ function App() {
         vaultTokens(b.connection, new PublicKey(key.vault)),
         chainTime(b.connection),
       ]);
+      // The trusted addresses and the waiting period are fixed for the life
+      // of a Bunker and are in the day key. Every read is held to them, so a
+      // connection that reports others can never put its own address on the
+      // trusted list this page shows.
+      if (
+        key.trusted.length !== v.state.trusted.length ||
+        key.trusted.some((t, i) => t !== v.state.trusted[i].toBase58()) ||
+        key.delaySecs !== v.state.delaySecs
+      )
+        throw new Error(
+          "The network reports different trusted addresses or a different waiting period from the ones this Bunker was built with. Nothing was done. Try again later or on another connection.",
+        );
       const loaded = { state: v.state, spendable: v.spendable, tokens, now, at: Date.now() };
       setVault(loaded);
       return loaded;
@@ -282,17 +294,6 @@ function App() {
         "This browser is not letting the page store anything (private mode or blocked site data), so it cannot keep the record that stops a key being used twice. Open your Bunker in a normal window.",
       );
     }
-    if (
-      key.trusted.length !== loaded.state.trusted.length ||
-      key.trusted.some((t, i) => t !== loaded.state.trusted[i].toBase58())
-    )
-      throw new Error(
-        "The network reports different trusted addresses from the ones this Bunker was built with. Nothing was opened. Try again later or on another connection.",
-      );
-    if (key.delaySecs !== loaded.state.delaySecs)
-      throw new Error(
-        "The network reports a different waiting period from the one this Bunker was built with. Nothing was opened. Try again later or on another connection.",
-      );
     // Ask the browser not to evict this site's storage: the record of what
     // has been signed lives there.
     void navigator.storage?.persist?.().catch(() => false);

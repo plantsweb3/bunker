@@ -68,8 +68,10 @@ export default function Page() {
         </p>
         <p>
           Trusted addresses should be wallets that a thief on your everyday
-          computer could not also empty: a hardware wallet, or your own
-          deposit address at an exchange.
+          computer could not also empty, and whose keys you hold: a hardware
+          wallet is the right answer. Someone who steals your day key can
+          send everything to a trusted address at once, so it has to be
+          somewhere you can always get it back from.
         </p>
         <p>
           What it buys: without one, anyone who gets your day key and its
