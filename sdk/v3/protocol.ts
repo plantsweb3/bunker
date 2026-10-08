@@ -1,4 +1,4 @@
-/** Protocol 3 encodings and instructions (docs/PROTOCOL-3-DRAFT.md §2–§4).
+/** Protocol 3 encodings and instructions (docs/PROTOCOL.md §2–§4).
  * DRAFT: mirrors programs/bunker3; not reviewed, not used by the released app. */
 import "../polyfill";
 import { Buffer } from "buffer";

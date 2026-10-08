@@ -1,12 +1,12 @@
-# Protocol 3: draft byte-level specification
+# Bunker protocol: byte-level specification (draft)
 
-**Status: draft for design review. Not implemented, not approved, not audited.** 7 October 2026. It makes `docs/RECOVERY-POLICY-PROPOSAL.md` concrete enough to review and to implement against: accounts, instructions, signed bytes, derivation and a transition table. Where the proposal left a choice open, this draft picks one and lists it under [Open questions](#open-questions). Nothing here changes protocol 2, the release gate or any deployed behaviour. Real-fund custody remains disabled.
+**Status: draft for design review. Not approved, not audited, not deployed.** This is the only protocol in this repository. The protocol version byte is `0x03`; versions 1 and 2 were earlier experiments with a different design (no recovery authority, a new backup after every withdrawal) and have been removed. `docs/RECOVERY-POLICY-PROPOSAL.md` is the design rationale this document made concrete. Real-fund custody remains disabled.
 
-A draft implementation of this document is in `programs/bunker3` (see [Implementation status](#implementation-status)). It exists so the design can be reviewed against running code; it is not deployed and the web app does not use it.
+The implementation is `programs/bunker3` (on-chain), `sdk/v3` (client), `tools/recovery` (offline tool) and `components/bunker/v3` (web app); see [Implementation status](#implementation-status).
 
 Scope of this draft: the recovery authority (proposal §1), the stable archival secret (§2) and delayed withdrawals with cancel-by-recovery (§3). Pre-approved destinations (§4) and the alert service (§6) are out of scope; the vault layout reserves no space for them and a later version must be a new, reviewed layout.
 
-Unchanged from protocol 2: the vendored Winterwallet verifier at revision `672fc6789b1532ee680f24842d235e0be8737b61`, N=32, 1,088-byte signatures, two-chunk proof staging, direct deposits, no administrator, no fee recipient, no arbitrary invocation, SOL and classic SPL only.
+Fixed points: the vendored Winterwallet verifier at revision `672fc6789b1532ee680f24842d235e0be8737b61`, N=32, 1,088-byte signatures, two-chunk proof staging (a 1,088-byte signature does not fit one transaction), direct deposits, no administrator, no fee recipient, no arbitrary invocation, SOL and classic SPL only.
 
 ## 1. Roles and secrets
 
@@ -62,9 +62,17 @@ The role byte makes the three derivations disjoint. 1,088 bytes is within HKDF-S
 
 When `pending` is 0, bytes 157..286 must be zero. The vault is never closed. At most one pending record exists.
 
-### 2.2 Proof — unchanged, 1,162 bytes, PDA `["proof", payer, digest]`
+### 2.2 Proof — 1,162 bytes, PDA `["proof", payer, digest]`
 
-Magic becomes `BKPROOF3`. Layout, two-chunk staging, identical-chunk retry and payer-only close are as in protocol 2. A proof account carries a signature; it never carries authority.
+| Offset | Bytes | Field |
+|---|---:|---|
+| 0 | 8 | Magic `BKPROOF3` |
+| 8 | 32 | Fee payer that created it |
+| 40 | 32 | SHA-256 of the signed message |
+| 72 | 2 | Bytes written so far, little endian |
+| 74 | 1,088 | Signature |
+
+Written in two append-only chunks of at most 600 bytes. Re-sending bytes identical to those already stored succeeds; different bytes fail. Only the fee payer that created it can close it and reclaim its rent. A proof account carries a signature; it never carries authority, and closing it revokes nothing.
 
 ### 2.3 Spent marker — 8 bytes, PDA `["spent-v3", root]`
 
@@ -116,16 +124,16 @@ Opcode is the first byte of instruction data. Any account count, data length, ve
 | Op | Name | Signers | Summary |
 |---:|---|---|---|
 | 0 | `initialize` | fee payer | Create the vault with both roots and a delay |
-| 1 | `stage` | fee payer | Append signature bytes to a proof account (as protocol 2) |
+| 1 | `stage` | fee payer | Append signature bytes to a proof account |
 | 2 | `announce` | fee payer | Verify an operational signature, rotate it, record a pending withdrawal; moves nothing |
 | 3 | `execute` | fee payer | Carry out the pending withdrawal inside its window; permissionless |
 | 4 | `expire` | fee payer | Clear a pending withdrawal past its deadline; permissionless |
 | 5 | `recover` | fee payer | Verify the recovery packet, install a new epoch, clear any pending withdrawal |
-| 6 | `close_proof` | proof payer | Reclaim proof rent (as protocol 2) |
+| 6 | `close_proof` | proof payer | Reclaim proof rent |
 
 ### 4.0 `initialize` — data: `vault_id (32) || chain_tag (32) || op_root (32) || rec_root (32) || delay_secs (4)`
 
-Requires `op_root ≠ rec_root`, both nonzero, both spent markers absent, delay within bounds. Creates the vault with `op_index = 0`, `epoch = 0`, `pending = 0`. As in protocol 2, a prefunded PDA must not block creation, and no wallet key gains any authority over the vault.
+Requires `op_root ≠ rec_root`, both nonzero, both spent markers absent, delay within bounds. Creates the vault with `op_index = 0`, `epoch = 0`, `pending = 0`. A prefunded PDA must not block creation, and no wallet key gains any authority over the vault.
 
 ### 4.2 `announce` — data: the 195-byte payload
 
@@ -144,7 +152,7 @@ Effects, atomically: create the spent marker for `op_root`; set `op_root = next_
 
 ### 4.3 `execute` — no data
 
-Requires `pending == 1`, pending `epoch == epoch`, `opens_at ≤ now ≤ deadline`, and the supplied destination (and for SPL the mint and source) equal to the record. Performs the same SOL or classic SPL transfer and the same owner, mint, delegate, close-authority and rent checks as protocol 2's withdrawal, signed by the vault PDA. On success zeroes the pending record. On failure nothing changes and it may be retried until `deadline`. No hash signature is involved.
+Requires `pending == 1`, pending `epoch == epoch`, `opens_at ≤ now ≤ deadline`, and the supplied destination (and for SPL the mint and source) equal to the record. For SOL: debits the vault, keeping its rent-exempt reserve, and credits the destination. For classic SPL: requires the token program, the recorded mint, a source account owned by the vault with that mint and with no delegate and no close authority, and a destination with that mint, then calls `transfer_checked` signed by the vault PDA. On success zeroes the pending record. On failure nothing changes and it may be retried until `deadline`. No hash signature is involved.
 
 ### 4.4 `expire` — no data
 
@@ -236,7 +244,7 @@ Measured on that VM with the 1,400,000-unit limit: `announce` about 594,000 comp
 
 | Public file formats (rejecting secrets, mismatched vaults, a packet whose stated epoch differs from its signed payload, and signatures from another master) and the tool page's policy | `tests/requests-v3.test.ts` | 5 |
 | Randomized: 20,000 sequences of up to 40 interleaved announce, execute, expire, recover and time steps (a quarter corrupted) against invariants, and 300,000 arbitrary inputs to every decoder. Fixed seed, no external crates | `programs/bunker3/tests/model.rs` | 2 |
-| Repeated cycles on a local validator with the app's client: create, withdraw (instant and waiting), replay, recovery, continue; every expected rejection asserted | `tests/chain-v3.ts` (`npm run test:chain:v3`) | script |
+| Repeated cycles on a local validator with the app's client: create, withdraw (instant and waiting), replay, recovery, continue; every expected rejection asserted | `tests/chain-v3.ts` (`npm run test:chain`) | script |
 | Signing journal and key files: one signature per key, racing tabs, an orphaned reservation, chain advance, file confusion and tampering | `tests/journal-v3.test.ts` | 10 |
 | Browser, against a local validator running this program: build, deposit, announce (state and balances asserted on-chain), countdown, cancel by recovery, dead old day key, announce with the new key, seal | `tests/browser/custody3.spec.ts` | 1 × desktop and mobile |
 
@@ -258,6 +266,6 @@ Each is a decision this draft made provisionally and wants challenged.
 6. **Fixed 7-day execution window** as a program constant rather than a signed field.
 7. **Permissionless `execute`.** It means the fee wallet is not needed at execution and alerts cannot be bypassed by withholding; it also means anyone can complete an announced transfer the moment it opens. The alternative binds execution to a signer and reintroduces a liveness dependency.
 8. **One spent-marker namespace for both roles**, and marking the displaced operational root on recovery even when it was never used.
-9. **No migration from protocol 2.** Vaults are created fresh under a new program id.
+9. **No migration path between program deployments.** A changed layout means a new program id and new vaults.
 10. **`chain_tag` is client-asserted.** Is a mismatch at initialization detectable in any stronger way worth its cost?
 11. **A zero waiting period is permitted and is the interface default.** It removes the reaction window for a stolen day key in exchange for withdrawals that complete at once. Should a reviewed release allow it, allow it only below a balance, or require a minimum?

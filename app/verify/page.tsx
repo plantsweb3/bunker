@@ -51,7 +51,7 @@ export default function Page() {
             [
               "03",
               "Recovery and signing review",
-              "Address stale backups, multi-device state, interrupted submissions, browser isolation, and malicious frontend updates.",
+              "Address multi-device use of a day key, interrupted submissions, the offline tool’s separation from the site, and malicious frontend updates.",
             ],
             [
               "04",

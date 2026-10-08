@@ -1,6 +1,6 @@
 //! Pure protocol-3 state, encodings and transitions. No account or syscall access,
 //! so every rule here is exercised directly by the tests in `tests/state.rs`.
-//! Layouts are specified in docs/PROTOCOL-3-DRAFT.md.
+//! Layouts are specified in docs/PROTOCOL.md.
 use solana_program_error::ProgramError;
 
 pub const VAULT_LEN: usize = 287;

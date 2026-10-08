@@ -10,9 +10,9 @@ If private reporting is unavailable, do not put exploit details in a public issu
 
 ## Scope
 
-The Solana program, browser signer and recovery state, protocol encoding, RPC proxy, dependency supply chain, website deployment, and release process are in scope. Report dependency findings even if a browser-only path appears unreachable. Include evidence rather than assuming an npm scan proves exploitability or safety.
+The Solana program, browser signer and journal, offline recovery tool, protocol encoding, RPC proxy, dependency supply chain, website deployment, and release process are in scope. Report dependency findings even if a browser-only path appears unreachable. Include evidence rather than assuming an npm scan proves exploitability or safety.
 
-Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [CRYPTOGRAPHY.md](docs/CRYPTOGRAPHY.md) and [REVIEW-CHECKLIST.md](docs/REVIEW-CHECKLIST.md). Stale recovery backups and concurrent devices can reuse a one-time key. A compromised website can steal keys or alter transactions. Solana consensus, account keys, program upgrade authority, RPC integrity and token issuer powers remain part of the trust boundary.
+Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [PROTOCOL.md](docs/PROTOCOL.md), [CRYPTOGRAPHY.md](docs/CRYPTOGRAPHY.md) and [REVIEW-CHECKLIST.md](docs/REVIEW-CHECKLIST.md). Using one day key on more than one device can reuse a one-time key. A compromised website can steal keys or alter transactions. Solana consensus, account keys, program upgrade authority, RPC integrity and token issuer powers remain part of the trust boundary.
 
 ## Supported release
 

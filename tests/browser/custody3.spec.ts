@@ -41,7 +41,6 @@ async function setup(page: Page, info: TestInfo, origin = "") {
         network: "localnet",
         custodyEnabled: true,
         programId: PROGRAM,
-        protocolVersion: 3,
         expectedGenesis: genesis,
         releaseStatus: "Isolated local testing",
       },

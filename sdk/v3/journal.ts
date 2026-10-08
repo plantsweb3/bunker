@@ -5,8 +5,7 @@
  * then saved so an interrupted upload resumes the SAME bytes. If a reservation
  * exists with no saved signature, or the announcement can no longer land, this
  * journal refuses to sign again and the user recovers to a new epoch instead.
- * That is the difference from protocol 2: refusing is safe, because recovery
- * exists.
+ * Refusing is safe because recovery exists.
  *
  * Same limits as before: this coordinates one browser profile only. */
 import { z } from "zod";

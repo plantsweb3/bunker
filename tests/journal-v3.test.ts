@@ -15,7 +15,7 @@ import {
 } from "../sdk/v3/kit";
 import { decodeAnnounce, vaultAddress, VaultState } from "../sdk/v3/protocol";
 import { formatDuration } from "../sdk/v3/chain";
-import { memoryBrowser } from "./recovery-fixture";
+import { memoryBrowser } from "./memory-browser";
 afterEach(() => vi.unstubAllGlobals());
 const program = new PublicKey(new Uint8Array(32).fill(11));
 const genesis = new PublicKey(new Uint8Array(32).fill(9)).toBase58();

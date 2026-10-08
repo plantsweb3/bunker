@@ -1,40 +1,60 @@
 # Architecture
 
-The frontend uses React/TypeScript and Next.js App Router on Vercel. Eleven routes: `/`, `/vault`, `/demo`, `/check`, `/integrate`, `/emergency`, `/security`, `/verify`, `/docs`, `/terms`, `/privacy`. The last four, `/integrate` and `/emergency` are static text; `/integrate` describes how a vault address is used beside a trading wallet and marks every integration surface that is planned rather than built; `/terms` and `/privacy` are plain-language pre-release statements, not reviewed legal documents. `/check` is a read-only inventory of a pasted address: SOL balance, classic SPL and Token-2022 token accounts, and open token delegations, read through the existing `/api/rpc` allowlist (`getBalance`, `getTokenAccountsByOwner`). It connects no wallet, signs nothing, stores nothing, and infers no names or prices; `sdk/exposure.ts` holds the classification and is unit tested. The address may be supplied as `/check?a=<address>` so a result can be linked; the landing page form submits there. `sdk/known-mints.ts` labels a short fixed list of well-known tokens by mint address only. `app/opengraph-image.tsx` renders the link-preview card at build time from the repository's own mark and font. The recovery signer is separated in `sdk/` but still runs in the same browser origin and bundle trust boundary. No production signer isolation is claimed.
+Status: pre-release. Nothing is deployed on mainnet, no independent audit is complete, and real-fund custody is disabled.
 
-`/api/config` exposes network and release status, never RPC credentials. `/api/rpc` proxies an allowlist to one server-configured endpoint, rejects write methods in the production release, enforces origin and request-size checks, and applies upstream timeouts. It is not a durable rate limiter: add edge limits and a dedicated RPC provider before broader publication. The public website is a read-only pre-release.
+## Parts
 
-`/api/verify` reads executable and upgrade-authority state only for the configured test program. Source equivalence and audit status always remain unverified until actual external evidence is supplied.
+| Part | Where | Role |
+|---|---|---|
+| On-chain program | `programs/bunker3` | Holds assets and releases them only under the rules in [PROTOCOL.md](PROTOCOL.md) |
+| Signature verifier | `crates/winterwallet-core` | Vendored unchanged; see [CRYPTOGRAPHY.md](CRYPTOGRAPHY.md) |
+| Client | `sdk/v3`, `sdk/winternitz.ts` | Derivation, encodings, instructions, key files, signing journal, passkey storage |
+| Offline recovery tool | `tools/recovery` | The only code that handles the archival master |
+| Web app | `app`, `components/bunker` | Next.js App Router on Vercel |
 
-`/vault` now renders one of two apps. A test configuration for protocol 2 gets the protocol 2 app described below. The read-only public site and a protocol 3 test configuration (`BUNKER_TEST_PROTOCOL=3`) get the draft protocol 3 app in `components/bunker/v3`, with `/recovery` as the page that submits public files produced by the offline recovery tool. That tool is a separate single HTML file built from `tools/recovery` into `public/source/bunker-recovery-tool.html` at build time alongside the source archive, with its SHA-256 in `recovery-tool-manifest.json`; it is the only code that handles the archival master and its page policy forbids all connections. On the public site both are locked: the configuration reports custody disabled and no code path can submit a transaction. See `docs/PROTOCOL-3-DRAFT.md` for what the draft does and does not implement.
+## The program
 
-## On-chain surface
+Seven instructions, no administrator, no fee recipient, no arbitrary invocation, no close of a vault. The only instruction that debits a vault is `execute`, which takes no data and pays exactly what an earlier, signature-verified `announce` recorded, after the vault's own waiting period (which may be zero). `recover` installs new authorities from a fixed packet and never moves assets. Layouts, checks and the transition table are in PROTOCOL.md.
 
-Four instructions in `programs/bunker/src/lib.rs`:
+`src/state.rs` holds layouts and every transition as pure functions; `src/lib.rs` holds account validation, signature verification, spent markers and transfers.
 
-0. Initialize: derive PDA `[b"bunker", random_id_32]`, fund/allocate/assign it and store a root with no spent marker. Handles prefunding of the PDA. Requires fee payer signature, never creates a wallet-based withdrawal backdoor.
-1. Stage: proof PDA `[b"proof", fee_payer, SHA256(canonical_message)]`. Two append-only chunks, at most 600 bytes each. Identical chunks can retry. Buffer is bounded to 1,088 signature bytes plus 74 metadata bytes. This publishes a signature, never a secret preimage.
-2. Withdraw: fixed SOL or classic SPL checked transfer after full signature verification. Checks protocol version, fixed length, expiry against Clock, vault owner/PDA/magic/id/nonce/root, proof owner/magic/length/digest, destination, token program, mint, source owner, delegate/close authority, and rent. Creates a permanent spent-root marker, rejects a spent next root, and advances root and nonce atomically with the transfer. Every remaining asset is under the next authority. No generic CPI routing, arbitrary programs, admin override, token extensions, or relayer.
-3. Close proof: the uploading payer can reclaim its buffer rent. This is a public-signature account, not a vault, and cannot move vault funds. Successful client withdrawals close it in the same final transaction; interrupted uploads may be closed separately through SDK after diagnosis. Closing a buffer does NOT revoke the signature or permit a different signature with the same key.
+## Keys and files
 
-Protocol 2 uses vault magic `BUNKER02`, proof magic `BKPROOF2`, and spent-marker magic `BKSPENT2`. Spent markers are 8-byte program-owned PDAs `[b"spent-v2", root]`, never closable. They add permanent per-withdrawal rent funded by the fee payer.
+One 32-byte archival master derives everything (PROTOCOL.md §1). Two encrypted files exist, both AES-256-GCM under PBKDF2-SHA256 (see CRYPTOGRAPHY.md):
 
-Vault data is 81 bytes: magic(8), identity(32), root(32), nonce(8 LE), bump(1). Proof data is 1,162 bytes: magic(8), payer(32), message digest(32), used length(2 LE), signature(1,088). Vault rent is intentionally not closable. Standard SPL ATA rent is not reclaimed by this release. Deposits use System/SPL/ATA programs directly.
+- **Recovery kit** (archival): holds the master. Created once, never changes. Opened only by the offline tool.
+- **Day key**: holds one epoch's seed. Opened by the vault page. Replaced whenever a recovery installs a new epoch.
 
-## Client safety
+Three public files cross between the offline tool and the site (`sdk/v3/requests.ts`): a network card, a creation request and a recovery packet. None contains a secret, and their schemas reject extra fields.
 
-All amounts are parsed into bigint; exponent notation, negatives, excessive decimals and u64 overflow are rejected. RPC SOL numbers beyond JS's safe integer range fail closed. Transactions remain <=1,232 bytes. Transactions simulate before signing and compare the wallet-returned message bytes to the reviewed message. Genesis is checked before signing and before sending. Confirmation errors retain transaction signatures and pending recovery data; resume checks chain authority before retrying.
+## The offline recovery tool
 
-Only ordinary on-curve wallet recipients are supported by the web withdrawal UI. For SPL, the exact recipient ATA is signed and the ATA may be created idempotently in the final transaction. Asset names and prices are not inferred; unknown assets display mint identifiers, not potentially spoofed metadata.
+`scripts/build-recovery-tool.mjs` bundles `tools/recovery` into one HTML file, `public/source/bunker-recovery-tool.html`, at build time, and writes its SHA-256 to `recovery-tool-manifest.json`. The page's own Content Security Policy is `default-src 'none'; connect-src 'none'; form-action 'none'` with the inline script pinned by hash. The build is reproducible and its output is not committed.
 
-The canonical signed layout and exact recovery transitions are in `CRYPTOGRAPHY.md`. The v2 encrypted recovery blob is checked against the persistent journal and chain. Signing consumes the journal before cryptographic work; retries load a saved signature. Expiry/failure never resets that consumed state. Web Locks do not synchronize devices or protect against storage rollback.
+It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
 
-Because the one-time signature must exist before a withdrawal can be simulated, `sdk/preflight.ts` checks what is knowable beforehand, before the review screen and again immediately before signing: a SOL destination that is a program or program-owned account, a SOL amount that would leave the recipient below the rent minimum, a recipient token account that is frozen, foreign or mismatched, and a fee wallet that cannot fund the proof account, spent marker, token account and fees. These reads trust the RPC and state can change afterwards; they narrow the failure window and do not remove it.
+## The web app
 
-## Compatibility
+Routes: `/`, `/vault`, `/recovery`, `/demo`, `/check`, `/integrate`, `/emergency`, `/security`, `/verify`, `/docs`, `/terms`, `/privacy`.
 
-Protocol 2 is a breaking test-only format. The payload is 154 bytes and adds version, vault identity and expiry. Vault/proof magic and encrypted recovery envelopes reject v1. There is no automatic migration or reinterpretation of old test keys. Use a fresh isolated ledger and fresh valueless assets for v2; preserve any v1 experiment separately. Do not upgrade an existing program/ledger in place without a reviewed migration.
+- `/vault` opens a Bunker with a day key (file and password, or a passkey saved on the device), deposits SOL and classic SPL tokens, announces withdrawals, shows the waiting period, releases or clears a withdrawal, and seals. The signing journal (`sdk/v3/journal.ts`) reserves a one-time key before signing and never signs a reserved key again; the remedy for any doubt is recovery.
+- `/recovery` hands out the offline tool and a network card, and submits a creation request or recovery packet after checking it against the chain. It never accepts a kit or a password.
+- `/check` is a read-only inventory of a pasted address (`sdk/exposure.ts`): SOL, classic SPL and Token-2022 accounts, and open delegations. It connects no wallet and stores nothing.
+- `/demo` runs the browser signature code on a demo message; balances and the attacker are simulated.
 
-## Production gate
+Before a key is used, `sdk/preflight.ts` checks what is knowable in advance: a SOL destination that is a program or program-owned account, an amount that would leave the recipient below the rent minimum, a recipient token account that is frozen or mismatched, and a fee wallet that cannot pay. These reads trust the RPC and state can change afterwards.
 
-Default is mainnet read-only. No variable turns on mainnet custody. Test writes need explicit localnet/devnet selection, explicit enablement, a test program ID, and pinned genesis. Client and server enforce the restriction. A deployment owner could change source; this gate is a release policy, not an on-chain security proof. The experimental program can technically be deployed elsewhere by someone with its source, but doing so does not create an approved release.
+Passkey storage (`sdk/v3/passkey.ts`) encrypts a day key with a key derived from the authenticator's WebAuthn PRF output and stores only ciphertext. It protects a day key at rest on one device. It is not a backup.
+
+## Server side
+
+- `/api/config` reports network and release status, never credentials.
+- `/api/rpc` proxies an allowlist of read methods to one server-configured endpoint, refuses write methods in the production release, checks origin and request size, and applies timeouts. It is not a rate limiter; add edge limits and a dedicated provider before wider use.
+- `/api/verify` reports executable and upgrade-authority state for a configured test program. Source equivalence and audit status are reported as unverified until real evidence exists.
+- `proxy.ts` attaches a per-request nonce Content Security Policy to every document response.
+
+## Release gate
+
+The default configuration is mainnet read-only. No environment variable enables mainnet custody: test writes need an explicit `localnet` or `devnet` selection, explicit enablement, a test program id and a pinned genesis, and both client and server refuse a mainnet genesis for writes. A deployment owner could change source; the gate is a release policy, not an on-chain guarantee.
+
+Asset names and prices are not read from chain metadata. A short fixed list in `sdk/known-mints.ts` labels well-known tokens by mint address; everything else is shown by mint.

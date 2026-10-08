@@ -31,9 +31,9 @@ export default function Page() {
       <section>
         <h2>You are responsible for your keys</h2>
         <p>
-          A vault is controlled only by its recovery kit and password. If you
-          lose either, or someone else obtains both, the assets can be lost
-          permanently. There is no reset, no support desk that can recover
+          A vault is controlled only by its keys: a day key and a recovery
+          kit, each with a password. If you lose them, or someone else obtains
+          them, the assets can be lost permanently. There is no reset, no support desk that can recover
           them, and no administrator key.
         </p>
       </section>
@@ -46,7 +46,8 @@ export default function Page() {
           </li>
           <li>
             Permanent loss of access from an expired or interrupted
-            withdrawal, a stale backup, or use on more than one device.
+            lost recovery kit, or from using one day key on more than one
+            device.
           </li>
           <li>
             A compromised device, browser, extension, website deployment or

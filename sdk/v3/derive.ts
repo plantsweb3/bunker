@@ -1,4 +1,4 @@
-/** Protocol 3 secret derivation (docs/PROTOCOL-3-DRAFT.md §1.1). DRAFT: not
+/** Protocol 3 secret derivation (docs/PROTOCOL.md §1.1). DRAFT: not
  * reviewed, not used by the released app.
  *
  * One archival master `M` derives everything. An operational signer is given

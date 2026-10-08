@@ -1,4 +1,4 @@
-//! Every row of the transition table in docs/PROTOCOL-3-DRAFT.md, plus encoding
+//! Every row of the transition table in docs/PROTOCOL.md, plus encoding
 //! and boundary cases, against the pure state logic the program executes.
 use bunker3::state::*;
 

@@ -1,7 +1,8 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { writeFile } from "node:fs/promises";
 const c = new Connection("http://127.0.0.1:19099");
-const program = "AhZPKQAwKeCJ47PVKz5QZmBwf1PE8BHcmcqsjvSdPaZ";
+// Fixed TEST-ONLY address; the same one fixtures/bunker-v3.json uses.
+const program = "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn";
 const genesis = await c.getGenesisHash();
 if (
   [
