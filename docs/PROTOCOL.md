@@ -260,12 +260,12 @@ These are trust assumptions, not program guarantees.
 | Evidence | Where | Count |
 |---|---|---:|
 | Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 17 |
-| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 21 |
+| The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 22 |
 | Isolation, on the same VM: shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 7 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
 | The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
 
-The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; both displaced roots retired; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; and a classic SPL withdrawal including a frozen destination that later thaws.
+The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; both displaced roots retired; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; a classic SPL withdrawal including a frozen destination that later thaws; and eleven wrong sets of token accounts for `execute` (a source owned by someone else, of another mint, with a delegate, with a close authority, or not owned by the token program; source equal to destination; another mint; another program in place of the token program; an unrecorded destination; missing and extra accounts), each leaving the record and balances untouched.
 
 Each of the following checks was removed in turn and the suite confirmed to fail: the waiting period, signature verification, clearing the record on recovery, retiring the displaced operational root, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`.
 
@@ -281,7 +281,7 @@ In the browser suite the offline tool is opened as a local `file://` page, every
 
 The client and the Rust check share one author and one reading of this document; agreement between them shows consistency, not correctness of the design.
 
-Known gaps: the randomized tests cover the pure state machine and decoders, not account handling, and are not coverage-guided fuzzing; no independent implementation of the encodings by a second author; SPL coverage is one VM scenario and one browser scenario; passkey unlock is tested with a simulated authenticator only, not on real phones. None of this is an audit.
+Known gaps: the randomized tests cover the pure state machine and decoders, not account handling, and are not coverage-guided fuzzing; no independent implementation of the encodings by a second author; SPL coverage is two VM tests and one browser scenario; passkey unlock is tested with a simulated authenticator only, not on real phones. None of this is an audit.
 
 ## Open questions
 
