@@ -17,7 +17,7 @@ import { z } from "zod";
 import { hex, unhex } from "../bytes";
 import { operationalRoot, signAnnouncement } from "./authority";
 import type { Descriptor } from "./derive";
-import { Announce, MAX_ANNOUNCE_AHEAD_SECS, VaultState } from "./protocol";
+import { Announce, encodeAnnounce, MAX_ANNOUNCE_AHEAD_SECS, VaultState } from "./protocol";
 const entry = z
   .object({
     version: z.literal(3),
@@ -170,10 +170,20 @@ export async function authorizeAnnouncement(
       );
     // The deadline comes from the network's clock; bound it by this device's.
     const local = BigInt(Math.floor(Date.now() / 1000));
-    if (withdrawal.announceBy > local + MAX_ANNOUNCE_AHEAD_SECS)
+    if (withdrawal.announceBy > local + MAX_ANNOUNCE_AHEAD_SECS || withdrawal.announceBy <= local)
       throw new Error(
-        "The network’s clock is far ahead of this device’s. Nothing was signed. Check your device’s time and connection.",
+        "The network’s clock and this device’s clock disagree. Nothing was signed. Check your device’s time and connection.",
       );
+    // Anything that would make the message invalid is found now, before the
+    // key is reserved, so a bad request cannot use a key up.
+    encodeAnnounce({
+      ...withdrawal,
+      vaultId: d.vaultId,
+      chainTag: d.chainTag,
+      epoch: chain.epoch,
+      opIndex: chain.opIndex,
+      nextOpRoot: expected,
+    });
     const tuple = {
       version: 3 as const,
       epoch: chain.epoch.toString(),

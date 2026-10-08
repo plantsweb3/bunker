@@ -361,8 +361,11 @@ fn recover(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult 
     verify_proof(id, proof, message, &digest, &old_rec)?;
     mark_spent(payer, rec_spent, system, id, vault.key, &old_rec)?;
     // An offline signature under the displaced operational root may exist even
-    // if it was never announced, so that root is retired too.
-    mark_spent(payer, op_spent, system, id, vault.key, &old_op)?;
+    // if it was never announced, so that root is retired too, unless it is one
+    // of the roots this packet installs (see `apply_recover`).
+    if let Some(old_op) = old_op {
+        mark_spent(payer, op_spent, system, id, vault.key, &old_op)?;
+    }
     store_vault(vault, &v)
 }
 

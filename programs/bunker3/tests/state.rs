@@ -296,7 +296,7 @@ fn recover_installs_a_new_epoch_from_every_state() {
         let mut v = start.clone();
         let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
         let displaced = apply_recover(&mut v, &r).unwrap();
-        assert_eq!(displaced, (start.rec_root, start.op_root), "{label}");
+        assert_eq!(displaced, (start.rec_root, Some(start.op_root)), "{label}");
         assert_eq!(
             (v.epoch, v.op_index, v.rec_root, v.op_root, v.pending.clone()),
             (1, 0, root(21), root(12), None),
@@ -337,12 +337,10 @@ fn recover_guards() {
     assert!(try_with(&|d| d[34] ^= 1).is_err(), "chain tag");
     assert!(try_with(&|d| d[66] = 1).is_err(), "future epoch");
     for (offset, label) in [(74, "next recovery root"), (106, "next operational root")] {
-        for current in [root(20), root(11)] {
-            assert!(
-                try_with(&|d| d[offset..offset + 32].copy_from_slice(&current)).is_err(),
-                "{label} reuses a current root"
-            );
-        }
+        assert!(
+            try_with(&|d| d[offset..offset + 32].copy_from_slice(&root(20))).is_err(),
+            "{label} reuses the current recovery root"
+        );
     }
     let mut v = vault();
     v.epoch = u64::MAX;
@@ -368,5 +366,27 @@ fn a_full_life_cycle_never_reuses_an_authority_tuple() {
         let r = decode_recover(&recover_bytes(&v, root(next), root(next - 1))).unwrap();
         apply_recover(&mut v, &r).unwrap();
         assert_eq!((v.epoch, v.op_index), (round + 1, 0));
+    }
+}
+
+/// The operational signer chooses the next operational root freely, so it can
+/// install a root the recovery packet names. The packet must still apply:
+/// otherwise a stolen day key could block cancel-by-recovery.
+#[test]
+fn an_operational_key_cannot_make_the_recovery_packet_fail() {
+    for (label, planted) in [("next operational root", root(12)), ("next recovery root", root(21))] {
+        let mut v = vault();
+        let a = decode_announce(&announce_bytes(&v, planted)).unwrap();
+        apply_announce(&mut v, &a, root(99), NOW).unwrap();
+        assert_eq!(v.op_root, planted);
+        let r = decode_recover(&recover_bytes(&v, root(21), root(12))).unwrap();
+        let (old_rec, old_op) = apply_recover(&mut v, &r).unwrap();
+        // The planted root is installed, not retired.
+        assert_eq!((old_rec, old_op), (root(20), None), "{label}");
+        assert_eq!(
+            (v.epoch, v.op_index, v.rec_root, v.op_root, v.pending.clone()),
+            (1, 0, root(21), root(12), None),
+            "{label}"
+        );
     }
 }

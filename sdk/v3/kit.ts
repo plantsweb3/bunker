@@ -32,6 +32,9 @@ export const dayKeySchema = z
   .object({
     ...base,
     kind: z.literal("day-key"),
+    /** The vault's waiting period, so the page can show it from the file and
+     * notice a network that reports a different one. */
+    delaySecs: z.number().int().min(MIN_DELAY_SECS).max(MAX_DELAY_SECS),
     epoch: z.string().regex(/^(0|[1-9][0-9]*)$/),
     seed: hex32,
   })
@@ -79,7 +82,10 @@ export function validateDayKey(input: unknown): DayKey {
 
 const envelopeSchema = z
   .object({
-    format: z.literal("bunker3-encrypted-v1"),
+    format: z.literal("bunker3-encrypted-v2"),
+    /** In the clear and authenticated, so a page that expects a day key can
+     * refuse a recovery kit without ever deriving a key from its password. */
+    kind: z.enum(["archival", "day-key"]),
     aead: z.literal("AES-256-GCM"),
     kdf: z.literal("PBKDF2-SHA256"),
     iterations: z.literal(600000),
@@ -88,17 +94,19 @@ const envelopeSchema = z
     ciphertext: z.string().regex(/^[0-9a-f]+$/).max(4000),
   })
   .strict();
-const header = (salt: string, iv: string) =>
+type Kind = "archival" | "day-key";
+const header = (kind: Kind, salt: string, iv: string) =>
   ({
-    format: "bunker3-encrypted-v1",
+    format: "bunker3-encrypted-v2",
+    kind,
     aead: "AES-256-GCM",
     kdf: "PBKDF2-SHA256",
     iterations: 600000,
     salt,
     iv,
   }) as const;
-const aad = (salt: string, iv: string) =>
-  new TextEncoder().encode("BUNKER3_KIT_TEST_V1:" + JSON.stringify(header(salt, iv)));
+const aad = (kind: Kind, salt: string, iv: string) =>
+  new TextEncoder().encode("BUNKER3_KIT_TEST_V2:" + JSON.stringify(header(kind, salt, iv)));
 /** A floor, not a guarantee: these files are only as strong as the password. */
 export function passwordProblem(password: string): string | null {
   if (password.length < 12) return "Use a password with at least 12 characters";
@@ -136,12 +144,12 @@ export async function encryptFile(
   const plaintext = new TextEncoder().encode(JSON.stringify(canonical));
   try {
     const ciphertext = await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv, additionalData: aad(hex(salt), hex(iv)) },
+      { name: "AES-GCM", iv, additionalData: aad(file.kind, hex(salt), hex(iv)) },
       k,
       plaintext,
     );
     return JSON.stringify(
-      { ...header(hex(salt), hex(iv)), ciphertext: hex(new Uint8Array(ciphertext)) },
+      { ...header(file.kind, hex(salt), hex(iv)), ciphertext: hex(new Uint8Array(ciphertext)) },
       null,
       2,
     );
@@ -149,7 +157,10 @@ export async function encryptFile(
     plaintext.fill(0);
   }
 }
-async function decrypt(raw: string, password: string): Promise<unknown> {
+const wrongKind = (expected: string) =>
+  new Error(`That file is not ${expected}. Check which file you selected.`);
+const NAME = { archival: "an archival recovery kit", "day-key": "a day key" } as const;
+async function decrypt(raw: string, password: string, expected: Kind): Promise<unknown> {
   if (raw.length > 6000) throw new Error("Key file is too large");
   let e: z.infer<typeof envelopeSchema>;
   try {
@@ -157,11 +168,13 @@ async function decrypt(raw: string, password: string): Promise<unknown> {
   } catch {
     throw new Error("That is not a Bunker key file");
   }
+  // Before the password is used for anything.
+  if (e.kind !== expected) throw wrongKind(NAME[expected]);
   const k = await key(password, unhex(e.salt));
   let plain: ArrayBuffer;
   try {
     plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: unhex(e.iv) as BufferSource, additionalData: aad(e.salt, e.iv) },
+      { name: "AES-GCM", iv: unhex(e.iv) as BufferSource, additionalData: aad(e.kind, e.salt, e.iv) },
       k,
       unhex(e.ciphertext) as BufferSource,
     );
@@ -174,15 +187,13 @@ async function decrypt(raw: string, password: string): Promise<unknown> {
     new Uint8Array(plain).fill(0);
   }
 }
-const wrongKind = (expected: string) =>
-  new Error(`That file is not ${expected}. Check which file you selected.`);
 export async function decryptArchival(raw: string, password: string) {
-  const v = (await decrypt(raw, password)) as { kind?: string };
+  const v = (await decrypt(raw, password, "archival")) as { kind?: string };
   if (v?.kind !== "archival") throw wrongKind("an archival recovery kit");
   return validateArchival(v);
 }
 export async function decryptDayKey(raw: string, password: string) {
-  const v = (await decrypt(raw, password)) as { kind?: string };
+  const v = (await decrypt(raw, password, "day-key")) as { kind?: string };
   if (v?.kind !== "day-key") throw wrongKind("a day key");
   return validateDayKey(v);
 }

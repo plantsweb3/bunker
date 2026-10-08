@@ -231,6 +231,13 @@ function App() {
       throw new Error(
         "This day key has been replaced. Use the newest one from the recovery tool.",
       );
+    if (key.delaySecs !== loaded.state.delaySecs)
+      throw new Error(
+        "The network reports a different waiting period from the one this Bunker was built with. Nothing was opened. Try again later or on another connection.",
+      );
+    // Ask the browser not to evict this site's storage: the record of what
+    // has been signed lives there.
+    void navigator.storage?.persist?.().catch(() => false);
     setDay(key);
     close();
   }
@@ -1079,8 +1086,9 @@ function App() {
                   <Checkbox checked={fresh} onCheckedChange={(v) => setFresh(v === true)} />
                   <span>
                     This day key has not started a withdrawal on another
-                    device or browser. If unsure, install new keys in the
-                    recovery tool first.
+                    device or browser, or in this one before its site data
+                    was cleared or a private window was closed. If unsure,
+                    install new keys in the recovery tool first.
                   </span>
                 </label>
                 <div className="actions">
@@ -1109,7 +1117,8 @@ function App() {
                     <Checkbox checked={fresh} onCheckedChange={(v) => setFresh(v === true)} />
                     <span>
                       This day key has not started a withdrawal on another
-                      device or browser.
+                      device or browser, or in this one before its site data
+                      was cleared.
                     </span>
                   </label>
                 )}
