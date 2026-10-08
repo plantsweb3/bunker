@@ -981,6 +981,17 @@ function App() {
                     Unseal with a passkey next time
                   </button>
                 ))}
+              {b.config?.alertsBot && (
+                <a
+                  className="button ghost passkey-offer"
+                  href={`https://t.me/${b.config.alertsBot}?start=${day.vault}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <BIcon name="alert" size={17} />
+                  Get Telegram alerts
+                </a>
+              )}
               <Link className="security-link" href="/recovery">
                 <BIcon name="recovery-kit" size={16} />
                 Open the recovery tool

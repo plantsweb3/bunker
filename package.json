@@ -21,6 +21,7 @@
     "test": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
     "test:chain": "tsx tests/chain-v3.ts",
+    "test:alerts": "tsx tests/alerts-chain.ts",
     "program:build": "cargo-build-sbf --manifest-path programs/bunker3/Cargo.toml --sbf-out-dir target/deploy",
     "setup:local": "tsx scripts/setup-local.ts",
     "source:bundle": "node scripts/bundle-source.mjs && node scripts/build-recovery-tool.mjs",

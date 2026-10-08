@@ -20,7 +20,7 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Seed phrase stolen | Does not derive any Bunker key | None for the vault |
 | Amount, asset, destination, vault, program, epoch, index or next root altered | Signed bytes and verifier reject it | Correctness of both implementations and all account checks needs review |
 | Replay of a used signature | The root is retired at announcement; index and epoch no longer match | Fork or rollback behaviour needs analysis |
-| Day key stolen, vault has a waiting period | Withdrawal is visible on-chain and waits; recovery cancels it and kills the key | The owner must notice in time. No alert service exists yet. |
+| Day key stolen, vault has a waiting period | Withdrawal is visible on-chain and waits; recovery cancels it and kills the key | The owner must notice in time. Telegram alerts are optional, best effort, and depend on the project's server, Telegram and an RPC provider. |
 | Day key stolen, vault has **no** waiting period | Nothing | Immediate loss. This is the default and is stated when a vault is created. |
 | Day key lost, passkey or device lost | Recovery kit re-issues a day key or installs a new epoch | None while the kit exists |
 | Signed announcement never lands, tab closed mid-signing | Journal refuses to sign that key again; recovery installs a new epoch | None while the kit exists |
@@ -33,6 +33,7 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Token issuer freezes an account | Frozen balances are not offered; a failed release stays retryable | A frozen recipient account blocks that withdrawal until it thaws or is cancelled |
 | Program upgraded maliciously | Upgrade authority is disclosed per deployment | An upgradeable program can change every rule. The policy for the authority is undecided. |
 | Solana consensus, validators, clock | Trusted | Waiting periods use validator-reported time |
+| Alert service compromised or impersonated | It holds no keys and cannot move assets; messages are plain text and state that Bunker never asks for a key | It can be silenced, or made to send false alarms. A fake bot can phish. Alerts name bunkermode.io/recovery, which never accepts a kit. |
 
 ## What the waiting period is
 
@@ -40,7 +41,7 @@ Optional, chosen when a vault is created, fixed for that vault, off by default. 
 
 ## Explicit non-goals
 
-No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary program invocation, Token-2022, multisig policy, social recovery, pre-approved destinations or alerts. No audit, insurance, formal proof or quantified post-quantum claim.
+No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary program invocation, Token-2022, multisig policy, social recovery or pre-approved destinations. No audit, insurance, formal proof or quantified post-quantum claim.
 
 ## Before real funds
 

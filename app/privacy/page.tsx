@@ -60,6 +60,18 @@ export default function Page() {
         </p>
       </section>
       <section>
+        <h2>Telegram alerts</h2>
+        <p>
+          Alerts are optional. If you turn them on for a Bunker, the site
+          stores your Telegram chat ID and the address of each Bunker you
+          watch, so it can message you when something happens there. It stores
+          no keys and no wallet address. Telegram, which delivers the
+          messages, knows the same. Send <code>/stop</code> to the bot and the
+          record is deleted. Alerts can be late or missing; silence is not
+          proof that nothing happened.
+        </p>
+      </section>
+      <section>
         <h2>The wallet check</h2>
         <p>
           The address you paste is used for that lookup and is not stored by
