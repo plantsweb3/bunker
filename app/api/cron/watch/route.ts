@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     connection: new Connection(getRpcUrl(), "confirmed"),
     program: new PublicKey(config.programId),
     send: (chat, text) => telegramSend(alerts.botToken, chat, text),
-    link: (signature) => explorer(signature, config.network),
+    link: (vault) => explorer(vault, config.network, "address"),
   });
   return Response.json({ enabled: true, ...result }, { headers: { "Cache-Control": "no-store" } });
 }

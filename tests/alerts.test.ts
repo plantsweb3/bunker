@@ -2,67 +2,71 @@ import { describe, it, expect } from "vitest";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { alertsFromEnv, sameSecret } from "../lib/alerts/config";
 import { handleUpdate } from "../lib/alerts/commands";
-import { alertText, FOOTER } from "../lib/alerts/messages";
+import { eventText, FOOTER } from "../lib/alerts/messages";
 import { MAX_VAULTS_PER_CHAT, MemoryStore } from "../lib/alerts/store";
-import { runWatch } from "../lib/alerts/watch";
+import { diff, runWatch, Snapshot, WatchEvent } from "../lib/alerts/watch";
 import { configFromEnv } from "../lib/bunker-config";
-import type { Activity } from "../sdk/v3/history";
 import { vaultAddress, VAULT_SIZE } from "../sdk/v3/protocol";
 const program = new PublicKey(new Uint8Array(32).fill(11));
 const id = (n: number) => new Uint8Array(32).fill(n);
 const vault = vaultAddress(program, id(7));
 const payer = new PublicKey(id(5));
 const CLOCK = "SysvarC1ock11111111111111111111111111111111";
-function vaultData(vaultId: Uint8Array) {
+const NOW = 1_800_000_000n;
+type Record = { amount: bigint; opensAt: bigint; deadline: bigint; digest: number };
+type Sim = { epoch: bigint; opIndex: bigint; lamports: number; pending: Record | null; owner: PublicKey };
+function vaultData(vaultId: Uint8Array, v: Sim) {
   const d = new Uint8Array(VAULT_SIZE);
+  const view = new DataView(d.buffer);
   d.set(new TextEncoder().encode("BUNKER03"));
   d.set(vaultId, 8);
   d.set(id(2), 40);
   d.set(id(3), 72);
+  view.setBigUint64(104, v.opIndex, true);
+  view.setBigUint64(112, v.epoch, true);
   d.set(id(4), 120);
+  if (v.pending) {
+    d[156] = 1;
+    d.set(id(6), 190);
+    view.setBigUint64(222, v.pending.amount, true);
+    view.setBigInt64(230, v.pending.opensAt, true);
+    view.setBigInt64(238, v.pending.deadline, true);
+    view.setBigUint64(246, v.epoch, true);
+    d.set(id(v.pending.digest), 254);
+  }
   d[286] = 255;
   return d;
 }
-type Tx = { signature: string; ops: number[]; before: number; after: number; failed?: boolean };
-/** A stand-in chain: newest-first signatures per address, as the RPC returns them. */
-function chain(history: Tx[], vaults = [id(7)]) {
-  const known = new Map(vaults.map((v) => [vaultAddress(program, v).toBase58(), v]));
+/** A stand-in chain that serves vault accounts and the clock, and nothing
+ * else: the watcher must not need any transaction history. */
+function chain(vaults = [id(7)]) {
+  const state = new Map<string, { vaultId: Uint8Array; v: Sim }>(
+    vaults.map((v) => [
+      vaultAddress(program, v).toBase58(),
+      { vaultId: v, v: { epoch: 0n, opIndex: 0n, lamports: 9_000_000, pending: null, owner: program } },
+    ]),
+  );
   const clock = new Uint8Array(40);
-  new DataView(clock.buffer).setBigInt64(32, 1_800_000_000n, true);
+  new DataView(clock.buffer).setBigInt64(32, NOW, true);
+  const account = (key: PublicKey) => {
+    const found = state.get(key.toBase58());
+    return found
+      ? { data: vaultData(found.vaultId, found.v), owner: found.v.owner, lamports: found.v.lamports }
+      : null;
+  };
   return {
-    history,
+    of: (key: PublicKey = vault) => state.get(key.toBase58())!.v,
     connection: {
       getAccountInfo: async (key: PublicKey) =>
-        key.toBase58() === CLOCK
-          ? { data: clock, owner: PublicKey.default, lamports: 1 }
-          : known.has(key.toBase58())
-            ? { data: vaultData(known.get(key.toBase58())!), owner: program, lamports: 9_000_000 }
-            : null,
+        key.toBase58() === CLOCK ? { data: clock, owner: PublicKey.default, lamports: 1 } : account(key),
+      getMultipleAccountsInfo: async (keys: PublicKey[]) => keys.map(account),
       getMinimumBalanceForRentExemption: async () => 2_000_000,
-      getSignaturesForAddress: async (_: PublicKey, o: { until?: string; limit?: number }) => {
-        const stop = o.until ? history.findIndex((t) => t.signature === o.until) : -1;
-        return (stop >= 0 ? history.slice(0, stop) : history)
-          .slice(0, o.limit ?? 1000)
-          .map((t) => ({ signature: t.signature, err: null, blockTime: 1 }));
-      },
-      getTransaction: async (signature: string) => {
-        const t = history.find((x) => x.signature === signature)!;
-        return {
-          blockTime: 1_800_000_000,
-          meta: { err: t.failed ? {} : null, preBalances: [9, t.before, 1], postBalances: [8, t.after, 1] },
-          transaction: {
-            message: {
-              staticAccountKeys: [payer, vault, program],
-              compiledInstructions: t.ops.map((op) => ({ programIdIndex: 2, data: new Uint8Array([op]) })),
-            },
-          },
-        };
-      },
     } as unknown as Connection,
   };
 }
-const watch = (store: MemoryStore, c: ReturnType<typeof chain>, sent: [string, string][], fail?: string) =>
-  runWatch({
+const watch = (store: MemoryStore, c: ReturnType<typeof chain>, sent: [string, string][], fail?: string) => {
+  store.unlock();
+  return runWatch({
     store,
     connection: c.connection,
     program,
@@ -70,83 +74,173 @@ const watch = (store: MemoryStore, c: ReturnType<typeof chain>, sent: [string, s
       if (chat === fail) throw new Error("blocked");
       sent.push([chat, text]);
     },
-    link: (s) => `https://explorer.example/${s}`,
+    link: (v) => `https://explorer.example/${v}`,
+    log: () => undefined,
   });
+};
+const record = (digest: number, over: Partial<Record> = {}): Record => ({
+  amount: 1_250_000_000n,
+  opensAt: NOW + 86_400n,
+  deadline: NOW + 691_200n,
+  digest,
+  ...over,
+});
 describe("Alert watcher", () => {
-  it("starts from now, reports new events once, in order, to every subscriber", async () => {
-    const c = chain([{ signature: "s1", ops: [0], before: 0, after: 2_000_000 }]);
+  it("starts from now and reports each change once, to every subscriber", async () => {
+    const c = chain();
     const store = new MemoryStore();
-    await store.subscribe("100", vault.toBase58(), "s1");
-    await store.subscribe("200", vault.toBase58(), "ignored-because-already-watched");
+    await store.subscribe("100", vault.toBase58(), null);
+    await store.subscribe("200", vault.toBase58(), null);
     const sent: [string, string][] = [];
-    expect(await watch(store, c, sent)).toMatchObject({ vaults: 1, events: 0, messages: 0 });
-    c.history.unshift({ signature: "s2", ops: [], before: 2_000_000, after: 3_500_000 });
-    c.history.unshift({ signature: "s3", ops: [2, 3], before: 3_500_000, after: 3_000_000 });
-    expect(await watch(store, c, sent)).toMatchObject({ events: 2, messages: 4, errors: 0 });
-    expect(sent.map(([chat]) => chat)).toEqual(["100", "200", "100", "200"]);
+    expect(await watch(store, c, sent)).toMatchObject({ vaults: 1, events: 0, messages: 0, errors: 0 });
+    c.of().lamports += 1_500_000;
+    expect(await watch(store, c, sent)).toMatchObject({ events: 1, messages: 2 });
+    expect(sent.map(([chat]) => chat)).toEqual(["100", "200"]);
     expect(sent[0][1]).toContain("deposit received");
     expect(sent[0][1]).toContain("+0.0015 SOL");
-    expect(sent[2][1]).toContain("a withdrawal was sent");
-    expect(sent[2][1]).toContain("−0.0005 SOL");
-    expect(sent[2][1]).toContain("https://explorer.example/s3");
-    expect(await store.cursor(vault.toBase58())).toBe("s3");
+    Object.assign(c.of(), { opIndex: 1n, pending: record(9) });
+    expect(await watch(store, c, sent)).toMatchObject({ events: 1, messages: 2, errors: 0 });
+    expect(sent[2][1]).toContain("ANNOUNCED");
+    expect(sent[2][1]).toContain("1.25 SOL to " + new PublicKey(id(6)).toBase58());
+    expect(sent[2][1]).toContain("It can leave in 1d 0h");
+    expect(sent[2][1]).toContain(`https://explorer.example/${vault.toBase58()}`);
     // Nothing new: nothing sent.
     expect(await watch(store, c, sent)).toMatchObject({ events: 0, messages: 0 });
     expect(sent).toHaveLength(4);
   });
-  it("does not replay history for a vault seen for the first time", async () => {
-    const c = chain([{ signature: "old", ops: [5], before: 1, after: 1 }]);
+  it("needs no transaction history, so traffic can neither hide nor fake an alert", async () => {
+    // The stand-in chain has no getSignaturesForAddress or getTransaction at
+    // all. However many transactions mention the vault, and whatever they
+    // contain, the watcher sees only what the vault account became.
+    const c = chain();
     const store = new MemoryStore();
     await store.subscribe("100", vault.toBase58(), null);
     const sent: [string, string][] = [];
     await watch(store, c, sent);
-    expect(sent).toEqual([]);
-    expect(await store.cursor(vault.toBase58())).toBe("old");
-  });
-  it("skips failed transactions and proof uploads, and survives an unreachable chat", async () => {
-    const c = chain([{ signature: "s1", ops: [0], before: 0, after: 1 }]);
-    const store = new MemoryStore();
-    await store.subscribe("100", vault.toBase58(), "s1");
-    await store.subscribe("blocked", vault.toBase58(), null);
-    c.history.unshift({ signature: "s2", ops: [2], before: 1, after: 1, failed: true });
-    c.history.unshift({ signature: "s3", ops: [5], before: 1, after: 1 });
-    const sent: [string, string][] = [];
-    const result = await watch(store, c, sent, "blocked");
-    expect(result).toMatchObject({ events: 1, messages: 1, errors: 1 });
+    // Unchanged account: no alert, whatever was sent at it.
+    expect(await watch(store, c, sent)).toMatchObject({ events: 0, errors: 0 });
+    // Changed account: alerted, however the change was made.
+    c.of().epoch = 1n;
+    expect(await watch(store, c, sent)).toMatchObject({ events: 1, errors: 0 });
     expect(sent[0][1]).toContain("NEW KEYS were installed");
-    // The failed delivery is not retried and does not hold the cursor back.
-    expect(await store.cursor(vault.toBase58())).toBe("s3");
+  });
+  it("survives an unreachable chat without repeating or holding back", async () => {
+    const c = chain();
+    const store = new MemoryStore();
+    await store.subscribe("100", vault.toBase58(), null);
+    await store.subscribe("blocked", vault.toBase58(), null);
+    const sent: [string, string][] = [];
+    await watch(store, c, sent, "blocked");
+    c.of().epoch = 1n;
+    expect(await watch(store, c, sent, "blocked")).toMatchObject({ events: 1, messages: 1, errors: 1 });
     expect((await watch(store, c, sent, "blocked")).messages).toBe(0);
   });
-  it("takes vaults in turn within its per-pass limit", async () => {
+  it("reports an account that stopped being a Bunker as an error, not an event", async () => {
+    const c = chain();
+    const store = new MemoryStore();
+    await store.subscribe("100", vault.toBase58(), null);
+    const sent: [string, string][] = [];
+    await watch(store, c, sent);
+    c.of().owner = payer;
+    expect(await watch(store, c, sent)).toMatchObject({ events: 0, errors: 1 });
+    expect(sent).toEqual([]);
+  });
+  it("runs one pass at a time and drops a vault nobody is subscribed to", async () => {
+    const c = chain();
+    const store = new MemoryStore();
+    await store.subscribe("100", vault.toBase58(), null);
+    const sent: [string, string][] = [];
+    await watch(store, c, sent);
+    const overlapping = await runWatch({ store, connection: c.connection, program, send: async () => undefined, link: () => null });
+    expect(overlapping.skipped).toBe("busy");
+    // A subscription removed part-way: the vault is still listed, with no chats.
+    (store as unknown as { subs: Map<string, Set<string>> }).subs.get(vault.toBase58())!.clear();
+    c.of().epoch = 1n;
+    expect(await watch(store, c, sent)).toMatchObject({ events: 0, messages: 0 });
+    expect(await store.nextVaults(5)).toEqual([]);
+  });
+  it("takes vaults in turn within its per-pass limit, in batches", async () => {
     const ids = [1, 2, 3, 4, 5].map(id);
     const store = new MemoryStore();
-    for (const v of ids) await store.subscribe("100", vaultAddress(program, v).toBase58(), "x");
+    for (const v of ids) await store.subscribe("100", vaultAddress(program, v).toBase58(), null);
     const first = await store.nextVaults(3);
     const second = await store.nextVaults(3);
     expect(new Set([...first, ...second.slice(0, 2)]).size).toBe(5);
     expect(second[2]).toBe(first[0]);
     expect(await new MemoryStore().nextVaults(3)).toEqual([]);
+    // More vaults than one account batch holds are all read in a single pass.
+    const many = Array.from({ length: 130 }, (_, i) => new Uint8Array(32).fill(1).map((b, k) => (k === 0 ? i : b)));
+    const c = chain(many);
+    const big = new MemoryStore();
+    for (let i = 0; i < many.length; i += 5)
+      for (const v of many.slice(i, i + 5)) await big.subscribe(`c${i}`, vaultAddress(program, v).toBase58(), null);
+    expect(await watch(big, c, [])).toMatchObject({ vaults: 130, errors: 0 });
+  });
+});
+describe("Reading changes from two snapshots", () => {
+  const snap = (over: Partial<Snapshot> = {}): Snapshot => ({ v: 1, epoch: "0", opIndex: "0", lamports: "9000000", pending: null, ...over });
+  const p = (digest: string, deadline = NOW + 100n) => ({
+    kind: 0 as const,
+    mint: PublicKey.default.toBase58(),
+    destination: payer.toBase58(),
+    amount: "500",
+    opensAt: NOW.toString(),
+    deadline: deadline.toString(),
+    digest,
+  });
+  const kinds = (a: Snapshot, b: Snapshot, now = NOW) => diff(a, b, now).map((e) => e.kind);
+  it("names every transition", () => {
+    expect(kinds(snap(), snap())).toEqual([]);
+    expect(kinds(snap(), snap({ opIndex: "1", pending: p("aa") }))).toEqual(["announced"]);
+    // No waiting period: announced and gone between two passes.
+    const instant = diff(snap(), snap({ opIndex: "1", lamports: "8000000" }), NOW);
+    expect(instant).toEqual([{ kind: "left", count: 1, record: null, lamports: 1_000_000n }]);
+    expect(kinds(snap(), snap({ opIndex: "3" }))).toEqual(["left"]);
+    // Released inside its window, and the ambiguous case after the deadline.
+    expect(kinds(snap({ opIndex: "1", pending: p("aa") }), snap({ opIndex: "1" }))).toEqual(["left"]);
+    expect(kinds(snap({ opIndex: "1", pending: p("aa") }), snap({ opIndex: "1" }), NOW + 101n)).toEqual(["ended"]);
+    // One record replaced by another between passes.
+    expect(kinds(snap({ opIndex: "1", pending: p("aa") }), snap({ opIndex: "2", pending: p("bb") }))).toEqual(["left", "announced"]);
+    // Recovery, with and without a withdrawal to cancel, and with activity after it.
+    expect(diff(snap({ opIndex: "4", pending: p("aa") }), snap({ epoch: "1" }), NOW)).toEqual([
+      { kind: "recovered", cancelled: p("aa") },
+    ]);
+    expect(kinds(snap(), snap({ epoch: "1", opIndex: "1", pending: p("cc") }))).toEqual(["recovered", "announced"]);
+    expect(kinds(snap(), snap({ epoch: "2", opIndex: "2" }))).toEqual(["recovered", "left"]);
+  });
+  it("reports SOL arriving, but not dust and not alongside something that matters more", () => {
+    expect(diff(snap(), snap({ lamports: "10000000" }), NOW)).toEqual([{ kind: "deposit", lamports: 1_000_000n }]);
+    expect(kinds(snap(), snap({ lamports: "9999999" }))).toEqual([]);
+    expect(kinds(snap(), snap({ lamports: "9000001" }))).toEqual([]);
+    expect(kinds(snap(), snap({ lamports: "99000000", opIndex: "1", pending: p("aa") }))).toEqual(["announced"]);
   });
 });
 describe("Alert wording", () => {
-  const base: Activity = { signature: "s", time: 1, failed: false, kind: "deposit", sol: 5n, tokens: [] };
-  it("says nothing for events that are not worth a message", () => {
-    for (const a of [{ ...base, failed: true }, { ...base, kind: "built" as const }, { ...base, kind: "other" as const }])
-      expect(alertText(vault.toBase58(), a, null, 0n, null)).toBeNull();
-  });
+  const pending = { kind: 1 as const, mint: payer.toBase58(), destination: vault.toBase58(), amount: "42", opensAt: "5", deadline: "9", digest: "aa" };
+  const events: WatchEvent[] = [
+    { kind: "deposit", lamports: 5n },
+    { kind: "announced", pending },
+    { kind: "left", count: 1, record: pending, lamports: 0n },
+    { kind: "left", count: 2, record: null, lamports: 7n },
+    { kind: "left", count: 1, record: null, lamports: 0n },
+    { kind: "ended", record: pending },
+    { kind: "recovered", cancelled: pending },
+    { kind: "recovered", cancelled: null },
+  ];
   it("always ends with the anti-phishing line and tells the user what to do", () => {
-    for (const kind of ["deposit", "announced", "sent", "released", "cleared", "recovered"] as const) {
-      const text = alertText(vault.toBase58(), { ...base, kind }, null, 0n, null)!;
-      expect(text.endsWith(FOOTER), kind).toBe(true);
+    for (const e of events) {
+      const text = eventText(vault.toBase58(), e, 0n, null);
+      expect(text.endsWith(FOOTER), e.kind).toBe(true);
       expect(text).not.toMatch(/[<>*_`\[\]]/); // nothing that reads as markup
     }
-    expect(alertText(vault.toBase58(), { ...base, kind: "announced" }, null, 0n, null)).toContain("bunkermode.io/recovery");
-    expect(alertText(vault.toBase58(), { ...base, kind: "recovered" }, null, 0n, null)).toContain("Withdraw everything");
+    expect(eventText(vault.toBase58(), events[1], 0n, null)).toContain("bunkermode.io/recovery");
+    expect(eventText(vault.toBase58(), events[1], 0n, null)).toContain("42 base units of token");
+    expect(eventText(vault.toBase58(), events[3], 0n, null)).toContain("2 withdrawals left");
+    expect(eventText(vault.toBase58(), events[6], 0n, null)).toContain("Withdraw everything");
   });
 });
 describe("Bot commands", () => {
-  const deps = (store: MemoryStore, c = chain([{ signature: "s1", ops: [0], before: 0, after: 1 }], [1, 2, 3, 4, 5, 6, 7].map(id))) => ({
+  const deps = (store: MemoryStore, c = chain([1, 2, 3, 4, 5, 6, 7].map(id))) => ({
     store,
     connection: c.connection,
     program,
@@ -160,7 +254,8 @@ describe("Bot commands", () => {
     expect(ok?.text).toContain("Watching Bunker");
     expect(ok?.text).toContain("Silence is not proof");
     expect(await store.vaultsOf("100")).toEqual([vault.toBase58()]);
-    expect(await store.cursor(vault.toBase58())).toBe("s1");
+    // Watching starts from the state the Bunker is in when it is subscribed.
+    expect(JSON.parse((await store.snapshot(vault.toBase58()))!)).toMatchObject({ epoch: "0", lamports: "9000000", pending: null });
     const notVault = await handleUpdate(say(`/start ${payer.toBase58()}`), deps(store));
     expect(notVault?.text).toContain("not a Bunker");
     for (const bad of ["/start", "/start not-an-address", "/start <b>x</b>", `/start ${"1".repeat(60)}`])

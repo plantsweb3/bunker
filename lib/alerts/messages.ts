@@ -3,56 +3,58 @@
 import { formatAmount } from "@/sdk/bytes";
 import { mintLabel } from "@/sdk/known-mints";
 import { formatDuration } from "@/sdk/v3/chain";
-import type { Activity } from "@/sdk/v3/history";
-import type { VaultState } from "@/sdk/v3/protocol";
+import type { PendingView, WatchEvent } from "./watch";
 export const FOOTER = "Bunker will never ask for your recovery kit or day key by message.";
 const short = (a: string) => `${a.slice(0, 4)}…${a.slice(-4)}`;
 const name = (mint: string) => mintLabel(mint) ?? short(mint);
-const magnitude = (n: bigint) => (n < 0n ? -n : n);
-function amounts(a: Activity): string {
-  const parts = [
-    ...(a.sol !== 0n ? [`${formatAmount(magnitude(a.sol), 9)} SOL`] : []),
-    ...a.tokens.map((t) => `${formatAmount(magnitude(t.delta), t.decimals)} ${name(t.mint)}`),
-  ];
-  return parts.length ? parts.join(" and ") : "an amount this alert could not read";
-}
-/** The text for one event, or null when the event is not worth a message. */
-export function alertText(
+const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
+/** A record's amount and destination, exactly as the vault account holds them. */
+const record = (p: PendingView) =>
+  `${p.kind === 0 ? sol(BigInt(p.amount)) : `${p.amount} base units of token ${name(p.mint)}`} to ${p.destination}`;
+const RECOVER =
+  "Not you? Open the offline recovery tool with your recovery kit, make a recovery packet, and submit it at bunkermode.io/recovery. That replaces your keys.";
+/** The text for one change in a watched vault. */
+export function eventText(
   vault: string,
-  a: Activity,
-  state: VaultState | null,
+  e: WatchEvent,
   now: bigint,
   link: string | null,
-): string | null {
-  if (a.failed || a.kind === "built" || a.kind === "other") return null;
+): string {
   const head = `Bunker ${short(vault)}`;
   const lines: string[] = [];
-  if (a.kind === "deposit") lines.push(`${head}: deposit received.`, `+${amounts(a)}`);
-  else if (a.kind === "announced") {
-    const p = state?.pending;
-    lines.push(`${head}: a withdrawal was ANNOUNCED. Nothing has left yet.`);
-    if (p) {
-      lines.push(
-        `${p.kind === 0 ? `${formatAmount(p.amount, 9)} SOL` : `${p.amount.toString()} units of ${name(p.mint.toBase58())}`} to ${p.destination.toBase58()}`,
-        p.opensAt > now
-          ? `It can leave in ${formatDuration(p.opensAt - now)}.`
-          : "Its waiting period is over; it can be released now.",
-      );
-    }
+  if (e.kind === "deposit") lines.push(`${head}: deposit received.`, `+${sol(e.lamports)}`);
+  else if (e.kind === "announced") {
+    const opens = BigInt(e.pending.opensAt);
     lines.push(
-      "Not you? Open the offline recovery tool with your recovery kit, make a recovery packet, and submit it at bunkermode.io/recovery. That cancels it and replaces your keys.",
+      `${head}: a withdrawal was ANNOUNCED. Nothing has left yet.`,
+      record(e.pending),
+      opens > now
+        ? `It can leave in ${formatDuration(opens - now)}.`
+        : "Its waiting period is over; it can be released now.",
+      `${RECOVER} It also cancels this withdrawal.`,
     );
-  } else if (a.kind === "sent" || a.kind === "released")
+  } else if (e.kind === "left")
     lines.push(
-      `${head}: a withdrawal ${a.kind === "sent" ? "was sent" : "was released"}.`,
-      `−${amounts(a)}`,
-      "Not you? Your day key is compromised. Use your recovery kit in the offline tool to install new keys now.",
+      e.count === 1
+        ? `${head}: a withdrawal left your Bunker.`
+        : `${head}: ${e.count} withdrawals left your Bunker.`,
+      e.record
+        ? record(e.record)
+        : e.lamports > 0n
+          ? `−${sol(e.lamports)} since the last check`
+          : "A token withdrawal. Open your Bunker to see what moved.",
+      `Not you? Your day key is compromised. ${RECOVER}`,
     );
-  else if (a.kind === "cleared")
-    lines.push(`${head}: an expired withdrawal was cleared. Nothing moved.`);
-  else if (a.kind === "recovered")
+  else if (e.kind === "ended")
     lines.push(
-      `${head}: NEW KEYS were installed. Every earlier day key is dead and any waiting withdrawal was cancelled.`,
+      `${head}: an announced withdrawal is no longer waiting. It was released at its deadline, or it expired and was cleared.`,
+      record(e.record),
+      "Open your Bunker to see which.",
+    );
+  else
+    lines.push(
+      `${head}: NEW KEYS were installed. Every earlier day key is dead${e.cancelled ? " and the waiting withdrawal was cancelled" : ""}.`,
+      ...(e.cancelled ? [`Cancelled: ${record(e.cancelled)}`] : []),
       "Not you? Then someone else has your recovery kit. Withdraw everything to a new wallet immediately.",
     );
   if (link) lines.push(link);
@@ -62,7 +64,7 @@ export function alertText(
 export const WELCOME = (vault: string) =>
   [
     `Watching Bunker ${short(vault)}.`,
-    "You will get a message here when a deposit arrives, a withdrawal is announced, sent or released, or its keys are replaced.",
+    "You will get a message here when SOL arrives, a withdrawal is announced or leaves, or its keys are replaced. Token deposits are not reported.",
     "Alerts are best effort and can be late or missing. Silence is not proof that nothing happened.",
     "Send /list to see what you are watching, /stop to stop everything.",
     "",
