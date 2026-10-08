@@ -21,13 +21,13 @@ Fixed points: the vendored Winterwallet verifier at revision `672fc6789b1532ee68
 
 ### 1.1 Derivation
 
-HKDF-SHA256 (RFC 5869) with an empty HKDF salt. All integers are unsigned little endian. `ctx` is a fixed 109-byte prefix:
+HKDF-SHA256 (RFC 5869) with an empty HKDF salt. All integers are unsigned little endian. `ctx` is a fixed 113-byte prefix:
 
 ```
-ctx = "BUNKER-KDF-3" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32)   // 109 bytes
+ctx = "BUNKER-KDF-3" (12) || 0x00 || chain_tag (32) || program_id (32) || salt (32) || delay_secs (4)   // 113 bytes
 ```
 
-`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them.
+`salt` is 32 random bytes chosen when the recovery kit is made. It is not secret: it is published in `initialize`. It stands where an earlier draft used `vault_id`, because `vault_id` is now computed from the derived roots (§1.2) and cannot also be an input to deriving them. `delay_secs` is included so that the context holds every input of the vault identity other than the roots: a given recovery key can then only ever sign for one vault. The label `BUNKER-KDF-3` also fixes the message formats in §3; a change to either format needs a new label, so that an existing recovery key is never asked to sign a second encoding.
 
 | Output | IKM | info | Length |
 |---|---|---|---|
@@ -86,7 +86,7 @@ Written in append-only chunks of at most 600 bytes each; the reference client us
 
 ### 2.3 Spent marker — 8 bytes, PDA `["spent-v3", vault_address, root]`
 
-Magic `BKSPENT3`, never closable. **A marker belongs to one vault.** Within that vault there is one namespace for both roles: a root that has been an operational root can never become a recovery root and the reverse. Nothing done in any other vault can create, occupy or depend on a vault's markers; two vaults may hold the same root without affecting each other. (An earlier draft derived markers from the root alone. Because recovery retires the displaced operational root without a signature under it, anyone could then retire another vault's live root from a vault of their own. See `docs/INTERNAL-REVIEW.md`, finding P-1.)
+Magic `BKSPENT3`, never closable. **A marker belongs to one vault.** Within that vault there is one namespace for both roles: a root that has been an operational root can never become a recovery root and the reverse. Nothing done in any other vault can create, occupy or depend on a vault's markers; two vaults may hold the same root without affecting each other. **A marker is only ever created for a root that has signed**: the operational root displaced by an accepted announcement, and the recovery root that signed an accepted packet. (Earlier drafts also marked the operational root displaced by a recovery, which had not signed. Since the operational signer chooses that root freely, that let it decide what would be marked. See `docs/INTERNAL-REVIEW.md`, findings P-1, P-8 and P-11.)
 
 ## 3. Signed messages
 
@@ -140,7 +140,7 @@ Opcode is the first byte of instruction data. Any account count, data length, ve
 | 2 | `announce` | payer | vault (w), proof, payer (w), marker of `op_root` (w), marker of `next_op_root`, system program | Verify an operational signature, rotate it, record a pending withdrawal; moves nothing |
 | 3 | `execute` | none | vault (w), destination (w); for SPL also source token account (w), mint, token program | Carry out the pending withdrawal inside its window; permissionless |
 | 4 | `expire` | none | vault (w) | Clear a pending withdrawal past its deadline; permissionless |
-| 5 | `recover` | payer | vault (w), proof, payer (w), marker of `rec_root` (w), marker of `op_root` (w), marker of `next_rec_root`, marker of `next_op_root`, system program | Verify the recovery packet, install a new epoch, clear any pending withdrawal |
+| 5 | `recover` | payer | vault (w), proof, payer (w), marker of `rec_root` (w), marker of `next_rec_root`, marker of `next_op_root`, system program | Verify the recovery packet, install a new epoch, clear any pending withdrawal |
 | 6 | `close_proof` | payer | proof (w), payer (w) | Reclaim proof rent |
 
 In `announce` and `recover` the payer signs only to fund the spent markers. It has no authority over the vault.
@@ -151,11 +151,11 @@ Requires `op_root ≠ rec_root`, both nonzero, delay within bounds, and the vaul
 
 ### 4.1 `stage` — data: `digest (32) || offset (2) || chunk (1..600)`
 
-The proof account must be the address derived from the payer and `digest`. The first chunk (offset 0) creates it and records the payer and digest. A later chunk must start exactly where the stored bytes end, or lie wholly inside them and be identical. `offset + len(chunk) ≤ 1,088`.
+The proof account must be the address derived from the payer and `digest`, and the third account must be the system program on every chunk. The first chunk (offset 0) creates it and records the payer and digest. A later chunk must start exactly where the stored bytes end, or lie wholly inside them and be identical. `offset + len(chunk) ≤ 1,088`.
 
 ### 4.2 `announce` — data: the 195-byte payload
 
-Checks, in order:
+Checks. All must pass; the order below is for reading, and differs from the order in the code only in which error is returned when several fail.
 
 1. Vault owner, length, magic; PDA re-derived from stored `vault_id` and bump.
 2. Payload version and role; `vault_id`, `chain_tag`, `epoch`, `op_index` equal the stored values.
@@ -166,7 +166,7 @@ Checks, in order:
 7. Proof account owner, magic, full length, and digest equal to SHA-256 of the recomputed message.
 8. Signature verifies against `op_root`.
 
-Effects, atomically: create this vault's spent marker for `op_root`; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + delay_secs`, `deadline = opens_at + 604,800`, `epoch`, `digest`. **No lamports or tokens move.** The destination's present state is not validated here; it is validated at execution.
+Effects, atomically: create this vault's spent marker for `op_root`, which has just signed; set `op_root = next_op_root`; `op_index += 1`; write the pending record with `opens_at = now + delay_secs`, `deadline = opens_at + 604,800`, `epoch`, `digest`. **No lamports or tokens move.** The destination's present state is not validated here; it is validated at execution.
 
 ### 4.3 `execute` — no data
 
@@ -180,9 +180,9 @@ Requires `pending == 1` and `now > deadline`. Zeroes the pending record. Moves n
 
 Checks: vault as above; payload version and role; `vault_id`, `chain_tag` and `epoch` equal the stored values; `next_rec_root` and `next_op_root` nonzero, distinct from each other and from the current `rec_root`, both of their markers in this vault absent; proof digest; signature verifies against `rec_root`.
 
-**No check compares the packet with the current `op_root`.** The operational signer chooses each next operational root freely and can therefore install any 32 bytes there, including a root the packet names. If that could make the packet fail, a stolen day key together with sight of the packet would block recovery for good. A root planted this way is simply installed by the packet: only the holder of `M` can sign under it.
+**`recover` neither reads nor marks the operational root.** The operational signer chooses each next operational root freely and can install any 32 bytes there, including a root that this packet, or a later one, names. If recovery compared the packet with that root, or marked that root spent, a stolen day key with sight of a packet could make this recovery or a future one fail for good. The displaced operational root is simply overwritten. That is safe because every announcement names its epoch: a signature made under a root in epoch `e` can never be accepted once the epoch has moved on, whether or not that root is ever installed again.
 
-Effects, atomically: create this vault's spent markers for `rec_root` **and**, unless it equals one of the packet's two next roots, the displaced `op_root` (an offline signature under it may exist even if it was never announced); set `rec_root = next_rec_root`, `op_root = next_op_root`, `op_index = 0`, `epoch += 1`; zero any pending record. **Never debits the vault.** There is no time condition: recovery is valid before, during and after a waiting period.
+Effects, atomically: create this vault's spent marker for `rec_root`; set `rec_root = next_rec_root`, `op_root = next_op_root`, `op_index = 0`, `epoch += 1`; zero any pending record. **Never debits the vault.** There is no time condition: recovery is valid before, during and after a waiting period.
 
 ### 4.6 `close_proof` — no data
 
@@ -208,8 +208,8 @@ Consequences to check against the implementation:
 2. **At most one transfer per announcement.** `execute` zeroes the record in the same instruction as the transfer.
 3. **No field changes between announcement and execution.** `execute` takes no data; every transfer field comes from the record.
 4. **Recovery always wins over a pending withdrawal that has not executed.** It zeroes the record; a stale `execute` then fails on `pending == 0`.
-5. **A disclosed root is never reinstalled** in the vault that disclosed it, in either role.
-6. **An operational key cannot block recovery.** Whether the packet for epoch `e` is accepted depends on no operational state: announcements change `op_root` and `op_index` only, and `recover` compares the packet with neither. The *transaction* that carries it does name the current `op_root`'s marker account, so an announcement that lands in between makes that transaction fail and the client must rebuild it; with a waiting period that can happen at most once per pending withdrawal.
+5. **A root that has signed is never installed again** in that vault, in either role.
+6. **An operational key cannot block recovery, now or later.** Neither the packet for epoch `e` nor the transaction that carries it depends on any operational state: announcements change `op_root` and `op_index` and can mark only roots that the operational signer itself signed under, and `recover` reads none of those. A recovery transaction built before an announcement lands is still valid after it.
 7. **Expiry never strands the vault.** An announcement that is signed but not landed by `announce_by`, an execution that never succeeds, and a lost epoch seed all leave `recover` available while `M` exists.
 8. **Vaults are independent.** No instruction on one vault reads or writes any account that another vault's instructions depend on. In particular no party without a vault's keys can make its `announce` or `recover` fail.
 9. **A vault is what its address says.** The address is derived from a hash of the creation data, so the roots, chain tag and waiting period at an address are the ones its owner derived, whoever created the account.
@@ -262,22 +262,22 @@ These are trust assumptions, not program guarantees.
 
 | Evidence | Where | Count |
 |---|---|---:|
-| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 18 |
+| Transition table, encodings, boundaries and overflow against the pure state logic | `programs/bunker3/tests/state.rs` (`cargo test -p bunker3`) | 19 |
 | The compiled SBF binary in an in-process Solana VM with a controlled clock | `programs/bunker3-svm-tests/tests/program.rs` (standalone crate; see `docs/TESTING.md`) | 22 |
-| Isolation, on the same VM: a day key planting the recovery packet's roots, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 8 |
+| Isolation, on the same VM: a day key planting the roots of this recovery packet or the next one, recovery after operational progress, one account in two slots of `announce` and `recover`, shared roots across vaults, the address commitment, racing `initialize`, markers from another vault, re-staging a closed proof, prefunded addresses | `programs/bunker3-svm-tests/tests/isolation.rs` | 12 |
 | TypeScript client: RFC 5869 vector, context layout, role and epoch separation, encodings, the vault identity, instruction shapes, and byte-for-byte reproduction of `fixtures/bunker-v3.json` | `tests/protocol-v3.test.ts` (`npm test`) | 17 |
 | The client's vectors against an independent Rust derivation (RustCrypto HKDF), the vendored verifier, and the compiled program (create, announce, recover, announce in the next epoch) | `programs/bunker3-svm-tests/tests/client_vectors.rs` | 3 |
 
-The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; both displaced roots retired; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; a classic SPL withdrawal including a frozen destination that later thaws; and eleven wrong sets of token accounts for `execute` (a source owned by someone else, of another mint, with a delegate, with a close authority, or not owned by the token program; source equal to destination; another mint; another program in place of the token program; an unrecorded destination; missing and extra accounts), each leaving the record and balances untouched.
+The second suite covers: nothing leaving before `opens_at` and exactly once after; the inclusive `announce_by`, `opens_at` and `deadline` seconds; permissionless execution; expiry leaving the authority usable; recovery when idle and while a withdrawal is pending; the signing recovery root retired and the displaced operational root left unmarked; a recovery packet bound to its epoch; cross-role proof substitution; altered payload bytes; retired roots refused as any next root; the rent reserve; a forged vault account; proof staging and close; a classic SPL withdrawal including a frozen destination that later thaws; and eleven wrong sets of token accounts for `execute` (a source owned by someone else, of another mint, with a delegate, with a close authority, or not owned by the token program; source equal to destination; another mint; another program in place of the token program; an unrecorded destination; missing and extra accounts), each leaving the record and balances untouched.
 
-Each of the following checks was removed in turn and the suite confirmed to fail: the waiting period, signature verification, clearing the record on recovery, retiring the displaced operational root, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`.
+Each of the following checks was removed in turn and the suite confirmed to fail (an earlier entry, retiring the displaced operational root, is gone because that rule was itself removed): the waiting period, signature verification, clearing the record on recovery, the vault PDA check, clearing the record after execution, destination binding, the next-root marker check, computing the vault identity from the creation data, scoping markers to the vault, returning a closed proof to the system program, and the bound on `announce_by`.
 
 Measured on that VM with the 1,400,000-unit limit: `announce` about 597,000 compute units and `recover` about 634,000 for the fixture messages. The cost follows the message digest, about 120 units per chain hash; observed announcements ranged from 470,000 to 626,000, and the worst possible digest extrapolates to about 1,055,000 for `announce` and 1,100,000 for `recover`, inside the limit.
 
 | Public file formats (rejecting secrets, mismatched vaults, a packet whose stated epoch differs from its signed payload, and signatures from another master) and the tool page's policy | `tests/requests-v3.test.ts` | 5 |
-| Randomized: 20,000 sequences of up to 40 interleaved announce, execute, expire, recover and time steps (a quarter corrupted) against invariants, and 300,000 arbitrary inputs to every decoder. Fixed seed, no external crates | `programs/bunker3/tests/model.rs` | 2 |
+| Randomized: 20,000 sequences of up to 40 interleaved announce, execute, expire, recover and time steps (a quarter corrupted) against invariants, with an operational signer that chooses its next roots adversarially (the current roots, marked roots, and the roots of this and the next recovery packet) and a model of the spent markers; the undamaged recovery packet must always land. And 300,000 arbitrary inputs to every decoder. Fixed seed, no external crates | `programs/bunker3/tests/model.rs` | 2 |
 | Repeated cycles on a local validator with the app's client: create, withdraw (instant and waiting), replay, recovery, continue; every expected rejection asserted | `tests/chain-v3.ts` (`npm run test:chain`) | script |
-| Signing journal and key files: one signature per key, racing tabs, an orphaned reservation, chain advance, a chain view that goes forward and then back, a key the day key does not derive, an unreadable journal, file confusion and tampering | `tests/journal-v3.test.ts` | 15 |
+| Signing journal and key files: one signature per key, racing tabs, an orphaned reservation, chain advance, a chain view that goes forward and then back, a key the day key does not derive, an unreadable journal, file confusion and tampering | `tests/journal-v3.test.ts` | 17 |
 | Browser, against a local validator running this program: build, deposit, announce (state and balances asserted on-chain), countdown, cancel by recovery, dead old day key, announce with the new key, seal | `tests/browser/custody3.spec.ts` | 1 × desktop and mobile |
 
 In the browser suite the offline tool is opened as a local `file://` page, every file passes between it and the site through the filesystem, and the suite asserts the tool page issued no network request. The browser suite has two cases: a vault with no waiting period, where a withdrawal arrives on the third approval, and a vault that opted into 24 hours. It cannot let 24 hours pass, so releasing after a wait is exercised only by the VM suite.
@@ -297,10 +297,12 @@ Each is a decision this draft made provisionally and wants challenged.
 5. **Immutable `delay_secs`.** Changing the delay is a policy operation with its own delay and is deferred. Is a fixed per-vault delay acceptable for a first release?
 6. **Fixed 7-day execution window** as a program constant rather than a signed field.
 7. **Permissionless `execute`.** It means the fee wallet is not needed at execution and alerts cannot be bypassed by withholding; it also means anyone can complete an announced transfer the moment it opens. The alternative binds execution to a signer and reintroduces a liveness dependency.
-8. **One spent-marker namespace for both roles within a vault**, and marking the displaced operational root on recovery even when it was never used. Markers are scoped to the vault precisely because that second rule retires a root without a signature under it.
+8. **One spent-marker namespace for both roles within a vault, holding only roots that have signed.** An operational root displaced by recovery is not marked. The argument that this is safe is that announcements are bound to their epoch; it deserves an independent check.
 9. **No migration path between program deployments.** A changed layout means a new program id and new vaults.
 10. **`chain_tag` is client-asserted.** It is now part of the vault address, so a wrong tag cannot be attached to an owner's address by someone else, but the owner's own tool still takes it from a file. Is a stronger check worth its cost?
 11. **A zero waiting period is permitted and is the interface default.** It removes the reaction window for a stolen day key in exchange for withdrawals that complete at once. Should a reviewed release allow it, allow it only below a balance, or require a minimum?
 12. **Token-2022 is not supported, and nothing stops someone sending such a token to a vault.** It would be held by an account the program cannot move. Should a reviewed release add support, or a recovery path for tokens it does not handle?
 13. **The recorded `digest` is not read by the program.** It identifies the announcement for clients and alerts. Keep it, or drop 32 bytes from the layout?
 14. **Token decimals and balances shown before signing come from the RPC.** The signed amount is in base units, so a node that misreports a mint's decimals changes how many units "1.0" means. The destination is unaffected. Pin decimals for known mints, or read the mint account and show the raw amount as well?
+15. **No way to withdraw a pending record except execution, expiry or recovery.** A record that cannot execute (the recipient closed or froze the token account, the destination became a program, a Token-2022 mint was named) holds the single pending slot for the waiting period plus seven days unless the owner recovers, which costs an epoch. Should the program check the mint's owner at announcement, or allow the current operational key to cancel?
+16. **`announce` and `recover` need most of a transaction's compute budget** (up to about 1.06M and 1.1M units for the worst digest). They work only as top-level instructions with an explicit 1.4M limit; a caller that wraps them in another program or bundles other work beside them can push a valid signature over the limit. Is that acceptable, or should the verifier be made cheaper?

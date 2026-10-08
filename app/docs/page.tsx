@@ -46,8 +46,10 @@ export default function Page() {
         </p>
         <p>
           Each key file is encrypted with AES-256-GCM under a key derived
-          from its password with PBKDF2-SHA256, 600,000 iterations. There is
-          no reset. The Bunker’s address is computed from its keys and its
+          from its password with scrypt, a function chosen because each
+          guess at the password costs an attacker a large amount of memory.
+          There is no reset, so the recovery kit’s password should be five or
+          more unrelated words. The Bunker’s address is computed from its keys and its
           waiting period, so nobody else can create it with different ones. The tool makes you re-open the saved kit before it
           continues.
         </p>
