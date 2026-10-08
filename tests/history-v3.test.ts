@@ -18,8 +18,9 @@ const tx = (
       staticAccountKeys: keys,
       compiledInstructions: ops.map((op) =>
         op === "system"
-          ? { programIdIndex: 3, data: new Uint8Array([2, 0, 0, 0]) }
-          : { programIdIndex: 2, data: new Uint8Array([op, 1, 2]) },
+          ? { programIdIndex: 3, accountKeyIndexes: [0, 1], data: new Uint8Array([2, 0, 0, 0]) }
+          : // `initialize` names the vault second; every other instruction, first.
+            { programIdIndex: 2, accountKeyIndexes: op === 0 ? [0, 1, 3] : [1, 0], data: new Uint8Array([op, 1, 2]) },
       ),
     },
   },
@@ -35,6 +36,39 @@ describe("Vault activity", () => {
     expect(kind(tx([5]))).toBe("recovered");
     // Recovery in the same transaction as anything else is still a recovery.
     expect(kind(tx([5, 2]))).toBe("recovered");
+  });
+  it("ignores Bunker instructions that act on a different vault", () => {
+    // Someone recovers a Bunker of their own in a transaction that merely
+    // mentions this one: this vault's log must not show new keys.
+    for (const op of [0, 2, 3, 4, 5]) {
+      const t = tx([op], [5_000_000, 5_000_001]);
+      t.transaction.message.compiledInstructions[0].accountKeyIndexes = op === 0 ? [0, 0, 3] : [0, 1];
+      expect(kind(t), `opcode ${op}`).toBe("deposit");
+    }
+  });
+  it("sees Bunker instructions made through another program", () => {
+    // Base58 "3" is the single byte 0x02 (announce); "4" is 0x03 (execute).
+    const wrapped = tx(["system"], [5_000_000, 4_000_000], {
+      innerInstructions: [
+        { instructions: [{ programIdIndex: 2, accounts: [1, 0], data: "3" }, { programIdIndex: 2, accounts: [1, 0], data: "4" }] },
+      ],
+    });
+    expect(kind(wrapped)).toBe("sent");
+    const recover = tx(["system"], [1, 1], {
+      innerInstructions: [{ instructions: [{ programIdIndex: 2, accounts: [1], data: "6" }] }],
+    });
+    expect(kind(recover)).toBe("recovered");
+    // The same call aimed at another vault, or to another program, is not ours.
+    const elsewhere = tx(["system"], [1, 1], {
+      innerInstructions: [{ instructions: [{ programIdIndex: 2, accounts: [0], data: "6" }, { programIdIndex: 3, accounts: [1], data: "6" }] }],
+    });
+    expect(kind(elsewhere)).toBe("other");
+    // A vault reached through an address lookup table is still recognised.
+    const viaTable = tx([5]);
+    viaTable.transaction.message.staticAccountKeys = [payer, payer, program, system];
+    viaTable.transaction.message.compiledInstructions[0].accountKeyIndexes = [4];
+    viaTable.meta!.loadedAddresses = { writable: [vault], readonly: [] };
+    expect(kind(viaTable)).toBe("recovered");
   });
   it("treats an incoming transfer as a deposit and anything else as other", () => {
     const deposit = describeTransaction("sig", tx(["system"], [1_000, 2_500]), program, vault);

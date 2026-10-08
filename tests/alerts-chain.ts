@@ -39,6 +39,7 @@ const store = new MemoryStore();
 const sent: { chat: string; text: string }[] = [];
 const pass = async () => {
   const before = sent.length;
+  store.unlock();
   const result = await runWatch({
     store,
     connection: c,
@@ -104,7 +105,31 @@ await start(instant.vault);
 await send(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: instant.vault, lamports: 2_000_000_000 }));
 expectOne(await pass(), "deposit received", "+2 SOL");
 await announce(instant, 500_000_000n, true);
-expectOne(await pass(), "a withdrawal was sent", "−0.5 SOL", "install new keys now");
+expectOne(await pass(), "a withdrawal left your Bunker", "−0.5 SOL", "Your day key is compromised");
+
+// Traffic cannot hide an alert. A thief floods the Bunker's address with
+// transactions and then announces: the announcement is still reported.
+const flooded = await vaultWith(86_400);
+await start(flooded.vault);
+await send(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: flooded.vault, lamports: 2_000_000_000 }));
+expectOne(await pass(), "deposit received");
+await announce(flooded, 700_000_000n, false);
+for (let i = 0; i < 15; i++)
+  await send(SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: flooded.vault, lamports: 1 + i }));
+expectOne(await pass(), "ANNOUNCED", "0.7 SOL");
+
+// Traffic cannot fake one. A stranger recovers a Bunker of their own in a
+// transaction that also touches the watched Bunker: no false alarm.
+const strangers = await vaultWith(0);
+const own = recoveryPacket(strangers.master, strangers.d, 0n);
+for (const ix of stageIxs(PROGRAM, payer.publicKey, own.message, own.signature)) await send(ix);
+await send(
+  computeIx(),
+  SystemProgram.transfer({ fromPubkey: payer.publicKey, toPubkey: flooded.vault, lamports: 1 }),
+  recoverIx(PROGRAM, payer.publicKey, own.payload, (await fetchVault(c, PROGRAM, strangers.vault)).state),
+  closeProofIx(PROGRAM, payer.publicKey, own.message),
+);
+none(await pass(), "after a stranger's recovery that only touched the watched Bunker");
 
 // An address that is not a Bunker cannot be watched, and /stop ends everything.
 const refused = await handleUpdate({ message: { text: `/start ${payer.publicKey.toBase58()}`, chat: { id: 4242, type: "private" } } }, { store, connection: c, program: PROGRAM });

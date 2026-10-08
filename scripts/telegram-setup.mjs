@@ -21,6 +21,8 @@ await call("setWebhook", {
   url: `${site}/api/telegram`,
   secret_token: secret,
   allowed_updates: ["message"],
+  // One update at a time, so two subscription changes never interleave.
+  max_connections: 1,
   drop_pending_updates: true,
 });
 await call("setMyCommands", {
