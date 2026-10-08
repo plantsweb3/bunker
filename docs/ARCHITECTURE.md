@@ -31,7 +31,13 @@ Three public files cross between the offline tool and the site (`sdk/v3/requests
 
 `scripts/build-recovery-tool.mjs` bundles `tools/recovery` into one HTML file, `public/source/bunker-recovery-tool.html`, at build time, and writes its SHA-256 to `recovery-tool-manifest.json`. The page's own Content Security Policy is `default-src 'none'; connect-src 'none'; form-action 'none'` with the inline script pinned by hash. The build is reproducible and its output is not committed.
 
-CI builds the tool on every run, checks that a second build is byte-identical and prints its manifest. For commits on `main` it also uploads the file as a workflow artifact, kept 90 days, so there is a copy and a hash that do not come from the website. Nothing yet compares that hash with the file the site serves automatically. It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
+CI builds the tool on every run, checks that a second build is byte-identical and prints its manifest. For commits on `main` it also uploads the file as a workflow artifact, kept 90 days, so there is a copy and a hash that do not come from the website. A scheduled workflow builds the tool from `main` daily and compares it with the file the site serves. It is served from the same domain as the site. A compromised site could serve a different file; the published hash and reproducible build let that be detected but nothing enforces it.
+
+## Without the website
+
+`tools/cli` is a command-line client over the same `sdk` code the site uses: read a Bunker, withdraw, resume, release, clear, submit a recovery packet. Its signing journal is a file beside the day key, written through a temporary file and a rename, with a lock file so two runs cannot sign at once. It takes the network and program from the day key file and refuses an RPC on any other network, and it refuses mainnet as the site does. It exists so that a Bunker does not depend on this website staying up.
+
+`sdk/v3/master.ts` holds everything computed from the archival master, and `sdk/v3/core.ts` the addresses, vault identity and recovery-packet bytes with no Solana library. The offline tool is built from those and five other files and nothing else.
 
 ## The web app
 
