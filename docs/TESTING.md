@@ -6,6 +6,8 @@ Automated tests do not establish cryptographic security and are not an audit.
 
 | Command | What it covers |
 |---|---|
+| `npm run check:all` | Everything below, in order, on a local validator the script starts and stops itself. About fifteen minutes; stops at the first failure |
+| `npm run check:independent` | A third implementation, in Python from `docs/PROTOCOL.md` and the two RFCs alone, recomputes every value in `fixtures/bunker-v3.json` (derivation, identifiers, public keys, vault identity and address, all four signatures) and the RFC 8554 vectors. It shares no code with the client or the program; it does share their author |
 | `npm run typecheck`, `npm run lint` | Strict TypeScript and lint over app, client, tool, scripts and tests |
 | `npm test` | Client: exact amounts, LM-OTS against the RFC 8554 Appendix F vectors, key derivation and encodings, byte-for-byte reproduction of `fixtures/bunker-v3.json`, the vault identity, signing journal (including a chain view that goes back), key files, public file formats, activity classification, alert state changes, wallet-check classification, preflight decisions, RPC proxy rules and limits, release gate, and that the source bundle is exactly what Git tracks or would track (tracked files plus new files not ignored) and refuses key material |
 | `cargo test --workspace --locked` | The LM-OTS verifier's own tests (`crates/bunker-lmots`); the program's state machine row by row (`programs/bunker3/tests/state.rs`); fixed-seed randomized sequences and decoder inputs (`tests/model.rs`); and every reachable state up to twelve actions deep over a small alphabet of roots, with an operational signer free to name any root it could know (`tests/exhaustive.rs`) |

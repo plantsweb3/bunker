@@ -30,6 +30,8 @@
     "tool:build": "node scripts/build-recovery-tool.mjs",
     "cli:build": "node scripts/build-cli.mjs",
     "check:deployment": "tsx scripts/check-deployment.ts",
+    "check:independent": "python3 scripts/independent-check.py",
+    "check:all": "./scripts/full-check.sh",
     "audit:dependencies": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {

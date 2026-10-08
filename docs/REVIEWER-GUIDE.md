@@ -12,6 +12,10 @@ This repository is a pre-release research and engineering artifact. Assume no ex
 6. `sdk/lmots.ts`, then `sdk/v3/` — `derive.ts`, `onetime.ts`, `protocol.ts`, `authority.ts`, then `kit.ts`, `journal.ts`, `requests.ts`, `passkey.ts`.
 7. `tools/recovery/` and `scripts/build-recovery-tool.mjs`.
 
+## One command
+
+`npm ci && npm run check:all` runs every suite in `docs/TESTING.md` on an isolated local validator it starts itself. `npm run check:independent` alone takes a second and shows whether the specification, as you read it, produces the checked-in vectors: `scripts/independent-check.py` is short enough to read beside `docs/PROTOCOL.md`.
+
 ## Things to check
 
 - Read `crates/bunker-lmots/src/lib.rs` (the verifier the program runs, about a hundred lines) and `sdk/lmots.ts` beside RFC 8554 section 4. Both are tested against the RFC's Appendix F vectors (`fixtures/rfc8554-test-case-1.json` for verification, `-2.json` for signing), but they share an author: check them against another LM-OTS implementation. Then read `identifier` and `verify_proof` in `programs/bunker3/src/lib.rs` and `sdk/v3/onetime.ts` for how a key is bound to its vault, role, generation and index.
