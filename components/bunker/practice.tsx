@@ -10,7 +10,6 @@ const COINS = 10;
 /** How long the pretend "day" lasts while the door waits. */
 const WAIT_MS = 9000;
 type Phase = "pack" | "bait" | "robbed" | "door" | "stopped" | "lost";
-type Lang = "en" | "es";
 const TEXT = {
   en: {
     wallet: "WALLET",
@@ -43,37 +42,6 @@ const TEXT = {
     check: "Check my real wallet",
     build: "Build my Bunker",
   },
-  es: {
-    wallet: "BILLETERA",
-    bunker: "BÚNKER",
-    thief: "LADRÓN",
-    bait: "¡MONEDAS GRATIS! RECLAMA YA",
-    stop: "ALTO",
-    stopped: "DETENIDO",
-    day: "1 día",
-    coin: (n: number, safe: boolean) =>
-      safe ? `Moneda ${n}, en el Búnker. Regrésala a la billetera.` : `Moneda ${n}, en la billetera. Muévela al Búnker.`,
-    pack: ["Pon tus monedas detrás de la puerta.", "Toca una moneda para moverla. Deja un poco en tu billetera para gastar."],
-    baitSay: ["Aparece un regalo.", "Anda. Haz clic. Esto es solo práctica."],
-    tookAll: "Se llevó todo.",
-    tookNone: "Encontró la billetera vacía.",
-    took: (n: number) => `Se llevó tus ${n}.`,
-    keptSay: (n: number) => `Las ${n} detrás de la puerta no se movieron. Tu billetera no puede abrir esa puerta.`,
-    keptNone: "No había nada detrás de la puerta.",
-    door: ["Ahora también tiene la llave de tu puerta.", "La puerta espera un día antes de abrirle a un extraño. Aprieta ALTO."],
-    stoppedSay: (n: number) => ["Detenido.", `No salió nada de tu Búnker. Conservaste ${n} de ${COINS}.`],
-    lost: ["Muy lento.", "En la vida real tienes un día entero y una alerta en tu teléfono. Inténtalo de nuevo."],
-    ready: "Estoy listo",
-    skip: "Saltar el Búnker y ver qué pasa",
-    move8: "Mover 8 por mí",
-    tallyWallet: "Billetera",
-    tallyBunker: "Búnker",
-    whatIf: "¿Y si también consigue la llave de mi puerta?",
-    retry: "Intentar de nuevo, con un Búnker",
-    again: "Jugar otra vez",
-    check: "Revisar mi billetera real",
-    build: "Construir mi Búnker",
-  },
 };
 
 /** Where things sit, in percent of the stage. */
@@ -81,8 +49,8 @@ const inWallet = (slot: number) => ({ left: 8.6 + (slot % 5) * 4.4, top: 59 + Ma
 const inBunker = (slot: number) => ({ left: 43.2 + (slot % 4) * 5.3, top: 49 + Math.floor(slot / 4) * 13 });
 const stolen = (slot: number) => ({ left: 73 + (slot % 5) * 4.6, top: 55 + Math.floor(slot / 5) * 12 });
 
-export default function Practice({ lang = "en" }: { lang?: Lang }) {
-  const x = TEXT[lang];
+export default function Practice() {
+  const x = TEXT.en;
   const [phase, setPhase] = useState<Phase>("pack");
   /** Which coins the player has put behind the door. */
   const [safe, setSafe] = useState<boolean[]>(() => Array(COINS).fill(false));

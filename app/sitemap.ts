@@ -4,8 +4,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     "",
     "/demo",
-    "/es",
-    "/es/demo",
     "/check",
     "/integrate",
     "/emergency",
