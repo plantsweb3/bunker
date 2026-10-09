@@ -64,3 +64,5 @@ id.json
 
 # standalone in-process VM tests
 /programs/bunker3-svm-tests/target/
+# Written by the dev server for coding assistants; not source.
+AGENTS.md

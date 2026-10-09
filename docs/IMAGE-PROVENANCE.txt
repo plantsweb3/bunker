@@ -30,7 +30,7 @@ reduced-motion fallback.
 Diagrams (public/assets/diagrams): authored vector layouts with embedded
 fonts, labelled SIMULATION. They are illustrations, not security evidence.
 
-Share cards (app/**/opengraph-image.png): composed from the hero still, the
+Share cards (app/*/opengraph-image.png, the pages under the landing page): composed from the hero still, the
 existing lockup and set type.
 
 Icons (components/bunker/icon.tsx): sixteen authored vector icons; path data
@@ -55,3 +55,32 @@ caa59508a0affdcc728e2c4f243a8cd6b6ceba6a887b30af122b4c6c68250e24  public/assets/
 a543caff316068402a4bd0c44f95de8053407cb41abac5e37486533d1dd57b9b  public/assets/world/04-vault-room-1x1.webp  167830 bytes
 3ec008f970571326564e00aff1433dc199275552af89d38e4b5861447ed7a726  public/assets/world/05-weather.webp  178258 bytes
 8ca7acf4abe7d0f7c5461697d00709aaf577eee692712e62a906f8d96e266a8f  public/assets/world/06-detail.webp  343828 bytes
+
+------------------------------------------------------------------------
+Film and motion kit assets, added 2026-10-09
+------------------------------------------------------------------------
+"Bunker Mode" is a 4:06 music video made for Bunker. These files come from
+the film's site package and motion kit as delivered on 2026-10-09.
+
+Film (public/assets/film): the silent 6.4-second title loop (WebM and MP4),
+its poster still, the full film at 720p and the lyric captions. The share
+images (app/opengraph-image.jpg, app/twitter-image.jpg) are the kit's
+1200x630 card, unchanged.
+
+Section clips (public/assets/kit/clips): six of the kit's 39 silent loops.
+The -720.webm and -poster.jpg files are unchanged; each .mp4 is the kit's
+1080p file re-encoded to 720p H.264 for size.
+
+Explainer cards (public/assets/kit/cards): five of the film's cards, cropped
+from the kit's 1080p frames to the panel and re-encoded; each poster is the
+card's last frame. Their SIMULATION labels and demo values (DEMO-TOKEN,
+made-up addresses) are kept.
+
+Texture and fonts (public/assets/kit/design, public/assets/fonts): the kit's
+halftone tiles, JetBrains Mono and Barlow Condensed, with the SIL OFL licence
+file for every font the kit ships.
+
+The film's pictures are machine-generated and its product screens are a
+simulation. The generation tools and prompts are not recorded here yet.
+Nothing in the film or the kit implies an audit, a mainnet deployment or a
+safety guarantee.

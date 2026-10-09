@@ -124,18 +124,18 @@ export default function Practice({ lang = "en" }: { lang?: Lang }) {
   return (
     <div className="practice" data-phase={phase}>
       <div className="practice-stage">
-        <div className="story-wallet practice-wallet">
+        <div className="practice-wallet">
           <i />
           <b>{x.wallet}</b>
         </div>
-        <div className={`story-bunker practice-bunker ${phase === "door" ? "knock" : ""}`}>
+        <div className={`practice-bunker ${phase === "door" ? "knock" : ""}`}>
           <b>{x.bunker}</b>
         </div>
         {places.map((at, i) => (
           <button
             key={i}
             type="button"
-            className={`story-coin practice-coin ${safe[i] && phase !== "lost" ? "safe" : ""}`}
+            className={`practice-coin ${safe[i] && phase !== "lost" ? "safe" : ""}`}
             style={{ left: `${at.left}%`, top: `${at.top}%`, transitionDelay: phase === "robbed" || phase === "lost" ? `${i * 45}ms` : "0ms" }}
             onClick={() => toggle(i)}
             disabled={phase !== "pack"}
@@ -171,7 +171,7 @@ export default function Practice({ lang = "en" }: { lang?: Lang }) {
             </button>
           </>
         )}
-        {phase === "stopped" && <span className="story-cancelled practice-stamp">{x.stopped}</span>}
+        {phase === "stopped" && <span className="practice-stamp">{x.stopped}</span>}
       </div>
       <div className="practice-words" aria-live="polite">
         <h2>{say[phase][0]}</h2>
