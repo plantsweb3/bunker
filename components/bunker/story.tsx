@@ -10,7 +10,6 @@ import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from 
 import { Pause, Play, RotateCcw } from "lucide-react";
 
 type Beat = { title: string; without: string; with: string };
-export type Lang = "en" | "es";
 const TEXT = {
   en: {
     without: "Without a Bunker",
@@ -37,33 +36,6 @@ const TEXT = {
       { title: "Then the thief tries your Bunker.", without: "Nothing left to try.", with: "Your wallet’s key does not open this door." },
       { title: "Even with a stolen Bunker key, the door waits a day.", without: "Still nothing.", with: "You get an alert. You press cancel. Nothing leaves." },
       { title: "Same click. Different day.", without: "Lost: everything.", with: "Lost: pocket money. Kept: the rest." },
-    ] as Beat[],
-  },
-  es: {
-    without: "Sin Búnker",
-    with: "Con Búnker",
-    wallet: "BILLETERA",
-    bunker: "BÚNKER",
-    thief: "LADRÓN",
-    free: "GRATIS",
-    badClick: "CLIC MALO",
-    stop: "ALTO",
-    wrongKey: "LLAVE EQUIVOCADA",
-    cancelled: "CANCELADO",
-    play: "Ver",
-    pause: "Pausa",
-    again: "Otra vez",
-    playAgain: "Ver otra vez",
-    steps: "Pasos de la historia",
-    step: (n: number, of: number, title: string) => `Paso ${n} de ${of}: ${title}`,
-    note: "Una ilustración. No una garantía.",
-    beats: [
-      { title: "Esto es todo lo que tienes.", without: "Todo está en tu billetera.", with: "Un poco se queda en tu billetera. El resto va a tu Búnker." },
-      { title: "Un día haces clic donde no debías.", without: "Parecía un regalo gratis.", with: "El mismo clic. El mismo error." },
-      { title: "El ladrón se lleva todo lo que tu billetera alcanza.", without: "Era todo.", with: "Era tu dinero de bolsillo." },
-      { title: "Luego el ladrón intenta abrir tu Búnker.", without: "Ya no queda nada que intentar.", with: "La llave de tu billetera no abre esta puerta." },
-      { title: "Aun con la llave del Búnker robada, la puerta espera un día.", without: "Sigue sin haber nada.", with: "Te llega una alerta. Aprietas el botón de alto. No sale nada." },
-      { title: "El mismo clic. Un día distinto.", without: "Perdiste: todo.", with: "Perdiste: el dinero de bolsillo. Conservaste: el resto." },
     ] as Beat[],
   },
 };
@@ -192,8 +164,8 @@ function Cursor({ from, to }: { from: Point; to: Point }) {
   );
 }
 
-export default function Story({ lang = "en" }: { lang?: Lang }) {
-  const t = TEXT[lang];
+export default function Story() {
+  const t = TEXT.en;
   const [beat, setBeat] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [seen, setSeen] = useState(false);
