@@ -79,8 +79,11 @@ simulation. The generation tools and prompts are not recorded here yet.
 Nothing in the film or the kit implies an audit, a mainnet deployment or a
 safety guarantee.
 
-Added 2026-10-09 for the bounty page: two more of the kit's clips,
-vault-hatch-shut and crowd-descending-stairs, handled as the others above.
+Bounty page, 2026-10-10 (public/assets/kit/clips): nine clips from the bounty
+kit made with the "Secure the Bunker" video, handled as the clips above
+(-720.webm and poster unchanged, .mp4 re-encoded to 720p). The glowing ring
+in bounty-vault-filling is an illustration; the page's balance is read from
+the wallet and the clip is dimmed until that read succeeds.
 
 Share image, 2026-10-10 (app/opengraph-image.jpg, app/twitter-image.jpg): one
 card for every page, composed from the hero clip's poster frame, the halftone

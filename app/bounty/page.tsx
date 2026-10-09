@@ -11,12 +11,13 @@ export const metadata: Metadata = {
   description:
     "Break Bunker, report it privately, and get paid from the bounty vault. Public beta on Solana mainnet, not audited.",
 };
-const steps: [string, string][] = [
-  ["Find it", "In the program, the site, the offline tool or the command-line client. All of it is open source."],
-  ["Report it privately", "Through GitHub’s private vulnerability report. Nobody else can read it."],
-  ["We confirm and fix", "We reproduce it, tell you what we found, and ship the fix."],
-  ["You get paid", "From the bounty vault, to the Solana address you give us."],
-  ["Public write-up", "After the fix has shipped, with your name on it if you want it there."],
+/** Each step, with the clip from the bounty film that shows it. */
+const steps: [string, string, string][] = [
+  ["Find it", "In the program, the site, the offline tool or the command-line client. All of it is open source.", "testing-the-walls"],
+  ["Report it privately", "Through GitHub’s private vulnerability report. Nobody else can read it.", "crack-report-slot"],
+  ["We confirm and fix", "We reproduce it, tell you what we found, and ship the fix.", "welding-the-crack"],
+  ["You get paid", "From the bounty vault, to the Solana address you give us.", "envelope-payout"],
+  ["Public write-up", "After the fix has shipped, with your name on it if you want it there.", "many-eyes"],
 ];
 const rules = [
   "Proof of concept only. Show that it works; don’t use it.",
@@ -62,11 +63,15 @@ export default function Bounty() {
             <b>01</b>THE BOUNTY VAULT
           </div>
           <div className="bounty-vault-grid">
-            <VaultGauge address={bountyWallet}>
-              <Clip name="vault-hatch-shut" />
+            <VaultGauge address={bountyWallet} note="The door is a picture from the film. The number is read from the wallet.">
+              <Clip name="bounty-vault-filling" />
             </VaultGauge>
             <div className="bm-panel bounty-source">
               <div className="bm-panel__head">Where the money comes from</div>
+              <div className="bounty-source-media">
+                <Clip name="phones-stream-into-vault" />
+                <span className="halftone" />
+              </div>
               <p>
                 Funded by creator rewards from the Bunker Mode coin ($BUNKER).
                 Rewards flow into this wallet and pay for bug bounties and
@@ -100,8 +105,11 @@ export default function Bounty() {
             </p>
           </div>
           <ol className="bounty-steps">
-            {steps.map(([title, body], i) => (
+            {steps.map(([title, body, clip], i) => (
               <li key={title}>
+                <div className="bounty-step-media">
+                  <Clip name={clip} />
+                </div>
                 <span className="mono">{String(i + 1).padStart(2, "0")}</span>
                 <h3>{title}</h3>
                 <p>{body}</p>
@@ -114,7 +122,7 @@ export default function Bounty() {
         </section>
 
         <section className="world-plate bounty-rules">
-          <Clip name="key-being-cut" />
+          <Clip name="proof-of-concept" />
           <span className="halftone" />
           <div>
             <span className="mono">03 / THE RULES</span>
@@ -167,7 +175,7 @@ export default function Bounty() {
         </section>
 
         <section className="section bounty-fame room" id="hall-of-fame">
-          <Clip name="crowd-descending-stairs" className="backdrop" />
+          <Clip name="crew-shuts-the-door" className="backdrop" />
           <span className="halftone" />
           <div className="eyebrow">
             <b>05</b>HALL OF FAME
