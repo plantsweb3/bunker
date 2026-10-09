@@ -120,7 +120,8 @@ test("security, documentation, verification and no horizontal overflow", async (
     page.getByText("DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ").first(),
   ).toBeVisible();
   await expect(
-    page.getByText("Not independently verified", { exact: true }),
+    // Whichever the public verifier says when asked; both are honest answers.
+    page.getByText(/^(Not independently verified|Matches commit [0-9a-f]{7}, by public rebuild)$/),
   ).toBeVisible({ timeout: 25_000 });
 });
 test("wallet check summarises balances and open approvals without a wallet", async ({
