@@ -62,19 +62,21 @@ Film and motion kit assets, added 2026-10-09
 "Bunker Mode" is a 4:06 music video made for Bunker. These files come from
 the film's site package and motion kit as delivered on 2026-10-09.
 
-Film (public/assets/film): the silent 6.4-second title loop (WebM and MP4),
-its poster still, the full film at 720p and the lyric captions. The share
+Film (public/assets/film): the film's poster still, the full film at 720p
+and the lyric captions. The share
 images (app/opengraph-image.jpg, app/twitter-image.jpg) are the kit's
 1200x630 card, unchanged.
 
-Section clips (public/assets/kit/clips): six of the kit's 39 silent loops.
+Hero and section clips (public/assets/kit/clips): seven of the kit's 39
+silent loops. The hero's poster is the first frame of its 1080p file; the
+other posters are the kit's.
 The -720.webm and -poster.jpg files are unchanged; each .mp4 is the kit's
 1080p file re-encoded to 720p H.264 for size.
 
 Explainer cards (public/assets/kit/cards): five of the film's cards, cropped
 from the kit's 1080p frames to the panel and re-encoded; each poster is the
-card's last frame. Their SIMULATION labels and demo values (DEMO-TOKEN,
-made-up addresses) are kept.
+card's last frame. The word SIMULATION is painted out of two of them; the
+example values (DEMO-TOKEN, example addresses) are kept.
 
 Texture and fonts (public/assets/kit/design, public/assets/fonts): the kit's
 halftone tiles, JetBrains Mono and Barlow Condensed, with the SIL OFL licence

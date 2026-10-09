@@ -8,9 +8,9 @@ export const metadata: Metadata = {
     template: "%s | Bunker",
   },
   description:
-    "A separate vault for the Solana you can’t afford to lose. Your wallet key can’t open it. Pre-release: explore the demo, inspect the source, and understand the limits.",
+    "A separate vault for the Solana you can’t afford to lose. Your wallet key can’t open it. Open source and in beta: try the demo, read the source, know the limits.",
   metadataBase: new URL("https://bunkermode.io"),
-  openGraph: { type: "website", siteName: "Bunker", title: "Bunker — Prepare. Don’t panic.", description: "A separate vault for the Solana you can’t afford to lose. Pre-release; real funds not accepted yet." },
+  openGraph: { type: "website", siteName: "Bunker", title: "Bunker — Prepare. Don’t panic.", description: "A separate vault for the Solana you can’t afford to lose. Open source. In beta on a test network." },
   twitter: { card: "summary_large_image", site: "@BunkerModeIO" },
   icons: {
     icon: [

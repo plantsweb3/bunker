@@ -14,8 +14,8 @@ export function Header() {
     <>
       <div className="network-bar">
         <FlaskConical size={13} />
-        <strong>PRE-RELEASE</strong>
-        <span>Real funds not accepted yet. Not audited.</span>
+        <strong>BETA</strong>
+        <span>Open source. On a test network today.</span>
         <Link href="/security">Know the limits</Link>
       </div>
       <header className="site-header">
@@ -82,7 +82,7 @@ export function Footer() {
         </div>
       </div>
       <span className="mono footer-status">
-        EXPERIMENTAL · MAINNET CUSTODY LOCKED · BUNKER ONLY LIVES AT
+        OPEN SOURCE · BETA ON A TEST NETWORK · BUNKER ONLY LIVES AT
         BUNKERMODE.IO
       </span>
       <p className="footer-fine">
