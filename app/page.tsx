@@ -276,9 +276,6 @@ export default function Home() {
                 <BIcon name="bunker-key" size={15} />
                 Your wallet puts money in. A different key takes it out.
               </div>
-              <Link className="hero-lang" href="/es" hrefLang="es" lang="es">
-                Español
-              </Link>
             </div>
             <div className="ca-line" aria-label="Contract address coming soon">
               <span className="ca-label">CA</span>

@@ -279,30 +279,6 @@ test("the landing page tells the story in pictures, one step at a time", async (
   await expect(story).toHaveAttribute("data-beat", "0");
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
 });
-test("Spanish: the story and the practice run, start to finish", async ({ page }) => {
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  await page.getByRole("link", { name: "Español" }).click();
-  await expect(page).toHaveURL(/\/es$/);
-  await expect(page.getByRole("heading", { level: 1 })).toContainText("Un mal clic no debería");
-  const story = page.locator(".story");
-  await story.getByRole("tab").nth(4).click();
-  await expect(story.getByText("Aprietas el botón de alto. No sale nada.", { exact: false })).toBeVisible();
-  await expect(story.locator(".story-cancelled")).toHaveText("CANCELADO");
-  await page.getByRole("link", { name: /Hacer la práctica/ }).click();
-  await expect(page).toHaveURL(/\/es\/demo$/);
-  const game = page.locator(".practice");
-  await game.getByRole("button", { name: "Mover 8 por mí" }).click();
-  await game.getByRole("button", { name: "Estoy listo" }).click();
-  await game.getByRole("button", { name: /MONEDAS GRATIS/ }).click();
-  await expect(game.getByRole("heading", { name: "Se llevó tus 2." })).toBeVisible();
-  await game.getByRole("button", { name: "¿Y si también consigue la llave de mi puerta?" }).click();
-  await game.getByRole("button", { name: "ALTO" }).click();
-  await expect(game.getByText("Conservaste 8 de 10.", { exact: false })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
-  await page.getByRole("link", { name: "English" }).click();
-  await expect(page).toHaveURL(/\/demo$/);
-});
 test("unknown paths are served with the browser policy too", async ({
   page,
 }) => {
