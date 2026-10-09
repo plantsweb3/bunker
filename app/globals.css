@@ -4992,3 +4992,7 @@ details.advanced .field {
     animation: none !important;
   }
 }
+.limits-grid li b {
+  color: #f5f7f6;
+  font-weight: 600;
+}

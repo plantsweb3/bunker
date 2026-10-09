@@ -35,17 +35,23 @@ function Plate({
 }
 const REPO = "https://github.com/plantsweb3/bunker";
 const X_URL = "https://x.com/BunkerModeIO";
-const stops = [
-  "A drainer site that tricks your wallet into signing. A wallet signature alone cannot move what is in the vault.",
-  "A stolen or leaked seed phrase. Your seed phrase does not produce the Bunker key.",
-  "A reused authorization. Every successful withdrawal replaces the key in the same transaction.",
-  "A stolen Bunker key, while the wait is on. It can pay only the addresses you fixed when you built your Bunker. Anything else waits a day, and you can cancel it.",
+const stops: [string, string][] = [
+  ["A bad click.", "Tricking your wallet does not open your Bunker."],
+  ["A stolen seed phrase.", "Your seed phrase does not make the Bunker key."],
+  ["Using a key twice.", "Every key works once. Each withdrawal makes a new one."],
+  [
+    "A stolen day key, while the wait is on.",
+    "It can pay only the wallets you listed as yours. Anything else waits a day, and you press stop.",
+  ],
 ];
-const limits = [
-  "Malware on the device where you open your keys. It can copy a key file and record its password.",
-  "A stolen day key, if you turn the wait off. Whoever has it and its password can then withdraw anywhere at once.",
-  "A trusted address that is not safe. Whoever steals your day key can send everything to a trusted address immediately, so it has to be a wallet they cannot also reach.",
-  "A lost recovery kit. There is no reset and no administrator, and it is the only thing that replaces a lost key.",
+const limits: [string, string][] = [
+  ["A virus on your device.", "It can copy your key file and watch you type the password."],
+  ["A stolen day key, if you turn the wait off.", "Then a thief can send everything anywhere, at once."],
+  [
+    "A trusted wallet that is not safe.",
+    "A thief with your day key can pay it right away. Make it a wallet they cannot reach.",
+  ],
+  ["A lost recovery kit.", "Nobody can reset it. Not even us."],
 ];
 const gates = [
   [
@@ -103,9 +109,9 @@ const faq: [string, React.ReactNode][] = [
       When you build a Bunker you list up to four trusted addresses and
       choose how long anything else waits, 24 hours unless you change it. A
       thief with your day key can send at once only to those addresses,
-      which are yours. A withdrawal anywhere else sits in public for the
-      whole wait, and your recovery kit cancels it and replaces the stolen
-      key. If you turn the wait off, a stolen day key can take everything
+      which are yours. A withdrawal anywhere else waits in the open for
+      the whole wait. Your stop button cancels it, and your recovery kit then
+      makes a new key. If you turn the wait off, a stolen day key can take everything
       immediately.
     </>,
   ],
@@ -409,10 +415,9 @@ export default function Home() {
               Keep it in a Bunker.
             </h2>
             <p>
-              A trading wallet has to sign fast, so its key lives somewhere
-              exposed. Sweep what you’re keeping into a Bunker: anything can
-              go in from any wallet or terminal, and nothing comes out with
-              that wallet’s key.
+              A trading wallet has to be fast, so it is easy to rob. Sweep
+              what you want to keep into your Bunker. Anything can go in, from
+              any wallet. Nothing comes out with that wallet’s key.
             </p>
             <Link className="button ghost" href="/integrate">
               Bunker beside a trading terminal
@@ -515,18 +520,20 @@ export default function Home() {
             <b>03 / INSIDE</b>HONEST ABOUT THE EDGES
           </div>
           <h2>
-            What it’s built to stop.
+            What it stops.
             <br />
-            What it isn’t.
+            What it can’t.
           </h2>
           <div className="limits-grid">
             <div>
               <h3>Built to stop</h3>
               <ul>
-                {stops.map((s) => (
-                  <li key={s}>
+                {stops.map(([lead, rest]) => (
+                  <li key={lead}>
                     <Check size={16} className="ice" />
-                    <span>{s}</span>
+                    <span>
+                      <b>{lead}</b> {rest}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -534,19 +541,20 @@ export default function Home() {
             <div>
               <h3>Does not stop</h3>
               <ul>
-                {limits.map((s) => (
-                  <li key={s}>
+                {limits.map(([lead, rest]) => (
+                  <li key={lead}>
                     <X size={16} />
-                    <span>{s}</span>
+                    <span>
+                      <b>{lead}</b> {rest}
+                    </span>
                   </li>
                 ))}
               </ul>
             </div>
           </div>
           <p className="limits-note">
-            These are design goals supported by local tests, not the result of
-            an independent review.{" "}
-            <Link href="/security">Read the full threat model.</Link>
+            This is what it is built to do. Outside experts have not checked
+            it yet. <Link href="/security">Read every limit.</Link>
           </p>
         </section>
         <section className="truth section" id="road" data-level="04">
