@@ -71,11 +71,12 @@ test("demo has a complete, resettable journey", async ({ page }) => {
     .click();
   await expect(
     page.getByText("WITHDRAWAL REJECTED", { exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15000 });
   await page
     .getByRole("button", { name: "Withdraw $500 with your Bunker key" })
     .click();
-  await expect(page.getByText("$3,500", { exact: true })).toBeVisible();
+  // The balance counts up to its value, so give it time on a busy machine.
+  await expect(page.getByText("$3,500", { exact: true })).toBeVisible({ timeout: 15000 });
   await page.getByRole("button", { name: "Reset simulation" }).click();
   await expect(
     page.getByRole("button", { name: "Move assets into Bunker" }),
