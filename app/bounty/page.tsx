@@ -6,6 +6,7 @@ import VaultGauge from "@/components/bunker/vault-gauge";
 import FilmPlayer from "@/components/bunker/film";
 import { HALL_OF_FAME, REPORT_URL, TIERS } from "@/lib/bounty";
 import { getLaunch } from "@/lib/launch-config";
+import { rewardAccountsOf } from "@/lib/creator-reward-accounts";
 
 export const metadata: Metadata = {
   title: "Bug bounty",
@@ -71,7 +72,11 @@ export default function Bounty() {
             <b>01</b>THE BOUNTY VAULT
           </div>
           <div className="bounty-vault-grid">
-            <VaultGauge address={bountyWallet} note="The door is a picture from the film. The number is read from the wallet.">
+            <VaultGauge
+              address={bountyWallet}
+              rewards={bountyWallet ? rewardAccountsOf(bountyWallet) : undefined}
+              note="The door is a picture from the film. The numbers are read from the network."
+            >
               <Clip name="bounty-vault-filling" />
             </VaultGauge>
             <div className="bm-panel bounty-source">
@@ -90,8 +95,9 @@ export default function Bounty() {
                 Bunker. Nothing here is financial advice.
               </p>
               <p className="fine">
-                The figure is the wallet’s SOL balance, read from the network
-                when you opened this page. It is not a promise of any payout.
+                The figure is the SOL in the wallet plus the creator rewards
+                it has earned and not yet claimed, read from the network
+                while this page is open. It is not a promise of any payout.
               </p>
             </div>
           </div>
