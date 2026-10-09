@@ -5504,3 +5504,298 @@ details.advanced .field {
     align-items: start;
   }
 }
+
+/* ───────── The bug bounty page and its vault gauge ───────── */
+.bounty-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 110px 5.5% 96px;
+  border-bottom: 1px solid #1f282b;
+}
+.bounty-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(90deg, #080b0ef2 0%, #080b0eb8 55%, #080b0e66 100%),
+    linear-gradient(180deg, transparent 60%, #080b0e 100%);
+}
+.bounty-hero .bm-big {
+  font-size: clamp(44px, 8vw, 128px);
+  margin: 22px 0 22px;
+}
+.bounty-hero p {
+  max-width: 54ch;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #c3cccd;
+}
+.bounty-hero .actions {
+  margin-top: 28px;
+}
+.bounty-vault-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 28px;
+  align-items: stretch;
+  margin-top: 40px;
+}
+.gauge {
+  display: grid;
+  grid-template-columns: minmax(180px, 300px) minmax(0, 1fr);
+  gap: 34px;
+  align-items: center;
+  padding: 30px;
+  border: 1px solid rgba(113, 146, 165, 0.7);
+  background: rgba(8, 11, 14, 0.86);
+}
+.gauge-door {
+  position: relative;
+  aspect-ratio: 1;
+}
+.gauge-media {
+  position: absolute;
+  inset: 11%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #10161a;
+  box-shadow: 0 0 0 1px rgba(113, 146, 165, 0.5);
+}
+.gauge-media .loop {
+  object-position: 32% center;
+  filter: saturate(0.75) brightness(0.8);
+}
+.gauge-door svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.gauge-door rect {
+  fill: #1e2a30;
+  transition: fill 0.35s;
+}
+.gauge-door rect.lit {
+  fill: var(--bm-ice);
+}
+.gauge-read {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.gauge-read > .mono {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--bm-steel);
+}
+.gauge-read strong {
+  font: 800 clamp(34px, 4.4vw, 62px) / 1 var(--bm-display);
+  letter-spacing: -0.03em;
+  color: var(--bm-chalk);
+}
+.gauge-read strong i {
+  margin-left: 10px;
+  font: 500 0.36em / 1 var(--bm-mono);
+  letter-spacing: 0.08em;
+  color: var(--bm-ice);
+}
+.gauge-read strong.quiet {
+  font-size: clamp(22px, 2.4vw, 30px);
+  letter-spacing: -0.02em;
+  color: #9aa7ab;
+}
+.gauge-read .address {
+  font: 500 11px / 1.5 var(--bm-mono);
+  color: #8fa0a6;
+  overflow-wrap: anywhere;
+}
+.gauge-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 13px;
+}
+.gauge-actions a,
+.gauge-actions button {
+  color: var(--bm-ice);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.bounty-source p {
+  margin: 20px 20px 0;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #d3dadb;
+}
+.bounty-source p.fine {
+  font-size: 13px;
+  color: #8b989c;
+}
+.bounty-source {
+  padding-bottom: 22px;
+}
+.bounty-steps {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  margin: 44px 0 34px;
+  padding: 0;
+  list-style: none;
+  border: 1px solid #2b3336;
+}
+.bounty-steps li {
+  padding: 22px 20px 24px;
+  border-left: 1px solid #2b3336;
+}
+.bounty-steps li:first-child {
+  border-left: 0;
+}
+.bounty-steps .mono {
+  font-size: 12px;
+  color: var(--bm-ice);
+}
+.bounty-steps h3 {
+  margin: 14px 0 8px;
+  font-size: 18px;
+  color: #f5f7f6;
+}
+.bounty-steps p {
+  font-size: 14px;
+  line-height: 1.55;
+  color: #b2bdc1;
+}
+.bounty-steps li:nth-child(2) {
+  background: rgba(169, 222, 255, 0.06);
+}
+.bounty-rules ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 clamp(22px, 3vw, 40px) / 1.15 "Space Grotesk", "Inter", sans-serif;
+  letter-spacing: -0.03em;
+  color: #f5f7f6;
+}
+.tier-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin: 44px 0 18px;
+  padding: 0;
+  list-style: none;
+}
+.tier-grid > li {
+  padding-bottom: 20px;
+}
+.tier-grid .bm-panel__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--bm-chalk);
+}
+.tier-grid .bm-panel__head span:last-child {
+  color: var(--bm-steel);
+}
+.tier-critical .bm-panel__head span:first-child {
+  color: #f39687;
+}
+.tier-high .bm-panel__head span:first-child {
+  color: #e2bb55;
+}
+.tier-medium .bm-panel__head span:first-child {
+  color: var(--bm-ice);
+}
+.tier-grid h3 {
+  margin: 18px 18px 12px;
+  font-size: 19px;
+  line-height: 1.25;
+  color: #f5f7f6;
+}
+.tier-grid ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 18px;
+  padding: 0 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #b2bdc1;
+}
+.bounty-tiers > .micro {
+  display: block;
+  max-width: 80ch;
+  line-height: 1.7;
+  color: #7f8b8e;
+}
+.bounty-fame {
+  padding-block: 130px 150px;
+}
+.bounty-fame::after {
+  background: linear-gradient(180deg, #080b0e 0%, #080b0ecc 35%, #080b0ee6 100%);
+}
+.bounty-fame h2 {
+  margin-top: 22px;
+}
+.fame-empty {
+  margin-top: 26px;
+  padding: 26px 24px;
+  max-width: 560px;
+  border: 1px dashed rgba(113, 146, 165, 0.7);
+  background: rgba(8, 11, 14, 0.7);
+  font-size: 16px;
+  color: #c3cccd;
+}
+.fame-list {
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.fame-list li {
+  display: grid;
+  grid-template-columns: 1fr 2fr auto;
+  gap: 18px;
+  padding: 16px 0;
+  border-top: 1px solid #2b3336;
+}
+.ca-address {
+  font-size: 12px;
+  color: #d9eeee;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.road-list strong a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (max-width: 980px) {
+  .bounty-vault-grid,
+  .tier-grid {
+    grid-template-columns: 1fr;
+  }
+  .bounty-steps {
+    grid-template-columns: 1fr;
+  }
+  .bounty-steps li {
+    border-left: 0;
+    border-top: 1px solid #2b3336;
+  }
+  .bounty-steps li:first-child {
+    border-top: 0;
+  }
+}
+@media (max-width: 620px) {
+  .gauge {
+    grid-template-columns: 1fr;
+    padding: 22px;
+  }
+  .gauge-door {
+    max-width: 240px;
+  }
+  .bounty-hero {
+    padding: 64px 5.5% 60px;
+  }
+}

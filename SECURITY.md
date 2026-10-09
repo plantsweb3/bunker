@@ -6,7 +6,7 @@ Bunker is in public beta on Solana mainnet and holds real funds. No independent 
 
 Use [GitHub private vulnerability reporting](https://github.com/plantsweb3/bunker/security/advisories/new). Include the affected commit, a minimal local reproduction, expected and observed behavior, and impact. Do not include passwords, wallet seeds, recovery files, API credentials, or private personal data. Do not test against other people's funds or accounts. Use the isolated validator.
 
-If private reporting is unavailable, do not put exploit details in a public issue. The repository owner must restore that channel before collecting reports. There is no funded bounty, guaranteed response SLA, or completed audit represented by this policy.
+If private reporting is unavailable, do not put exploit details in a public issue. The repository owner must restore that channel before collecting reports. There is a bug bounty, described at https://bunkermode.io/bounty; its payout amounts are not set yet. There is no guaranteed response time and no completed audit.
 
 ## Scope
 

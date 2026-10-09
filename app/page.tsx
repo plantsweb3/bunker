@@ -12,6 +12,7 @@ import Story from "@/components/bunker/story";
 import { Card, Clip } from "@/components/bunker/loop";
 import FilmPlayer from "@/components/bunker/film";
 import { BIcon } from "@/components/bunker/icon";
+import { getLaunch } from "@/lib/launch-config";
 function Plate({
   clip,
   level,
@@ -57,6 +58,8 @@ const limits: [string, string][] = [
 /** The film's status line. */
 const ticker = [
   "OPEN SOURCE",
+  "NOT AUDITED",
+  "START SMALL",
   "WAITING PERIOD: YOUR CHOICE",
   "PROTECTS THE WITHDRAWAL PATH, NOT THE CHAIN",
   "A KEY IS NOT PERMISSION",
@@ -100,7 +103,7 @@ const works: { label: string; media: React.ReactNode; title: string; body: strin
     body: "You choose the wait: up to seven days, or off. While it runs, your stop button cancels.",
   },
 ];
-const gates: [string, string, string][] = [
+const gates: [string, string, string, string?][] = [
   [
     "Public source and tests",
     "Everything that holds or moves funds is public, with the tests that attack it.",
@@ -113,13 +116,14 @@ const gates: [string, string, string][] = [
   ],
   [
     "Public beta",
-    "Real vaults, unaudited, at your own risk.",
-    "Open",
+    "Real vaults holding real funds, unaudited, at your own risk. Start with small amounts.",
+    "Live",
   ],
   [
     "Bug bounties",
-    "Rewards for breaking it. The scope and the amounts are not final yet.",
-    "Planned",
+    "Rewards for breaking it, paid from the bounty vault. The vault is funded by creator rewards from the Bunker Mode coin. Amounts are not set yet.",
+    "Open",
+    "/bounty",
   ],
   [
     "Independent audit",
@@ -140,9 +144,9 @@ const faq: [string, React.ReactNode][] = [
     "Can I put real funds in today?",
     <>
       Yes. Bunker is in public beta on Solana mainnet, so a Bunker you build
-      holds real funds. It has not been audited, so start small and put in
-      only what you could afford to lose. See the{" "}
-      <Link href="#road">road</Link>.
+      holds real funds, and those funds are at risk. It has not been audited,
+      so start with small amounts and put in only what you could afford to
+      lose. See <Link href="#road">where it stands</Link>.
     </>,
   ],
   [
@@ -208,13 +212,14 @@ const faq: [string, React.ReactNode][] = [
     "Has it been audited?",
     <>
       No, and no audit is booked. The source is public so that anyone can
-      review it, and Bunker will open as a public beta with bug bounties,
-      which are not final yet. Readable source and passing tests are not an
-      audit. <Link href="/security">Read the limits.</Link>
+      review it, and Bunker is a public beta with an open{" "}
+      <Link href="/bounty">bug bounty</Link>. Readable source and passing
+      tests are not an audit. <Link href="/security">Read the limits.</Link>
     </>,
   ],
 ];
 export default function Home() {
+  const { coinAddress } = getLaunch();
   return (
     <>
       <Header />
@@ -277,12 +282,19 @@ export default function Home() {
                 Your wallet puts money in. A different key takes it out.
               </div>
             </div>
-            <div className="ca-line" aria-label="Contract address coming soon">
-              <span className="ca-label">CA</span>
-              <span className="ca-typed" aria-hidden="true">
-                contract address coming soon...
-              </span>
-            </div>
+            {coinAddress ? (
+              <div className="ca-line">
+                <span className="ca-label">CA</span>
+                <span className="ca-address">{coinAddress}</span>
+              </div>
+            ) : (
+              <div className="ca-line" aria-label="Contract address coming soon">
+                <span className="ca-label">CA</span>
+                <span className="ca-typed" aria-hidden="true">
+                  contract address coming soon...
+                </span>
+              </div>
+            )}
           </div>
         </section>
         <div className="bm-ticker" aria-hidden="true">
@@ -641,9 +653,10 @@ export default function Home() {
           <div className="truth-grid">
             <div>
               <p>
-                Bunker has not been audited. It opens as a public beta
-                instead: public code, public tests, and bug bounties for
-                people who break it. The beta is open now. Start small.
+                Bunker has not been audited. It is a public beta instead:
+                public code, public tests, and bug bounties for people who
+                break it. It is live on Solana mainnet and real funds are at
+                risk. Start with small amounts.
               </p>
               <div className="actions road-actions">
                 <a
@@ -660,13 +673,13 @@ export default function Home() {
               </div>
             </div>
             <ol className="road-list">
-              {gates.map(([title, body, state], i) => (
+              {gates.map(([title, body, state, href], i) => (
                 <li key={title}>
                   <span className="mono">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div>
-                    <strong>{title}</strong>
+                    <strong>{href ? <Link href={href}>{title}</Link> : title}</strong>
                     <span>{body}</span>
                   </div>
                   <b>{state}</b>

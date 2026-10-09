@@ -5,6 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "",
     "/demo",
     "/check",
+    "/bounty",
     "/integrate",
     "/emergency",
     "/docs",
