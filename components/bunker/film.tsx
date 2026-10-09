@@ -1,30 +1,44 @@
-// The full film. To move it to a video host, replace FILM with
-// { embed: "https://…the host's embed address…" } and allow that host in the
-// frame-src of the page policy in proxy.ts. Nothing else needs to change.
-type Film = { file: string } | { embed: string };
-const FILM: Film = { file: "/assets/film/bunker-mode-film-720p.mp4" };
-const POSTER = "/assets/film/poster.jpg";
-const TITLE = "Bunker Mode, the film";
+// The films. To move one to a video host, replace its entry with
+// { embed: "https://…the host's embed address…", … } and allow that host in
+// the frame-src of the page policy in proxy.ts. Nothing else needs to change.
+/** Exactly one of `file` and `embed`. */
+type Film = { title: string; poster: string; captions?: string; file?: string; embed?: string };
+const FILMS = {
+  /** "Bunker Mode", the music video. The lyrics are already in the picture,
+   * so its captions track is there to be switched on, and for screen
+   * readers, but is not shown by default. */
+  main: {
+    title: "Bunker Mode, the film",
+    file: "/assets/film/bunker-mode-film-720p.mp4",
+    poster: "/assets/film/poster.jpg",
+    captions: "/assets/film/lyrics.en.vtt",
+  },
+  /** "Secure the Bunker", about the bug bounty. */
+  bounty: {
+    title: "Secure the Bunker, the bug bounty film",
+    file: "/assets/film/secure-the-bunker-720p.mp4",
+    poster: "/assets/film/secure-the-bunker-poster.jpg",
+  },
+} satisfies Record<string, Film>;
 
-export default function FilmPlayer() {
-  if ("embed" in FILM) {
+export default function FilmPlayer({ film = "main" }: { film?: keyof typeof FILMS }) {
+  const f: Film = FILMS[film];
+  if (f.embed) {
     return (
       <iframe
         className="film-frame"
-        src={FILM.embed}
-        title={TITLE}
+        src={f.embed}
+        title={f.title}
         loading="lazy"
         allow="fullscreen; picture-in-picture"
         allowFullScreen
       />
     );
   }
-  // The lyrics are already in the picture, so the captions track is there to be
-  // switched on, and for screen readers, but is not shown by default.
   return (
-    <video className="film-frame" controls preload="metadata" playsInline poster={POSTER} aria-label={TITLE}>
-      <source src={FILM.file} type="video/mp4" />
-      <track kind="captions" src="/assets/film/lyrics.en.vtt" srcLang="en" label="Lyrics" />
+    <video className="film-frame" controls preload="metadata" playsInline poster={f.poster} aria-label={f.title}>
+      <source src={f.file} type="video/mp4" />
+      {f.captions && <track kind="captions" src={f.captions} srcLang="en" label="Lyrics" />}
     </video>
   );
 }

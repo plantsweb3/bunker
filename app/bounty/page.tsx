@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Header, Footer } from "@/components/bunker/shell";
 import { Clip } from "@/components/bunker/loop";
 import VaultGauge from "@/components/bunker/vault-gauge";
+import FilmPlayer from "@/components/bunker/film";
 import { HALL_OF_FAME, REPORT_URL, TIERS } from "@/lib/bounty";
 import { getLaunch } from "@/lib/launch-config";
 
@@ -55,6 +56,13 @@ export default function Bounty() {
                 What counts
               </Link>
             </div>
+          </div>
+          <div className="bm-panel bounty-film">
+            <div className="bm-panel__head">
+              <span>Secure the Bunker</span>
+              <span>1:11</span>
+            </div>
+            <FilmPlayer film="bounty" />
           </div>
         </section>
 
