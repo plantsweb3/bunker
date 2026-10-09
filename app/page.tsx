@@ -56,7 +56,7 @@ const limits: [string, string][] = [
 ];
 /** The film's status line. */
 const ticker = [
-  "NOT AUDITED",
+  "OPEN SOURCE",
   "WAITING PERIOD: YOUR CHOICE",
   "PROTECTS THE WITHDRAWAL PATH, NOT THE CHAIN",
   "A KEY IS NOT PERMISSION",
@@ -64,9 +64,9 @@ const ticker = [
   "CURVE BREAK: HYPOTHETICAL",
   "WALLET KEY: PAYS, CAN’T WITHDRAW",
   "ONE KEY, ONE MESSAGE",
-  "REAL-FUND CUSTODY: OFF",
+  "BETA: TEST NETWORK TODAY",
 ];
-/** How the door works, told with the film's own cards. All of it is simulation with demo values. */
+/** How the door works, told with the film's own cards. */
 const works: { label: string; media: React.ReactNode; title: string; body: string; cream?: boolean }[] = [
   {
     label: "ONE-TIME KEY",
@@ -139,9 +139,10 @@ const faq: [string, React.ReactNode][] = [
   [
     "Can I put real funds in today?",
     <>
-      No. This is a pre-release. The mainnet site can read balances but cannot
-      create a vault or move assets, and no Bunker program is deployed on
-      mainnet. That stays true until the public beta opens; see the{" "}
+      Not yet. Bunker is in beta and runs on a test network today. The
+      mainnet site can read balances but cannot create a vault or move
+      assets, and the Bunker program is not on mainnet yet. That changes when
+      the public beta opens; see the{" "}
       <Link href="#road">road to the beta</Link>.
     </>,
   ],
@@ -199,7 +200,7 @@ const faq: [string, React.ReactNode][] = [
   [
     "What does it cost?",
     <>
-      The pre-release is free to explore. The custody program has no fee and no
+      The beta is free to use. The custody program has no fee and no
       administrator role. You pay ordinary Solana network fees and account rent
       from your own wallet. Pricing for anything beyond that has not been set.
     </>,
@@ -219,37 +220,37 @@ export default function Home() {
     <>
       <Header />
       <main className="descent">
-        <section className="hero film">
-          <div className="hero-stage">
-            {/* The film's title hit. The still is the poster, and all that a
-                visitor who asked for less motion is shown. */}
-            <Image
-              fill
-              priority
-              unoptimized
-              sizes="100vw"
-              className="hero-image"
-              src="/assets/film/poster.jpg"
-              alt="The words BUNKER MODE over a night city of data-center towers, framed like a film still and labelled as a simulation"
-            />
-            <video
-              className="hero-image hero-loop"
-              autoPlay
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              poster="/assets/film/poster.jpg"
-              aria-hidden="true"
-            >
-              <source src="/assets/film/hero-loop.webm" type="video/webm" />
-              <source src="/assets/film/hero-loop.mp4" type="video/mp4" />
-            </video>
-          </div>
-          <div className="hero-content bm-panel">
+        <section className="hero">
+          {/* A clip from the film with no words in it. The still is the
+              poster, and all that a visitor who asked for less motion is shown. */}
+          <Image
+            fill
+            priority
+            unoptimized
+            sizes="100vw"
+            className="hero-image"
+            src="/assets/kit/clips/datacenter-city-flyover-poster.jpg"
+            alt="A night city of dark towers, steam rising from their tops, seen from the air"
+          />
+          <video
+            className="hero-image hero-loop"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            poster="/assets/kit/clips/datacenter-city-flyover-poster.jpg"
+            aria-hidden="true"
+          >
+            <source src="/assets/kit/clips/datacenter-city-flyover-720.webm" type="video/webm" />
+            <source src="/assets/kit/clips/datacenter-city-flyover.mp4" type="video/mp4" />
+          </video>
+          <span className="halftone" />
+          <div className="hero-shade" />
+          <div className="hero-content">
             <div className="hero-chips">
-              <span className="bm-chip bm-chip--ice">Pre-release</span>
-              <span className="bm-chip bm-chip--cream">Real funds not accepted</span>
+              <span className="bm-chip bm-chip--ice">Open source</span>
+              <span className="bm-chip bm-chip--cream">Beta · test network</span>
             </div>
             <h1>
               One bad click{" "}
@@ -349,7 +350,7 @@ export default function Home() {
                   <span className="way-num">2</span>
                   <BIcon name="simulation" size={34} />
                   <b>Practice</b>
-                  <span>Get robbed on purpose, with pretend money. See what a Bunker changes.</span>
+                  <span>Get robbed on purpose, with play money. See what a Bunker changes.</span>
                   <em>Try the practice run</em>
                 </Link>
               </li>
@@ -417,20 +418,20 @@ export default function Home() {
               See what’s left.
             </h2>
             <p>
-              Move a simulated balance into Bunker, fall for a simulated
-              drainer, and watch what it can and can’t take.
+              Move a balance into a Bunker, fall for a drainer, and watch
+              what it can and can’t take.
             </p>
             <Link className="button light" href="/demo">
               <Play size={15} />
-              Run the simulation
+              Run the demo
             </Link>
             <span className="micro">
-              No wallet. No funds. Clearly labeled simulation.
+              No wallet. No funds. One minute.
             </span>
           </div>
           <div className="flow-preview">
             <div className="flow-top">
-              <span className="mono">SIMULATION / AFTER THE DRAIN</span>
+              <span className="mono">DEMO / AFTER THE DRAIN</span>
               <LockKeyhole size={18} />
             </div>
             <div className="flow-row drained-row">
@@ -573,17 +574,14 @@ export default function Home() {
               No new cryptography.
             </h2>
             <p>
-              Pictures from the film. Every screen in them is a simulation
-              with made-up values. Bunker is pre-release.
+              Each of these is code you can read today. The pictures are from
+              the film.
             </p>
           </div>
           <ol className="works-grid">
             {works.map((w) => (
               <li key={w.label} className={`bm-panel ${w.cream ? "cream" : ""}`}>
-                <div className="bm-panel__head">
-                  <span>{w.label}</span>
-                  <span>SIMULATION</span>
-                </div>
+                <div className="bm-panel__head">{w.label}</div>
                 <div className="works-media">{w.media}</div>
                 <h3>{w.title}</h3>
                 <p>{w.body}</p>
@@ -708,22 +706,18 @@ export default function Home() {
             <div>
               <div className="hero-chips">
                 <span className="bm-chip">Music video · 4:06</span>
-                <span className="bm-chip bm-chip--ice">Simulation</span>
               </div>
               <p>
-                A film about one-time keys. The product screens in it are a
-                simulation: Bunker is pre-release, no Bunker program is on
-                mainnet, real funds are not accepted, and it has not been
-                audited.
+                A film about one-time keys, and why Bunker exists. Bunker is
+                open source and in beta, on a test network today.
               </p>
             </div>
           </div>
           <FilmPlayer />
           <p className="micro">
             Bunker protects the way out of your vault, not the chain it lives
-            on. The pull request, the test names and “DEMO-TOKEN” in the film
-            are made up. The lyrics are in the picture; captions can be turned
-            on in the player.
+            on. The lyrics are in the picture; captions can be turned on in
+            the player.
           </p>
         </section>
         <section className="closing section room">
@@ -733,7 +727,7 @@ export default function Home() {
           <h2>Step inside.</h2>
           <div className="actions">
             <Link href="/demo" className="button light">
-              Run the simulation
+              Run the demo
             </Link>
             <Link href="/check" className="button ghost">
               Check a wallet
