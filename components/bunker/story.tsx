@@ -6,38 +6,60 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play, RotateCcw } from "lucide-react";
 
 type Beat = { title: string; without: string; with: string };
-const BEATS: Beat[] = [
-  {
-    title: "This is everything you own.",
-    without: "All of it sits in your wallet.",
-    with: "A little stays in your wallet. The rest goes in your Bunker.",
+export type Lang = "en" | "es";
+const TEXT = {
+  en: {
+    without: "Without a Bunker",
+    with: "With a Bunker",
+    wallet: "WALLET",
+    bunker: "BUNKER",
+    thief: "THIEF",
+    signed: "SIGNED",
+    wrongKey: "WRONG KEY",
+    cancelled: "CANCELLED",
+    play: "Play",
+    pause: "Pause",
+    again: "Again",
+    playAgain: "Play again",
+    steps: "Steps of the story",
+    step: (n: number, of: number, title: string) => `Step ${n} of ${of}: ${title}`,
+    note: "An illustration. Not a guarantee.",
+    beats: [
+      { title: "This is everything you own.", without: "All of it sits in your wallet.", with: "A little stays in your wallet. The rest goes in your Bunker." },
+      { title: "One day, you click the wrong thing.", without: "It looked like a free airdrop.", with: "Same click. Same mistake." },
+      { title: "The thief takes whatever your wallet can reach.", without: "That was everything.", with: "That was your pocket money." },
+      { title: "Then the thief tries your Bunker.", without: "Nothing left to try.", with: "Your wallet’s key does not open this door." },
+      { title: "Even with a stolen Bunker key, the door waits a day.", without: "Still nothing.", with: "You get an alert. You press cancel. Nothing leaves." },
+      { title: "Same click. Different day.", without: "Lost: everything.", with: "Lost: pocket money. Kept: the rest." },
+    ] as Beat[],
   },
-  {
-    title: "One day, you click the wrong thing.",
-    without: "It looked like a free airdrop.",
-    with: "Same click. Same mistake.",
+  es: {
+    without: "Sin Búnker",
+    with: "Con Búnker",
+    wallet: "BILLETERA",
+    bunker: "BÚNKER",
+    thief: "LADRÓN",
+    signed: "FIRMADO",
+    wrongKey: "LLAVE EQUIVOCADA",
+    cancelled: "CANCELADO",
+    play: "Ver",
+    pause: "Pausa",
+    again: "Otra vez",
+    playAgain: "Ver otra vez",
+    steps: "Pasos de la historia",
+    step: (n: number, of: number, title: string) => `Paso ${n} de ${of}: ${title}`,
+    note: "Una ilustración. No una garantía.",
+    beats: [
+      { title: "Esto es todo lo que tienes.", without: "Todo está en tu billetera.", with: "Un poco se queda en tu billetera. El resto va a tu Búnker." },
+      { title: "Un día haces clic donde no debías.", without: "Parecía un regalo gratis.", with: "El mismo clic. El mismo error." },
+      { title: "El ladrón se lleva todo lo que tu billetera alcanza.", without: "Era todo.", with: "Era tu dinero de bolsillo." },
+      { title: "Luego el ladrón intenta abrir tu Búnker.", without: "Ya no queda nada que intentar.", with: "La llave de tu billetera no abre esta puerta." },
+      { title: "Aun con la llave del Búnker robada, la puerta espera un día.", without: "Sigue sin haber nada.", with: "Te llega una alerta. Aprietas el botón de alto. No sale nada." },
+      { title: "El mismo clic. Un día distinto.", without: "Perdiste: todo.", with: "Perdiste: el dinero de bolsillo. Conservaste: el resto." },
+    ] as Beat[],
   },
-  {
-    title: "The thief takes whatever your wallet can reach.",
-    without: "That was everything.",
-    with: "That was your pocket money.",
-  },
-  {
-    title: "Then the thief tries your Bunker.",
-    without: "Nothing left to try.",
-    with: "Your wallet’s key does not open this door.",
-  },
-  {
-    title: "Even with a stolen Bunker key, the door waits a day.",
-    without: "Still nothing.",
-    with: "You get an alert. You press cancel. Nothing leaves.",
-  },
-  {
-    title: "Same click. Different day.",
-    without: "Lost: everything.",
-    with: "Lost: pocket money. Kept: the rest.",
-  },
-];
+};
+const BEATS = TEXT.en.beats;
 const LAST = BEATS.length - 1;
 const HOLD_MS = 3600;
 
@@ -67,7 +89,8 @@ function Thief() {
   );
 }
 
-export default function Story() {
+export default function Story({ lang = "en" }: { lang?: Lang }) {
+  const t = TEXT[lang];
   const [beat, setBeat] = useState(0);
   const [playing, setPlaying] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
@@ -104,49 +127,49 @@ export default function Story() {
     setBeat(b);
   };
   const taken = beat >= 2;
-  const b = BEATS[beat];
+  const b = t.beats[beat];
   return (
     <div className="story" data-beat={beat} ref={stage}>
       <div className="story-lanes" aria-hidden="true">
         {/* Without a Bunker */}
         <div className="story-lane without">
-          <span className="story-tag">WITHOUT A BUNKER</span>
+          <span className="story-tag">{t.without.toUpperCase()}</span>
           <div className="story-wallet">
             <i />
-            <b>WALLET</b>
+            <b>{t.wallet}</b>
           </div>
           {Array.from({ length: 10 }, (_, i) => (
             <Coin key={i} at={taken ? loot(i) : walletHome(i)} delay={taken ? i * 60 : 0} />
           ))}
-          <div className="story-thief">
+          <div className="story-thief" data-label={t.thief}>
             <Thief />
           </div>
           <div className="story-hook" />
-          <span className="story-signed">SIGNED</span>
+          <span className="story-signed">{t.signed}</span>
           <span className="story-count">{taken ? "0" : "10"}</span>
         </div>
         {/* With a Bunker */}
         <div className="story-lane with">
-          <span className="story-tag ice">WITH A BUNKER</span>
+          <span className="story-tag ice">{t.with.toUpperCase()}</span>
           <div className="story-wallet small">
             <i />
-            <b>WALLET</b>
+            <b>{t.wallet}</b>
           </div>
           {[0, 1].map((i) => (
             <Coin key={`p${i}`} at={taken ? pocketLoot(i) : pocketHome(i)} delay={taken ? i * 60 : 0} />
           ))}
           <div className="story-bunker">
-            <b>BUNKER</b>
+            <b>{t.bunker}</b>
           </div>
           {Array.from({ length: 8 }, (_, i) => (
             <Coin key={`b${i}`} at={bunkerHome(i)} safe />
           ))}
-          <div className="story-thief">
+          <div className="story-thief" data-label={t.thief}>
             <Thief />
           </div>
           <div className="story-hook" />
-          <span className="story-signed">SIGNED</span>
-          <span className="story-denied">WRONG KEY</span>
+          <span className="story-signed">{t.signed}</span>
+          <span className="story-denied">{t.wrongKey}</span>
           <div className="story-timer">
             <svg viewBox="0 0 44 44">
               <circle cx="22" cy="22" r="18" />
@@ -154,7 +177,7 @@ export default function Story() {
             </svg>
             <span>24h</span>
           </div>
-          <span className="story-cancelled">CANCELLED</span>
+          <span className="story-cancelled">{t.cancelled}</span>
           <span className="story-count">8</span>
         </div>
       </div>
@@ -164,11 +187,11 @@ export default function Story() {
         <h3>{b.title}</h3>
         <div>
           <p>
-            <span>Without a Bunker</span>
+            <span>{t.without}</span>
             {b.without}
           </p>
           <p className="ice">
-            <span>With a Bunker</span>
+            <span>{t.with}</span>
             {b.with}
           </p>
         </div>
@@ -181,24 +204,24 @@ export default function Story() {
             setPlaying(beat === LAST ? true : !playing);
             started.current = true;
           }}
-          aria-label={beat === LAST ? "Play again" : running ? "Pause" : "Play"}
+          aria-label={beat === LAST ? t.playAgain : running ? t.pause : t.play}
         >
           {beat === LAST ? <RotateCcw size={15} /> : running ? <Pause size={15} /> : <Play size={15} />}
-          {beat === LAST ? "Again" : running ? "Pause" : "Play"}
+          {beat === LAST ? t.again : running ? t.pause : t.play}
         </button>
-        <div className="story-dots" role="tablist" aria-label="Steps of the story">
-          {BEATS.map((x, i) => (
+        <div className="story-dots" role="tablist" aria-label={t.steps}>
+          {t.beats.map((x, i) => (
             <button
               key={x.title}
               role="tab"
               aria-selected={i === beat}
-              aria-label={`Step ${i + 1} of ${BEATS.length}: ${x.title}`}
+              aria-label={t.step(i + 1, t.beats.length, x.title)}
               className={i === beat ? "on" : i < beat ? "done" : ""}
               onClick={() => go(i)}
             />
           ))}
         </div>
-        <span className="story-note">An illustration. Not a guarantee.</span>
+        <span className="story-note">{t.note}</span>
       </div>
     </div>
   );
