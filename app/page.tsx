@@ -216,6 +216,9 @@ export default function Home() {
                 Try it yourself
               </Link>
             </div>
+            <Link className="hero-lang" href="/es" hrefLang="es" lang="es">
+              Español
+            </Link>
             <div className="hero-note">
               <BIcon name="bunker-key" size={15} />
               Your wallet puts money in. A different key takes it out.
