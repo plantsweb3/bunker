@@ -18,7 +18,7 @@ solana-program-pack = "=2.2.1"
 solana-pubkey = { version = "=2.4.0", features = ["curve25519"] }
 solana-rent = "=2.2.1"
 solana-system-interface = { version = "=1.0.0", features = ["bincode"] }
-solana-sysvar = "=2.3.0"
+solana-sysvar = "=5.0.0"
 spl-token = { version = "=8.0.0", features = ["no-entrypoint"] }
 bunker-lmots = { path = "../../crates/bunker-lmots" }
 [lints]
