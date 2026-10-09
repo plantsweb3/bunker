@@ -5598,6 +5598,14 @@ details.advanced .field {
 .gauge-note {
   color: #6f7b7e;
 }
+.gauge-split {
+  font: 500 12px / 1.7 var(--bm-mono);
+  color: #9aa7ab;
+}
+.gauge-split b {
+  color: var(--bm-chalk);
+  font-weight: 700;
+}
 .bounty-source-media {
   position: relative;
   isolation: isolate;
