@@ -5,17 +5,35 @@ updates:
     open-pull-requests-limit: 2
     schedule:
       interval: weekly
+    ignore:
+      # Moves together with the pinned CI container, by hand.
+      - dependency-name: "@playwright/test"
+      # Parses every key file and is bundled into the offline tool: a major
+      # version is a reviewed change, not a routine one.
+      - dependency-name: zod
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: cargo
     directory: /
     open-pull-requests-limit: 2
     schedule:
       interval: weekly
+    ignore:
+      # A dependency of the deployed program. Changing it changes the build
+      # that is on chain at a published hash.
+      - dependency-name: spl-token
+        update-types: ["version-update:semver-major"]
   # The VM test crate has its own lockfile.
   - package-ecosystem: cargo
     directory: /programs/bunker3-svm-tests
     open-pull-requests-limit: 2
     schedule:
       interval: weekly
+    ignore:
+      # 0.x releases that break the test crate's build as proposed.
+      - dependency-name: sha2
+        update-types: ["version-update:semver-minor"]
+      - dependency-name: hkdf
+        update-types: ["version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
     open-pull-requests-limit: 2
