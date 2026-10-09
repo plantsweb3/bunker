@@ -2,6 +2,15 @@ import { getConfig, getRpcUrl, MAINNET_GENESIS, MAINNET_PROGRAM_ID } from "@/lib
 import { boundedText, BodyLimitError } from "@/lib/bounded-body";
 import { clientOf, rateLimiter } from "@/lib/rate-limit";
 const allow = rateLimiter(300, 60_000);
+/** A person approves a handful of transactions a minute, each simulated once.
+ * Anything faster is not a person using a Bunker. */
+const allowSend = rateLimiter(40, 60_000);
+const SENDS = ["simulateTransaction", "sendTransaction"];
+/** The upstream network's genesis hash, remembered for a minute once it has
+ * matched the pinned one, so that each send does not cost a second upstream
+ * call. A mismatch is never remembered: it is asked again every time. */
+let checked: { at: number; url: string; genesis: string } | null = null;
+const CHECK_MS = 60_000;
 /** The largest answer passed back. Bounds how much one small request can pull. */
 const MAX_RESPONSE_BYTES = 1_500_000;
 /** Keeps list-shaped reads small. Returns false for a request that asks for
@@ -61,6 +70,11 @@ export async function POST(request: Request) {
         status: 429,
         headers: { ...h, "Retry-After": "30" },
       });
+    if (SENDS.includes(body.method) && !allowSend(clientOf(request)))
+      return new Response("Too many requests", {
+        status: 429,
+        headers: { ...h, "Retry-After": "30" },
+      });
     if (!bounded(body.method, body.params ?? []))
       return new Response("Request asks for too much", { status: 400 });
     const c = getConfig();
@@ -68,7 +82,7 @@ export async function POST(request: Request) {
       !reads.has(body.method) &&
       !(
         c.custodyEnabled &&
-        ["simulateTransaction", "sendTransaction"].includes(body.method)
+        SENDS.includes(body.method)
       )
     )
       return Response.json(
@@ -101,28 +115,42 @@ export async function POST(request: Request) {
       return new Response("Network has no pinned genesis hash", {
         status: 503,
       });
-    if (["simulateTransaction", "sendTransaction"].includes(body.method)) {
-      const check = await fetch(getRpcUrl(), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getGenesisHash",
-        }),
-        signal: AbortSignal.timeout(10000),
-        redirect: "error",
-      });
-      const genesis = JSON.parse(await boundedText(check.body, 4096)) as {
-        result?: string;
-      };
+    if (SENDS.includes(body.method)) {
+      const url = getRpcUrl();
+      if (
+        !checked ||
+        checked.url !== url ||
+        checked.genesis !== c.expectedGenesis ||
+        Date.now() - checked.at >= CHECK_MS
+      ) {
+        checked = null;
+        const check = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: 1,
+            method: "getGenesisHash",
+          }),
+          signal: AbortSignal.timeout(10000),
+          redirect: "error",
+        });
+        const answer = JSON.parse(await boundedText(check.body, 4096)) as {
+          result?: string;
+        };
+        if (!check.ok || answer.result !== c.expectedGenesis)
+          return new Response("Network mismatch: transaction blocked", {
+            status: 403,
+          });
+        checked = { at: Date.now(), url, genesis: answer.result };
+      }
       // The network must be the pinned one, and mainnet is only ever reached
       // by the mainnet configuration: a test setup whose "local" network turns
       // out to be mainnet sends nothing.
       if (
-        !check.ok ||
-        genesis.result !== c.expectedGenesis ||
-        (genesis.result === MAINNET_GENESIS &&
+        !checked ||
+        checked.genesis !== c.expectedGenesis ||
+        (checked.genesis === MAINNET_GENESIS &&
           (c.network !== "mainnet-beta" || c.programId !== MAINNET_PROGRAM_ID))
       )
         return new Response("Network mismatch: transaction blocked", {

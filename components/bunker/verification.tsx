@@ -72,7 +72,7 @@ export default function Verification() {
               <code>{data.program}</code>
               {data.network !== "localnet" && (
                 <a
-                  href={`https://explorer.solana.com/address/${data.program}?cluster=devnet`}
+                  href={`https://explorer.solana.com/address/${data.program}${data.network === "devnet" ? "?cluster=devnet" : ""}`}
                   target="_blank"
                   rel="noreferrer"
                 >

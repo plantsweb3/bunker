@@ -25,6 +25,13 @@ export type Asset = {
   decimals: number;
   frozen: boolean;
 };
+/** The Wallet Standard name of each network, which a wallet must list for the
+ * account that signs. */
+export const WALLET_CHAIN: Record<BunkerConfig["network"], string> = {
+  "mainnet-beta": "solana:mainnet",
+  devnet: "solana:devnet",
+  localnet: "solana:localnet",
+};
 export function createConnection() {
   return new Connection(
     `${typeof window === "undefined" ? "http://localhost" : window.location.origin}/api/rpc`,
@@ -170,10 +177,7 @@ export async function send(
     throw new Error(
       `The network would reject this step (${JSON.stringify(sim.value.err)}). This step was not sent.`,
     );
-  const signed = await sign(
-    tx,
-    config.network === "localnet" ? "solana:localnet" : "solana:devnet",
-  );
+  const signed = await sign(tx, WALLET_CHAIN[config.network]);
   await assertNetwork(connection, config, true);
   const signature = await connection.sendRawTransaction(signed.serialize(), {
     skipPreflight: false,

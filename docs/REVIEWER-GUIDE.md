@@ -1,6 +1,6 @@
 # Reviewer guide
 
-This repository is a pre-release research and engineering artifact. Assume no external audit or security level has been established. Nothing is deployed on mainnet.
+This repository is the source of a public beta running on Solana mainnet and holding real funds (program and build in [DEPLOYMENT.md](DEPLOYMENT.md)). Assume no external audit or security level has been established.
 
 ## Read in this order
 

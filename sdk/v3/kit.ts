@@ -225,10 +225,12 @@ export async function decryptDayKey(raw: string, password: string) {
   if (v?.kind !== "day-key") throw wrongKind("a day key");
   return validateDayKey(v);
 }
+/** Files for a test network say so in their name. Files for mainnet do not. */
+export const filePrefix = (k: { network: string }) => (k.network === "mainnet-beta" ? "bunker-" : "bunker-test-");
 export const fileName = (k: ArchivalKit | DayKey) =>
   k.kind === "archival"
-    ? `bunker-test-RECOVERY-KIT-${k.vault.slice(0, 8)}.json`
-    : `bunker-test-day-key-${k.vault.slice(0, 8)}-epoch-${k.epoch}.json`;
+    ? `${filePrefix(k)}RECOVERY-KIT-${k.vault.slice(0, 8)}.json`
+    : `${filePrefix(k)}day-key-${k.vault.slice(0, 8)}-epoch-${k.epoch}.json`;
 export function download(name: string, content: string) {
   const url = URL.createObjectURL(new Blob([content], { type: "application/json" }));
   const a = document.createElement("a");

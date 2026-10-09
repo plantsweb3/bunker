@@ -35,29 +35,46 @@ export function configFromEnv(
     /^[A-Za-z0-9_]{5,32}$/.test(env.TELEGRAM_BOT_USERNAME ?? "")
       ? env.TELEGRAM_BOT_USERNAME!
       : null;
-  // A malformed program id leaves custody off rather than half configured.
   const enabled =
     env.BUNKER_ENABLE_TEST_CUSTODY === "true" &&
     (mode === "devnet" || mode === "localnet") &&
     /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(env.BUNKER_TEST_PROGRAM_ID ?? "");
-  return enabled
-    ? {
-        network: mode as "devnet" | "localnet",
-        custodyEnabled: true,
-        programId: env.BUNKER_TEST_PROGRAM_ID!,
-        expectedGenesis:
-          mode === "devnet" ? DEVNET_GENESIS : (env.BUNKER_LOCAL_GENESIS ?? ""),
-        releaseStatus: "Experimental test custody. Valueless assets only.",
-        alertsBot,
-      }
-    : {
-        network: "mainnet-beta",
-        custodyEnabled: true,
-        programId: MAINNET_PROGRAM_ID,
-        expectedGenesis: MAINNET_GENESIS,
-        releaseStatus: "Public beta on Solana mainnet. Not audited.",
-        alertsBot,
-      };
+  if (enabled)
+    return {
+      network: mode as "devnet" | "localnet",
+      custodyEnabled: true,
+      programId: env.BUNKER_TEST_PROGRAM_ID!,
+      expectedGenesis: mode === "devnet" ? DEVNET_GENESIS : (env.BUNKER_LOCAL_GENESIS ?? ""),
+      releaseStatus: "Experimental test custody. Valueless assets only.",
+      alertsBot,
+    };
+  // Someone asked for a test setup and did not get one: a mistyped network or
+  // program id. That must not quietly become the live mainnet site, so it
+  // reads the chain and moves nothing until the setting is fixed or removed.
+  const asked = [
+    env.BUNKER_ENABLE_TEST_CUSTODY,
+    env.BUNKER_TEST_NETWORK,
+    env.BUNKER_TEST_PROGRAM_ID,
+    env.BUNKER_TEST_RPC_URL,
+    env.BUNKER_LOCAL_GENESIS,
+  ].some((v) => v !== undefined && v !== "" && v !== "false");
+  if (asked)
+    return {
+      network: "mainnet-beta",
+      custodyEnabled: false,
+      programId: null,
+      expectedGenesis: MAINNET_GENESIS,
+      releaseStatus: "The test settings on this server are incomplete. Nothing can be sent until they are fixed or removed.",
+      alertsBot: null,
+    };
+  return {
+    network: "mainnet-beta",
+    custodyEnabled: true,
+    programId: MAINNET_PROGRAM_ID,
+    expectedGenesis: MAINNET_GENESIS,
+    releaseStatus: "Public beta on Solana mainnet. Not audited.",
+    alertsBot,
+  };
 }
 export function getConfig() {
   return configFromEnv(process.env);
@@ -66,14 +83,15 @@ export function getRpcUrl() {
   const c = getConfig();
   if (c.network === "localnet") {
     const u = new URL(
-      process.env.BUNKER_TEST_RPC_URL ?? "http://127.0.0.1:19099",
+      process.env.BUNKER_TEST_RPC_URL || "http://127.0.0.1:19099",
     );
     if (!["127.0.0.1", "localhost"].includes(u.hostname))
       throw new Error("Local test RPC must use loopback");
     return u.href;
   }
   const url =
-    process.env.SOLANA_RPC_URL ??
+    // An empty setting is an unset one, not an address.
+    process.env.SOLANA_RPC_URL ||
     (c.network === "devnet"
       ? "https://api.devnet.solana.com"
       : "https://api.mainnet-beta.solana.com");

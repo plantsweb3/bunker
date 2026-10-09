@@ -30,6 +30,21 @@ describe("RPC boundary", () => {
     expect((await (await POST(request(write))).json()).result).toBe("signature");
     expect(mainnet).toHaveBeenCalledTimes(2);
   });
+  it("limits how fast one client can simulate or send", async () => {
+    const from = (ip: string) =>
+      new Request("https://bunkermode.io/api/rpc", {
+        method: "POST",
+        headers: { origin: "https://bunkermode.io", "x-real-ip": ip },
+        body: JSON.stringify(write),
+      });
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(Response.json({ result: MAINNET_GENESIS }))));
+    const statuses: number[] = [];
+    for (let i = 0; i < 45; i++) statuses.push((await POST(from("203.0.113.9"))).status);
+    expect(statuses.slice(0, 40).every((s) => s === 200)).toBe(true);
+    expect(statuses.slice(40).every((s) => s === 429)).toBe(true);
+    // Someone else is not held back by it.
+    expect((await POST(from("203.0.113.10"))).status).toBe(200);
+  });
   it("uses the browser-facing Host when Next has a different internal hostname, without trusting forwarded hosts", async () => {
     const fetcher = vi
       .fn()

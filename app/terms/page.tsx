@@ -2,7 +2,7 @@ import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 export const metadata = {
   title: "Terms & risks",
-  description: "The terms for using the Bunker pre-release and the risks you accept by using it.",
+  description: "The terms for using the Bunker public beta and the risks you accept by using it.",
 };
 export default function Page() {
   return (

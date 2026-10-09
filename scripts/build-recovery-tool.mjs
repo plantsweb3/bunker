@@ -31,7 +31,7 @@ const manifest = {
   bytes: Buffer.byteLength(html),
   sha256: createHash("sha256").update(html).digest("hex"),
   scriptCsp: scriptHash,
-  status: "DRAFT. Test networks only. Not reviewed.",
+  status: "Public beta. Not audited.",
 };
 await writeFile(`${out}/recovery-tool-manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
 console.log(`Recovery tool: ${manifest.bytes} bytes, sha256 ${manifest.sha256}`);

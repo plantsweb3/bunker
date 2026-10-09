@@ -1,6 +1,6 @@
 # Architecture
 
-Status: pre-release. Nothing is deployed on mainnet, no independent audit is complete, and real-fund custody is disabled.
+Status: public beta on Solana mainnet, holding real funds. No independent audit. The program is upgradeable by its maintainer (docs/DEPLOYMENT.md).
 
 ## Parts
 
