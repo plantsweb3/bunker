@@ -5522,8 +5522,30 @@ details.advanced .field {
     linear-gradient(90deg, #080b0ef2 0%, #080b0eb8 55%, #080b0e66 100%),
     linear-gradient(180deg, transparent 60%, #080b0e 100%);
 }
+.bounty-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: center;
+}
+.bounty-film .bm-panel__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 11px 14px 9px;
+}
+.bounty-film .film-frame {
+  border: 0;
+}
+@media (max-width: 1040px) {
+  .bounty-hero {
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+}
 .bounty-hero .bm-big {
-  font-size: clamp(44px, 8vw, 128px);
+  font-size: clamp(40px, 5.6vw, 92px);
   margin: 22px 0 22px;
 }
 .bounty-hero p {

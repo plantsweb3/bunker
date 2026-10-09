@@ -90,3 +90,8 @@ card for every page, composed from the hero clip's poster frame, the halftone
 tile, the existing lockup and set type. The per-page cards and the film's
 title card it replaces carried labels that were no longer true of a live
 product.
+
+Films, 2026-10-10 (public/assets/film): bunker-mode-film-720p.mp4 and
+poster.jpg are replaced by the film's later cut, as delivered in the site
+package. secure-the-bunker-720p.mp4 is the 1:11 bug bounty film,
+re-encoded from its 1080p master to 720p; its poster is the film's end card.
