@@ -42,7 +42,7 @@ export default function Page() {
             ["02", "Built from", "Commit 2182e5f of the public repository, in the pinned container."],
             ["03", "Executable hash", "a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7"],
             ["04", "Can be upgraded by", "Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth, a hardware wallet held by the maintainer."],
-            ["05", "Audit", "None. No audit is booked. Bug bounties are planned and not final yet."],
+            ["05", "Audit", "None. No audit is booked. A bug bounty is open."],
           ].map(([number, title, text]) => (
             <div key={number}>
               <span>{number}</span>
@@ -53,6 +53,23 @@ export default function Page() {
             </div>
           ))}
         </div>
+      </section>
+      <section>
+        <h2>What has been checked, and by whom</h2>
+        <p>
+          <strong>Checked by the project, not by anyone independent:</strong>{" "}
+          the executable hash above was produced three times from that
+          commit, twice by the public CI and once on a separate machine, and
+          it equals the hash of the program read back from mainnet. The
+          program’s test suite passes against that exact binary.
+        </p>
+        <p>
+          <strong>Not independently verified:</strong> nobody outside the
+          project has reproduced the build or confirmed it matches the chain.
+          Nobody has audited the program or reviewed the cryptography. The
+          site’s own code, the offline tool and the command-line client have
+          had no outside review either.
+        </p>
       </section>
       <section>
         <h2>Check it yourself</h2>

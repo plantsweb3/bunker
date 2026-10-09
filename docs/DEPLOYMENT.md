@@ -79,4 +79,4 @@ A website rollback cannot undo a transaction.
 
 ## What has not been done
 
-The preconditions in [LAUNCH-RUNBOOK.md](LAUNCH-RUNBOOK.md) step 0 were not met before launch: no independent cryptographic review, no program audit, no completed [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md), no legal review of the terms, and no run of the whole flow on real phones and in wallet apps' browsers. Bug bounties are planned; their scope and amounts are not final. These remain the work that would justify removing the word "unaudited" anywhere.
+The preconditions in [LAUNCH-RUNBOOK.md](LAUNCH-RUNBOOK.md) step 0 were not met before launch: no independent cryptographic review, no program audit, no completed [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md), no legal review of the terms, and no run of the whole flow on real phones and in wallet apps' browsers. A bug bounty is open (`/bounty`, terms in `lib/bounty.ts`); its payout amounts are not set. These remain the work that would justify removing the word "unaudited" anywhere.

@@ -6,6 +6,7 @@ export const NAV = [
   ["/check", "Check a wallet"],
   ["/docs", "How it works"],
   ["/security", "Security"],
+  ["/bounty", "Bounty"],
 ] as const;
 export function NavLinks({ extra = [] }: { extra?: [string, string][] }) {
   const path = usePathname();

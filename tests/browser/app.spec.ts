@@ -99,6 +99,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/privacy",
     "/security",
     "/docs",
+    "/bounty",
     "/verify",
   ]) {
     const response = await page.goto(path);
@@ -277,6 +278,27 @@ test("the landing page tells the story in pictures, one step at a time", async (
   await expect(story.getByRole("button", { name: "Play again" })).toBeVisible();
   await story.getByRole("button", { name: "Play again" }).click();
   await expect(story).toHaveAttribute("data-beat", "0");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
+test("bounty: no number without a wallet, private reports, no amounts made up", async ({ page }) => {
+  await page.goto("/bounty");
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("It’s a bounty.");
+  // No wallet address is configured here, so the gauge must not show a figure.
+  const gauge = page.locator(".gauge");
+  await expect(gauge.getByText("Balance unavailable")).toBeVisible();
+  await expect(gauge.getByText("has not been published yet", { exact: false })).toBeVisible();
+  await expect(gauge).not.toContainText("SOL");
+  await expect(gauge.locator("rect.lit")).toHaveCount(0);
+  for (const link of await page.getByRole("link", { name: /Report/ }).all())
+    if ((await link.getAttribute("href"))?.startsWith("http"))
+      await expect(link).toHaveAttribute("href", "https://github.com/plantsweb3/bunker/security/advisories/new");
+  const tiers = page.locator(".tier-grid .bm-panel__head");
+  await expect(tiers).toHaveCount(4);
+  for (const tier of await tiers.all()) await expect(tier).toContainText("Payout: TBD");
+  await expect(page.getByText("Nobody yet.", { exact: false })).toBeVisible();
+  await expect(page.getByText("The coin is not an investment", { exact: false })).toBeVisible();
+  // Nothing on the page sells the coin.
+  expect(await page.locator('a[href*="pump.fun"], a[href*="dexscreener"], a[href*="jup.ag"]').count()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
 });
 test("unknown paths are served with the browser policy too", async ({
