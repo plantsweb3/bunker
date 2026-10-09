@@ -182,7 +182,8 @@ export default function Page() {
         <p>
           The repository holds the program, the client, the offline tool, the
           byte-level specification, the tests and what they do not cover. No
-          wallet credentials are shipped. Mainnet custody is disabled.
+          wallet credentials are shipped. It runs on Solana mainnet as a public
+          beta and has not been audited.
         </p>
         <a href="https://github.com/plantsweb3/bunker" className="button light">
           Get the working repository

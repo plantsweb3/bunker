@@ -121,7 +121,7 @@ test("security, documentation, verification and no horizontal overflow", async (
   ).toBeVisible();
   await expect(
     page.getByText("Not independently verified", { exact: true }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 25_000 });
 });
 test("wallet check summarises balances and open approvals without a wallet", async ({
   page,

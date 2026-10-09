@@ -15,6 +15,7 @@ import {
   descriptorOf,
   encryptFile,
   fileName,
+  filePrefix,
   passwordProblem,
   validateArchival,
 } from "../../sdk/v3/kit";
@@ -90,7 +91,7 @@ function packetFor(kit: ArchivalKit, epoch: bigint): RecoveryFile {
 function offerCancelFile(listId: string, kit: ArchivalKit, epoch: bigint) {
   offer(
     listId,
-    `bunker-test-cancel-file-${kit.vault.slice(0, 8)}-generation-${epoch}.json`,
+    `${filePrefix(kit)}cancel-file-${kit.vault.slice(0, 8)}-generation-${epoch}.json`,
     publicJson(packetFor(kit, epoch)),
   );
 }
@@ -140,6 +141,10 @@ function dayPassword(id: string, repeatId: string, kitPassword: string) {
  * decides which kind of network it is looking at from these, not from the
  * label in the file it was handed, and builds nothing on mainnet for any
  * other program address. */
+function onlyPublished(k: { genesis: string; program: string }, what: string) {
+  if (k.genesis === MAINNET_GENESIS && k.program !== MAINNET_PROGRAM_ID)
+    throw new Error(`On mainnet this tool works only with the published Bunker program. ${what} names another.`);
+}
 const describe = (k: { network: string; genesis: string; program: string }) =>
   `${
     k.genesis !== MAINNET_GENESIS
@@ -217,8 +222,7 @@ $("create").addEventListener(
   "click",
   run("build-status", async () => {
     const card: NetworkCard = parseNetworkCard(await read(file("card"), "the network card"));
-    if (card.genesis === MAINNET_GENESIS && card.program !== MAINNET_PROGRAM_ID)
-      throw new Error("On mainnet this tool builds only for the published Bunker program. This card names another.");
+    onlyPublished(card, "This card");
     const password = value("password");
     if (password !== value("repeat")) throw new Error("Passwords do not match");
     const weak = passwordProblem(password, "archival");
@@ -301,7 +305,7 @@ $("verify").addEventListener(
     );
     offer(
       "build-files",
-      `bunker-test-creation-request-${kit.vault.slice(0, 8)}.json`,
+      `${filePrefix(kit)}creation-request-${kit.vault.slice(0, 8)}.json`,
       publicJson(request),
     );
     offerCancelFile("build-files", kit, 0n);
@@ -354,6 +358,7 @@ async function openKit() {
   );
   $("kit-echo").textContent = `${describe(kit)}\nBunker: ${kit.vault}`;
   $("kit-box").hidden = false;
+  onlyPublished(kit, "This kit");
   return kit;
 }
 const newDayPassword = () =>
@@ -370,7 +375,7 @@ $("recover").addEventListener(
     offer("recover-files", fileName(next), await encryptFile(next, password));
     offer(
       "recover-files",
-      `bunker-test-recovery-packet-${kit.vault.slice(0, 8)}-epoch-${epoch}.json`,
+      `${filePrefix(kit)}recovery-packet-${kit.vault.slice(0, 8)}-epoch-${epoch}.json`,
       publicJson(out),
     );
     offerCancelFile("recover-files", kit, epoch + 1n);

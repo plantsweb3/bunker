@@ -1,7 +1,10 @@
-import { describe, it, expect } from "vitest";
-import { configFromEnv, MAINNET_GENESIS, MAINNET_PROGRAM_ID, DEVNET_GENESIS } from "../lib/bunker-config";
+import { describe, it, expect, vi } from "vitest";
+import { Keypair } from "@solana/web3.js";
+import { configFromEnv, getRpcUrl, MAINNET_GENESIS, MAINNET_PROGRAM_ID, DEVNET_GENESIS } from "../lib/bunker-config";
+import { sessionFor } from "../tools/cli/lib";
+import { fileName } from "../sdk/v3/kit";
 import { transition } from "../sdk/demo";
-import { assertNetwork } from "../sdk/client";
+import { assertNetwork, WALLET_CHAIN } from "../sdk/client";
 import type { Connection } from "@solana/web3.js";
 describe("Release gate", () => {
   it("pins full RPC genesis hashes and accepts a mainnet read", async () => {
@@ -20,8 +23,9 @@ describe("Release gate", () => {
     expect(MAINNET_PROGRAM_ID).toBe("DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ");
     expect(configFromEnv({})).toMatchObject(published);
   });
-  it.each(["mainnet", "mainnet-beta", "production", ""])(
-    "no environment variable can name another mainnet program (mode %s)",
+  const off = { network: "mainnet-beta", custodyEnabled: false, programId: null };
+  it.each(["mainnet", "mainnet-beta", "production", "Devnet", ""])(
+    "a test setup that names no test network sends nothing, and is not mainnet (mode %s)",
     (mode) => {
       expect(
         configFromEnv({
@@ -29,18 +33,50 @@ describe("Release gate", () => {
           BUNKER_TEST_NETWORK: mode,
           BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn",
         }),
-      ).toMatchObject(published);
+      ).toMatchObject(off);
     },
   );
-  it("a test setup with a malformed program id is not a test setup", () => {
+  it("a test setup with a malformed program id sends nothing", () => {
     for (const id of ["test", "", "https://evil.example/x", "k7FaK87W HGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn"])
       expect(
         configFromEnv({ BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "devnet", BUNKER_TEST_PROGRAM_ID: id }),
         id,
-      ).toMatchObject(published);
+      ).toMatchObject(off);
   });
-  it("a test network needs the explicit opt-in and a program", () => {
-    expect(configFromEnv({ BUNKER_TEST_NETWORK: "devnet" })).toMatchObject(published);
+  it("half a test setup sends nothing; no test settings at all is the live site", () => {
+    expect(configFromEnv({ BUNKER_TEST_NETWORK: "devnet" })).toMatchObject(off);
+    expect(configFromEnv({ BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn" })).toMatchObject(off);
+    for (const unset of [{}, { BUNKER_ENABLE_TEST_CUSTODY: "false" }, { BUNKER_ENABLE_TEST_CUSTODY: "", BUNKER_TEST_NETWORK: "" }])
+      expect(configFromEnv(unset)).toMatchObject(published);
+  });
+  it("treats an empty RPC setting as unset", () => {
+    vi.stubEnv("SOLANA_RPC_URL", "");
+    expect(getRpcUrl()).toBe("https://api.mainnet-beta.solana.com");
+    vi.stubEnv("SOLANA_RPC_URL", "https://rpc.example/key");
+    expect(getRpcUrl()).toBe("https://rpc.example/key");
+    vi.unstubAllEnvs();
+  });
+  it("the command-line client refuses a mainnet file for another program before signing anything", () => {
+    const payer = Keypair.generate();
+    const other = "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn";
+    const rpc = "https://rpc.example";
+    expect(() => sessionFor({ network: "mainnet-beta", genesis: MAINNET_GENESIS, program: other }, rpc, payer)).toThrow("only the published Bunker program");
+    expect(() => sessionFor({ network: "devnet", genesis: MAINNET_GENESIS, program: MAINNET_PROGRAM_ID }, rpc, payer)).toThrow("only the published Bunker program");
+    expect(() => sessionFor({ network: "mainnet-beta", genesis: DEVNET_GENESIS, program: MAINNET_PROGRAM_ID }, rpc, payer)).toThrow("only the published Bunker program");
+    expect(sessionFor({ network: "mainnet-beta", genesis: MAINNET_GENESIS, program: MAINNET_PROGRAM_ID }, rpc, payer).program.toBase58()).toBe(MAINNET_PROGRAM_ID);
+    expect(sessionFor({ network: "devnet", genesis: DEVNET_GENESIS, program: other }, rpc, payer).program.toBase58()).toBe(other);
+  });
+  it("names mainnet key files without the word test", () => {
+    const file = { kind: "archival", vault: "7ayn5V2rABCDEFGH" } as const;
+    expect(fileName({ ...file, network: "mainnet-beta" } as never)).toBe("bunker-RECOVERY-KIT-7ayn5V2r.json");
+    expect(fileName({ ...file, network: "localnet" } as never)).toBe("bunker-test-RECOVERY-KIT-7ayn5V2r.json");
+  });
+  it("asks a wallet to sign for the network it is on", () => {
+    expect(WALLET_CHAIN).toEqual({
+      "mainnet-beta": "solana:mainnet",
+      devnet: "solana:devnet",
+      localnet: "solana:localnet",
+    });
   });
   it("on mainnet, writes go to the published program and no other", async () => {
     const calls: string[] = [];

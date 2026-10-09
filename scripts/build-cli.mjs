@@ -23,7 +23,7 @@ const result = await build({
   banner: {
     js: [
       "#!/usr/bin/env node",
-      "// Bunker command-line client (DRAFT, test networks only). Built from",
+      "// Bunker command-line client (public beta, not audited). Built from",
       "// https://github.com/plantsweb3/bunker by scripts/build-cli.mjs.",
       'import { createRequire as __bunkerRequire } from "node:module";',
       "const require = __bunkerRequire(import.meta.url);",
@@ -40,7 +40,7 @@ const manifest = {
   bytes: Buffer.byteLength(code),
   sha256: createHash("sha256").update(code).digest("hex"),
   runs: "node bunker-cli.mjs (Node 22 or later)",
-  status: "DRAFT. Test networks only. Not reviewed.",
+  status: "Public beta. Not audited.",
 };
 await writeFile(`${out}/cli-manifest.json`, JSON.stringify(manifest, null, 2) + "\n");
 console.log(`Command-line client: ${manifest.bytes} bytes, sha256 ${manifest.sha256}`);

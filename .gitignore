@@ -59,6 +59,12 @@ next-env.d.ts
 # Explicit exported recovery filenames must never enter source or Git.
 bunker-devnet-*.json
 bunker-test-*.json
+bunker-RECOVERY-KIT-*.json
+bunker-day-key-*.json
+bunker-cancel-file-*.json
+bunker-recovery-packet-*.json
+bunker-creation-request-*.json
+bunker-network-card-*.json
 id.json
 *.key
 

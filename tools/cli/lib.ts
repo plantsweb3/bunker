@@ -13,7 +13,7 @@
 import "../../sdk/polyfill";
 import { existsSync, openSync, closeSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
-import type { BunkerConfig } from "../../lib/bunker-config";
+import { type BunkerConfig, MAINNET_GENESIS, MAINNET_PROGRAM_ID } from "../../lib/bunker-config";
 import { formatAmount, parseAmount, unhex } from "../../sdk/bytes";
 import {
   createAssociatedTokenAccountIdempotentInstruction,
@@ -66,6 +66,13 @@ export function sessionFor(
   const url = new URL(rpc);
   if (url.protocol !== "https:" && !["127.0.0.1", "localhost"].includes(url.hostname))
     throw new Error("Use an https RPC address");
+  // Checked here, before anything is signed: `send` checks again, but by then
+  // a withdrawal has already used its one-time key.
+  if (
+    (identity.genesis === MAINNET_GENESIS || identity.network === "mainnet-beta") &&
+    (identity.genesis !== MAINNET_GENESIS || identity.network !== "mainnet-beta" || identity.program !== MAINNET_PROGRAM_ID)
+  )
+    throw new Error("On mainnet, only the published Bunker program is used. This file names another.");
   return {
     connection: new Connection(url.href, "confirmed"),
     config: {

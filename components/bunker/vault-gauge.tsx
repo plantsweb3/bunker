@@ -82,7 +82,7 @@ export default function VaultGauge({
               <i>SOL</i>
             </strong>
             <span className="micro">
-              Last updated {reading.at.toLocaleTimeString("en-US")}. Read from Solana mainnet.
+              Last updated {reading.at.toLocaleTimeString("en-US")}. Read from the network.
             </span>
           </>
         ) : reading.state === "reading" ? (

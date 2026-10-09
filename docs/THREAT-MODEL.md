@@ -1,6 +1,6 @@
 # Threat model
 
-Status: pre-release. No independent audit. Real-fund custody disabled.
+Status: public beta on Solana mainnet, holding real funds. No independent audit. The program is upgradeable by its maintainer (docs/DEPLOYMENT.md).
 
 ## What is protected, and by what
 
@@ -52,6 +52,8 @@ Chosen when a vault is created, fixed for that vault and part of its address. Th
 
 No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary program invocation, Token-2022, multisig policy, social recovery or pre-approved destinations. No audit, insurance, formal proof or quantified post-quantum claim.
 
-## Before real funds
+## Not done before real funds
+
+The beta opened on 2026-10-09 without the following. They remain the outstanding work.
 
 Independent cryptographic assessment and program audit; remediation; a decision on the open questions in [PROTOCOL.md](PROTOCOL.md); distribution of the offline tool independent of the website; testing on real devices; an independently reproducible deployed binary; a published upgrade-authority policy; and a named incident owner. Public source alone satisfies none of these.
