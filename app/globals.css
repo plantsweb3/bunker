@@ -4157,7 +4157,7 @@ details.advanced .field {
   color: var(--ice);
 }
 .story-thief::after {
-  content: "THIEF";
+  content: attr(data-label);
   display: block;
   margin-top: 6%;
   text-align: center;
@@ -4995,4 +4995,13 @@ details.advanced .field {
 .limits-grid li b {
   color: #f5f7f6;
   font-weight: 600;
+}
+.hero-lang {
+  display: inline-block;
+  margin-top: 18px;
+  font: 600 13px / 1 "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.12em;
+  color: var(--ice);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
