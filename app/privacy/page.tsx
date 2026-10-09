@@ -56,7 +56,7 @@ export default function Page() {
           so that an interrupted one can be resumed. If you choose passkey
           unlock, an encrypted copy of your day key is stored there too.
           Clearing site data removes them. The
-          public mainnet site is read-only and stores nothing.
+          site’s servers store none of it.
         </p>
       </section>
       <section>
@@ -82,8 +82,8 @@ export default function Page() {
       <section>
         <h2>Changes and contact</h2>
         <p>
-          This page describes the current pre-release and will be updated
-          before real funds are accepted, including any alert service that
+          This page describes the public beta and will be updated when
+          anything it describes changes, including any alert service that
           needs a contact address. The site’s source is public, so each claim
           here can be checked against the code. Questions:{" "}
           <a href="https://x.com/BunkerModeIO" target="_blank" rel="noreferrer">

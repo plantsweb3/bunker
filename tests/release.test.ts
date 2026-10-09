@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { configFromEnv, MAINNET_GENESIS, DEVNET_GENESIS } from "../lib/bunker-config";
+import { configFromEnv, MAINNET_GENESIS, MAINNET_PROGRAM_ID, DEVNET_GENESIS } from "../lib/bunker-config";
 import { transition } from "../sdk/demo";
 import { assertNetwork } from "../sdk/client";
 import type { Connection } from "@solana/web3.js";
@@ -10,48 +10,61 @@ describe("Release gate", () => {
     await expect(assertNetwork({ getGenesisHash: async () => MAINNET_GENESIS } as Connection, configFromEnv({}))).resolves.toBeUndefined();
     await expect(assertNetwork({ getGenesisHash: async () => MAINNET_GENESIS.slice(0, 32) } as Connection, configFromEnv({}))).rejects.toThrow("pinned network");
   });
-  it("defaults to read-only mainnet", () => {
-    expect(configFromEnv({})).toMatchObject({
-      network: "mainnet-beta",
-      custodyEnabled: false,
-      programId: null,
-    });
+  const published = {
+    network: "mainnet-beta",
+    custodyEnabled: true,
+    programId: MAINNET_PROGRAM_ID,
+    expectedGenesis: MAINNET_GENESIS,
+  };
+  it("defaults to mainnet and the one published program", () => {
+    expect(MAINNET_PROGRAM_ID).toBe("DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ");
+    expect(configFromEnv({})).toMatchObject(published);
   });
   it.each(["mainnet", "mainnet-beta", "production", ""])(
-    "cannot enable mainnet with mode %s",
+    "no environment variable can name another mainnet program (mode %s)",
     (mode) => {
       expect(
         configFromEnv({
           BUNKER_ENABLE_TEST_CUSTODY: "true",
           BUNKER_TEST_NETWORK: mode,
           BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn",
-        }).custodyEnabled,
-      ).toBe(false);
+        }),
+      ).toMatchObject(published);
     },
   );
-  it("stays off when the program id is not an address", () => {
+  it("a test setup with a malformed program id is not a test setup", () => {
     for (const id of ["test", "", "https://evil.example/x", "k7FaK87W HGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn"])
       expect(
-        configFromEnv({ BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "devnet", BUNKER_TEST_PROGRAM_ID: id }).custodyEnabled,
+        configFromEnv({ BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "devnet", BUNKER_TEST_PROGRAM_ID: id }),
         id,
-      ).toBe(false);
+      ).toMatchObject(published);
   });
-  it("requires explicit test opt-in and program", () => {
-    expect(
-      configFromEnv({ BUNKER_TEST_NETWORK: "devnet" }).custodyEnabled,
-    ).toBe(false);
+  it("a test network needs the explicit opt-in and a program", () => {
+    expect(configFromEnv({ BUNKER_TEST_NETWORK: "devnet" })).toMatchObject(published);
   });
-  it("rejects a mainnet RPC even if a caller supplies a forged test config", async () => {
-    const c = { getGenesisHash: async () => MAINNET_GENESIS } as Connection;
-    const config = {
-      ...configFromEnv({}),
-      custodyEnabled: true,
-      network: "devnet" as const,
-      programId: "test",
-    };
-    await expect(assertNetwork(c, config, true)).rejects.toThrow(
-      "Mainnet custody",
-    );
+  it("on mainnet, writes go to the published program and no other", async () => {
+    const calls: string[] = [];
+    const c = {
+      getGenesisHash: async () => MAINNET_GENESIS,
+      getAccountInfo: async (key: { toBase58(): string }) => {
+        calls.push(key.toBase58());
+        return { executable: true };
+      },
+    } as unknown as Connection;
+    await expect(assertNetwork(c, configFromEnv({}), true)).resolves.toBeUndefined();
+    expect(calls).toEqual([MAINNET_PROGRAM_ID]);
+    // A forged test configuration that turns out to be talking to mainnet.
+    const forged = { ...configFromEnv({}), network: "devnet" as const, programId: "test" };
+    await expect(assertNetwork(c, forged, true)).rejects.toThrow("only the published Bunker program");
+    // A mainnet configuration, or a key file, that names some other program.
+    const other = { ...configFromEnv({}), programId: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn" };
+    await expect(assertNetwork(c, other, true)).rejects.toThrow("only the published Bunker program");
+    // A configuration labelled mainnet whose pinned genesis is something else.
+    const mislabelled = { ...configFromEnv({}), expectedGenesis: DEVNET_GENESIS };
+    await expect(
+      assertNetwork({ ...c, getGenesisHash: async () => DEVNET_GENESIS } as unknown as Connection, mislabelled, true),
+    ).rejects.toThrow("only the published Bunker program");
+    expect(calls).toEqual([MAINNET_PROGRAM_ID]);
   });
 });
 describe("Simulation states", () => {

@@ -1,4 +1,4 @@
-// Bunker without the website (DRAFT, test networks only).
+// Bunker without the website. Public beta, not audited.
 //
 // From a checkout: `npx tsx tools/cli/bunker.ts <command> ...`. As the single
 // file built by scripts/build-cli.mjs, which needs only Node:
@@ -58,7 +58,7 @@ async function ask(question: string, hidden = false): Promise<string> {
   return answer;
 }
 const COMMANDS = ["status", "withdraw", "resume", "release", "clear", "recover"];
-const USAGE = `Bunker without the website. DRAFT: test networks only.
+const USAGE = `Bunker without the website. Public beta, not audited.
 
   status    --rpc URL --vault ADDRESS --program ID
             Show a Bunker. Needs no key.

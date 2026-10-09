@@ -16,12 +16,19 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("RPC boundary", () => {
-  it("blocks mainnet writes before making an upstream request", async () => {
+  it("checks that the network is mainnet before forwarding a mainnet write", async () => {
     vi.stubEnv("BUNKER_ENABLE_TEST_CUSTODY", "false");
-    const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
-    expect((await (await POST(request(write))).json()).error.code).toBe(-32601);
-    expect(fetch).not.toHaveBeenCalled();
+    const elsewhere = vi.fn().mockResolvedValue(Response.json({ result: "wrong" }));
+    vi.stubGlobal("fetch", elsewhere);
+    expect((await POST(request(write))).status).toBe(403);
+    expect(elsewhere).toHaveBeenCalledTimes(1);
+    const mainnet = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ result: MAINNET_GENESIS }))
+      .mockResolvedValueOnce(Response.json({ jsonrpc: "2.0", id: 1, result: "signature" }));
+    vi.stubGlobal("fetch", mainnet);
+    expect((await (await POST(request(write))).json()).result).toBe("signature");
+    expect(mainnet).toHaveBeenCalledTimes(2);
   });
   it("uses the browser-facing Host when Next has a different internal hostname, without trusting forwarded hosts", async () => {
     const fetcher = vi
@@ -75,8 +82,6 @@ describe("RPC boundary", () => {
       expect((await call(method)).error, method).toBeUndefined();
     expect(fetcher).toHaveBeenCalledTimes(5);
     for (const method of [
-      "sendTransaction",
-      "simulateTransaction",
       "requestAirdrop",
       "getProgramAccounts",
       "getBlock",

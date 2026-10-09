@@ -1,6 +1,16 @@
 // Full getGenesisHash results; these are not truncated CAIP chain identifiers.
 export const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 export const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
+/** The one Bunker program on Solana mainnet. Nothing in this repository sends
+ * a transaction to mainnet for any other program address, and no environment
+ * variable can change which one this is. Deployed from commit 2182e5f;
+ * docs/DEPLOYMENT.md records the build hash and who can upgrade it. */
+export const MAINNET_PROGRAM_ID = "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ";
+/** A file's network label is a convenience for people; the genesis hash is
+ * what binds it. The two must still agree, so that no file can call mainnet
+ * a test network or the reverse. */
+export const labelMatchesGenesis = (f: { network: string; genesis: string }) =>
+  (f.network === "mainnet-beta") === (f.genesis === MAINNET_GENESIS);
 export type BunkerConfig = {
   network: "mainnet-beta" | "devnet" | "localnet";
   custodyEnabled: boolean;
@@ -42,13 +52,11 @@ export function configFromEnv(
       }
     : {
         network: "mainnet-beta",
-        custodyEnabled: false,
-        programId: null,
+        custodyEnabled: true,
+        programId: MAINNET_PROGRAM_ID,
         expectedGenesis: MAINNET_GENESIS,
-        releaseStatus:
-          "Mainnet custody is locked pending independent cryptographic and program review.",
-        // Nothing to watch while no program is configured.
-        alertsBot: null,
+        releaseStatus: "Public beta on Solana mainnet. Not audited.",
+        alertsBot,
       };
 }
 export function getConfig() {

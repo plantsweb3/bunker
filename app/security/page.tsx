@@ -9,12 +9,14 @@ export default function Page() {
       description="What the design aims to protect, what it cannot protect, and what still needs review."
     >
       <div className="document-callout">
-        <h2>Experimental. Unaudited. No real-fund custody.</h2>
+        <h2>Public beta. Unaudited. Upgradeable.</h2>
         <p>
-          The implementation has automated tests, but no completed independent
-          cryptographic review or program audit. Mainnet creation, deposits, and
-          withdrawals are disabled in this release. No security certification or
-          quantum-resistance level is claimed.
+          Bunker runs on Solana mainnet and holds real funds. The
+          implementation has automated tests, but no independent cryptographic
+          review or program audit, and none is booked. The program can be
+          upgraded by one key, held by its maintainer on a hardware wallet. No
+          security certification or quantum-resistance level is claimed. Put
+          in only what you could afford to lose.
         </p>
       </div>
       <figure className="explainer">

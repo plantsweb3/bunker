@@ -365,8 +365,9 @@ describe("Alert configuration", () => {
     expect(alertsFromEnv({ ...full, TELEGRAM_BOT_USERNAME: "bad name" })).toBeNull();
     expect(() => alertsFromEnv({ ...full, KV_REST_API_URL: "http://store.example" })).toThrow("HTTPS");
   });
-  it("is never advertised on the read-only public site", () => {
-    expect(configFromEnv(full).alertsBot).toBeNull();
+  it("is advertised only when every piece is configured", () => {
+    expect(configFromEnv(full).alertsBot).toBe("BunkerAlertsBot");
+    expect(configFromEnv({ ...full, CRON_SECRET: undefined }).alertsBot).toBeNull();
     const test = { ...full, BUNKER_ENABLE_TEST_CUSTODY: "true", BUNKER_TEST_NETWORK: "localnet", BUNKER_TEST_PROGRAM_ID: "k7FaK87WHGVXzkaoHb7CdVPgkKDQhZ29VLDeBVbDfYn" };
     expect(configFromEnv(test).alertsBot).toBe("BunkerAlertsBot");
     expect(configFromEnv({ ...test, CRON_SECRET: undefined }).alertsBot).toBeNull();

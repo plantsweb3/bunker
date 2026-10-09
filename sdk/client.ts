@@ -14,7 +14,7 @@ import {
   createTransferCheckedInstruction,
   getMint,
 } from "./classic-token";
-import { BunkerConfig, MAINNET_GENESIS } from "../lib/bunker-config";
+import { BunkerConfig, MAINNET_GENESIS, MAINNET_PROGRAM_ID } from "../lib/bunker-config";
 import { formatAmount } from "./bytes";
 export type Asset = {
   key: string;
@@ -42,8 +42,14 @@ export async function assertNetwork(
     throw new Error(
       "RPC network does not match the pinned network. Operation blocked.",
     );
-  if (write && (hash === MAINNET_GENESIS || config.network === "mainnet-beta"))
-    throw new Error("Mainnet custody is locked pending independent review");
+  // On mainnet there is one Bunker program. A configuration, a key file or a
+  // network card that names another is refused before anything is signed.
+  if (
+    write &&
+    (hash === MAINNET_GENESIS || config.network === "mainnet-beta") &&
+    (hash !== MAINNET_GENESIS || config.network !== "mainnet-beta" || config.programId !== MAINNET_PROGRAM_ID)
+  )
+    throw new Error("On mainnet, only the published Bunker program is used. Operation blocked.");
   if (write) {
     if (!config.programId) throw new Error("No program configured");
     const info = await connection.getAccountInfo(

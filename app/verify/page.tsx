@@ -6,7 +6,7 @@ export default function Page() {
     <DocumentLayout
       eyebrow="VERIFY, THEN TRUST"
       title="Nothing hidden behind a badge."
-      description="Deployment observations, source, and the work required before real-fund custody."
+      description="The program on mainnet, the source it was built from, and who can change it."
     >
       <Verification />
       <section>
@@ -35,51 +35,30 @@ export default function Page() {
         </div>
       </section>
       <section>
-        <h2>The release gate</h2>
+        <h2>The program on mainnet</h2>
         <div className="review-list">
           {[
-            [
-              "01",
-              "Cryptographic review",
-              "Review the LM-OTS verifier and signer against RFC 8554, how Bunker uses them, the canonical message, and the key derivation.",
-            ],
-            [
-              "02",
-              "Program audit",
-              "Independently examine SOL and SPL custody, account validation, proof staging, and atomic authorization changes.",
-            ],
-            [
-              "03",
-              "Recovery and signing review",
-              "Address multi-device use of a day key, interrupted submissions, the offline tool’s separation from the site, and malicious frontend updates.",
-            ],
-            [
-              "04",
-              "Deployment verification",
-              "Match reviewed source to the binary, publish hashes and program ID, and revoke the upgrade authority, publishing the transaction.",
-            ],
-            [
-              "05",
-              "Operational readiness",
-              "Set up an RPC provider, incident contact, security disclosure process, monitoring, and a clearly scoped bounty.",
-            ],
+            ["01", "Program", "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ"],
+            ["02", "Built from", "Commit 2182e5f of the public repository, in the pinned container."],
+            ["03", "Executable hash", "a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7"],
+            ["04", "Can be upgraded by", "Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth, a hardware wallet held by the maintainer."],
+            ["05", "Audit", "None. No audit is booked. Bug bounties are planned and not final yet."],
           ].map(([number, title, text]) => (
             <div key={number}>
               <span>{number}</span>
               <div>
                 <h3>{title}</h3>
-                <p>{text}</p>
+                <p className="address">{text}</p>
               </div>
-              <b>Pending</b>
             </div>
           ))}
         </div>
       </section>
       <section>
-        <h2>How a future deployment is verified</h2>
+        <h2>Check it yourself</h2>
         <p>
-          A reviewer should reproduce the reviewed build and compare its
-          executable hash to the on-chain program using the{" "}
+          Reproduce the build and compare its executable hash to the program
+          on chain using the{" "}
           <a
             href="https://solana.com/docs/programs/verified-builds"
             target="_blank"
@@ -87,19 +66,21 @@ export default function Page() {
           >
             Solana verified-build workflow
           </a>
-          . Inspect the program-data account and upgrade authority separately.
-          An Explorer link alone establishes neither source equivalence nor
-          audit coverage.
+          : <code>solana-verify build --library-name bunker3</code> at that
+          commit, then <code>solana-verify get-program-hash</code> for the
+          program address. Read the program-data account for the upgrade
+          authority. An Explorer link alone establishes neither source
+          equivalence nor audit coverage.
         </p>
       </section>
       <section>
-        <h2>Current release policy</h2>
+        <h2>What the site will and will not do</h2>
         <p>
-          The public deployment is read-only on mainnet. No environment switch
-          enables mainnet custody. The isolated testing configuration permits
-          only a pinned local or devnet network and rejects mainnet writes.
-          Accepting real assets requires a reviewed code release and actual
-          audit evidence.
+          On mainnet this site, the offline tool and the command-line client
+          send transactions to that one program address and to no other; no
+          environment setting can change which. The program can be upgraded
+          by the key above, so a matching hash describes today’s code, not
+          tomorrow’s: check it again before you rely on it.
         </p>
       </section>
     </DocumentLayout>

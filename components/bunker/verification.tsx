@@ -68,7 +68,7 @@ export default function Verification() {
           </div>
           {data.program && (
             <div className="verification-address">
-              <span>Configured test program</span>
+              <span>Program</span>
               <code>{data.program}</code>
               {data.network !== "localnet" && (
                 <a

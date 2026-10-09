@@ -663,8 +663,8 @@ function App() {
     : !b.enabled
       ? {
           state: "locked",
-          label: "Locked until review",
-          line: "A preview of the inside. Real funds stay out until the review is done.",
+          label: "Unavailable",
+          line: "This site is not set up to reach a Bunker program.",
         }
       : !day || !vault
         ? {
@@ -773,21 +773,20 @@ function App() {
         <div className="release-gate">
           <BIcon name="review-pending" size={22} />
           <div>
-            <h2>Built, tested, and locked until it is reviewed.</h2>
-            <p>
-              One recovery kit that lasts for good, a day key you can
-              replace, trusted addresses that are paid at once, and a wait you
-              can cancel within for everything else.
-              It runs today only against an isolated test network.
-            </p>
-            <Link href="/verify">View release requirements</Link>
+            <h2>Not available here.</h2>
+            <p>This site is not set up to reach a Bunker program.</p>
+            <Link href="/verify">See the deployment</Link>
           </div>
-          <span className="pill">REVIEW PENDING</span>
+          <span className="pill">UNAVAILABLE</span>
         </div>
       ) : (
         <div className="notice">
           <BIcon name="simulation" size={18} />
-          <span>Draft protocol on a test network. No real assets. No completed audit.</span>
+          <span>
+            {b.config.network === "mainnet-beta"
+              ? "Public beta on Solana mainnet. Not audited. Put in only what you could afford to lose."
+              : "Test network. Nothing here holds real funds."}
+          </span>
         </div>
       )}
       <Messages busy={b.busy} error={b.error} notice={b.notice} />
@@ -1339,8 +1338,8 @@ function App() {
                 <b>Pays fees only</b>
               </div>
               <div className="metric">
-                <span>Independent review</span>
-                <b className="amber">Pending</b>
+                <span>Audit</span>
+                <b className="amber">None</b>
               </div>
               {canPasskey &&
                 !stale &&
@@ -1491,9 +1490,7 @@ function App() {
                   </p>
                 )}
                 <span className="micro">
-                  {b.enabled
-                    ? "TEST ASSETS ONLY · DRAFT PROTOCOL"
-                    : "REAL-FUND CUSTODY OPENS AFTER EXTERNAL REVIEW"}
+                  {b.config?.network === "mainnet-beta" ? "PUBLIC BETA · NOT AUDITED" : "TEST ASSETS ONLY"}
                 </span>
               </>
             )}

@@ -36,7 +36,7 @@ CI builds the tool on every run, checks that a second build is byte-identical an
 
 ## Without the website
 
-`tools/cli` is a command-line client over the same `sdk` code the site uses: read a Bunker, withdraw, resume, release, clear, submit a recovery packet. `scripts/build-cli.mjs` bundles it into a single file that needs only Node, published beside the offline tool with its hash. Its signing journal is a file beside the day key, written through a temporary file and a rename, with a lock file so two runs cannot sign at once. It takes the network and program from the day key file and refuses an RPC on any other network, and it refuses mainnet as the site does. It exists so that a Bunker does not depend on this website staying up.
+`tools/cli` is a command-line client over the same `sdk` code the site uses: read a Bunker, withdraw, resume, release, clear, submit a recovery packet. `scripts/build-cli.mjs` bundles it into a single file that needs only Node, published beside the offline tool with its hash. Its signing journal is a file beside the day key, written through a temporary file and a rename, with a lock file so two runs cannot sign at once. It takes the network and program from the day key file and refuses an RPC on any other network, and it on mainnet sends only to the published program, as the site does. It exists so that a Bunker does not depend on this website staying up.
 
 `sdk/v3/master.ts` holds everything computed from the archival master, and `sdk/v3/core.ts` the addresses, vault identity and recovery-packet bytes with no Solana library. The offline tool is built from those and six other files and nothing else.
 
@@ -72,6 +72,6 @@ Optional, and off unless every piece is configured (`lib/alerts/config.ts`): a T
 
 ## Release gate
 
-The default configuration is mainnet read-only. No environment variable enables mainnet custody: test writes need an explicit `localnet` or `devnet` selection, explicit enablement, a test program id and a pinned genesis, and both client and server refuse a mainnet genesis for writes. A deployment owner could change source; the gate is a release policy, not an on-chain guarantee.
+The default configuration is Solana mainnet and the one program address in `lib/bunker-config.ts`. No environment variable can name a different mainnet program: test writes need an explicit `localnet` or `devnet` selection, explicit enablement, a test program id and a pinned genesis, and both client and server refuse a mainnet genesis for any other configuration. Key files and network cards carry a network label that must agree with their genesis hash. A deployment owner could change source; the rule is a release policy, not an on-chain guarantee.
 
 Asset names and prices are not read from chain metadata. A short fixed list in `sdk/known-mints.ts` labels well-known tokens by mint address; everything else is shown by mint.

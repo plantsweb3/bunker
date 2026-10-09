@@ -1,6 +1,6 @@
 # Contributing
 
-Bunker is a pre-release research and engineering project. Nothing here has been independently audited and real-fund custody is disabled.
+Bunker is an open-source project in public beta on Solana mainnet. Nothing here has been independently audited, and it holds real funds.
 
 ## Security issues
 
@@ -12,7 +12,7 @@ Read [docs/REVIEWER-GUIDE.md](docs/REVIEWER-GUIDE.md) and, for anything touching
 
 Every change must keep these true:
 
-- No environment setting can enable mainnet custody.
+- No environment setting can point the software at a mainnet program other than the published one.
 - No claim of an audit, a mainnet deployment or a security level that has not been established and evidenced.
 - No key file, wallet keypair, credential or environment file is committed. Check `git status` before `git add`.
 - A change to behaviour comes with a test that fails without it. A fix for a flaw comes with a test that reproduces the flaw.

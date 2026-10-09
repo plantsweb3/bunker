@@ -101,7 +101,7 @@ export function NetworkPill({ config }: { config: BunkerConfig | null }) {
   return (
     <span className="pill">
       {config?.network === "mainnet-beta"
-        ? "MAINNET · READ ONLY"
+        ? "MAINNET · BETA"
         : config?.network === "localnet"
           ? "LOCAL TEST NETWORK"
           : config

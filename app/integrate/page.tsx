@@ -13,11 +13,12 @@ export default function Page() {
       description="A trading wallet has to be fast, so its key lives somewhere exposed. A Bunker is where the money goes when it is no longer in play."
     >
       <div className="document-callout">
-        <h2>Pre-release. Nothing here handles real funds yet.</h2>
+        <h2>Public beta. Not audited.</h2>
         <p>
-          This page describes how Bunker is designed to sit beside a trading
-          setup. No Bunker program is deployed on mainnet. Do not send assets
-          to any address on the strength of this page.
+          This page describes how Bunker sits beside a trading setup. The
+          program is live on Solana mainnet and has not been audited. Send
+          assets only to a Bunker you built yourself, never to an address
+          someone gives you.
         </p>
       </div>
       <section>
@@ -127,7 +128,7 @@ export default function Page() {
           A deposit link any wallet can open, a “Send to Bunker” action that
           terminals and wallets can render as a button, and a public
           read-only status lookup for a Bunker address. None of these exist
-          yet, and none will ship before the program has been reviewed. If you
+          yet. If you
           build a terminal or a wallet and want to shape them, reach out on{" "}
           <a href="https://x.com/BunkerModeIO" target="_blank" rel="noreferrer">
             X

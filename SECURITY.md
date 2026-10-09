@@ -1,6 +1,6 @@
 # Security policy
 
-Bunker is experimental. Mainnet custody is disabled and no independent audit is complete. Do not deposit real funds or rely on the software for security-critical custody.
+Bunker is in public beta on Solana mainnet and holds real funds. No independent audit has been done and none is booked. The program can be upgraded by one key, held by the maintainer on a hardware wallet. Deposit only what you could afford to lose.
 
 ## Report privately
 
@@ -16,4 +16,4 @@ Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [PROTOCOL.md](docs/PROTOCOL.md), [
 
 ## Supported release
 
-Only the latest revision of `main` is maintained. No revision has been independently reviewed. This pre-release is suitable for inspection and valueless testing, not real-asset custody. Security fixes are published with explicit affected revisions and migration guidance where applicable. No independent source-to-mainnet-binary equivalence is claimed.
+Only the latest revision of `main` is maintained. No revision has been independently reviewed. This is a public beta: unaudited software holding real funds at its users' own risk. Security fixes are published with explicit affected revisions and migration guidance where applicable. No independent source-to-mainnet-binary equivalence is claimed.
