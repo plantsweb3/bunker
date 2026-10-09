@@ -5,6 +5,24 @@ import { getConfig, getRpcUrl } from "@/lib/bunker-config";
  * the site's RPC quota. */
 let remembered: { at: number; body: unknown } | null = null;
 const REMEMBER_MS = 60_000;
+/** Asks the public verified-builds service whether it rebuilt this program
+ * from a public commit and got what is on chain now. Its answer is reported
+ * as its answer; when it cannot be reached, nothing is claimed. */
+async function publicRebuild(program: string): Promise<string | null> {
+  try {
+    const r = await fetch(`https://verify.osec.io/status/${program}`, {
+      signal: AbortSignal.timeout(6000),
+      redirect: "error",
+    });
+    if (!r.ok) return null;
+    const s = (await r.json()) as { is_verified?: unknown; commit?: unknown };
+    return s.is_verified === true && typeof s.commit === "string" && /^[0-9a-f]{40}$/.test(s.commit)
+      ? s.commit
+      : null;
+  } catch {
+    return null;
+  }
+}
 export async function GET() {
   const config = getConfig();
   if (remembered && Date.now() - remembered.at < REMEMBER_MS)
@@ -53,8 +71,11 @@ export async function GET() {
               ? new PublicKey(d.data.subarray(13, 45)).toBase58()
               : "Unknown";
     }
+    const commit = config.network === "mainnet-beta" ? await publicRebuild(config.programId) : null;
     const body = {
       ...base,
+      sourceVerified: commit !== null,
+      sourceCommit: commit,
       deployment:
         config.network === "mainnet-beta"
           ? "Executable on Solana mainnet"
