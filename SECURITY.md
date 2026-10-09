@@ -16,4 +16,4 @@ Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [PROTOCOL.md](docs/PROTOCOL.md), [
 
 ## Supported release
 
-Only the latest revision of `main` is maintained. No revision has been independently reviewed. This is a public beta: unaudited software holding real funds at its users' own risk. Security fixes are published with explicit affected revisions and migration guidance where applicable. No independent source-to-mainnet-binary equivalence is claimed.
+Only the latest revision of `main` is maintained. No revision has been independently reviewed. This is a public beta: unaudited software holding real funds at its users' own risk. Security fixes are published with explicit affected revisions and migration guidance where applicable. A public verified-builds service reports that the deployed program matches commit `2182e5f` (docs/DEPLOYMENT.md); that is a statement about which code is deployed, not about whether it is correct.

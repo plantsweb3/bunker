@@ -64,11 +64,25 @@ export default function Page() {
           program’s test suite passes against that exact binary.
         </p>
         <p>
-          <strong>Not independently verified:</strong> nobody outside the
-          project has reproduced the build or confirmed it matches the chain.
-          Nobody has audited the program or reviewed the cryptography. The
-          site’s own code, the offline tool and the command-line client have
-          had no outside review either.
+          <strong>Checked by a public service:</strong> the upgrade
+          authority recorded on chain which commit the program was built
+          from, and{" "}
+          <a
+            href="https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ"
+            target="_blank"
+            rel="noreferrer"
+          >
+            the public verified-builds service
+          </a>{" "}
+          rebuilt that commit and got the program that is on chain. That
+          shows the code on chain is the code in the repository. It does not
+          show the code is correct.
+        </p>
+        <p>
+          <strong>Not independently verified:</strong> nobody has audited the
+          program or reviewed the cryptography. The site’s own code, the
+          offline tool and the command-line client have had no outside
+          review.
         </p>
       </section>
       <section>

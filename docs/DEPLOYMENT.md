@@ -59,7 +59,7 @@ Deployed 2026-10-09 as a public beta. Nothing here has been audited.
 | Deployment transaction | `2A9ztQPhJCG5VUCf3NwJG9gG8d6nek4rJbtMieuRDEZWVPDSU2VaX6Fzmhmc3hEYMKDsF6MJhEoDizVjpGCWTEhj` |
 | Upgrade authority | `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth` |
 
-The same hash was produced by the `verified-build` job in CI for that commit, twice, and by a container build on a second machine; the program's VM suite was run against that binary before it was deployed. `npm run check:deployment -- --rpc <url> --program <address> --binary <file>` reads the program from the network and compares; it reports that the code matches and that upgrades are possible.
+The upgrade authority has recorded this commit on chain (with the build image, because the public verifier does not yet choose one for Solana 4.3.0), and the public verified-builds service rebuilt it and reports a match: https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ. The same hash was produced by the `verified-build` job in CI for that commit, twice, and by a container build on a second machine; the program's VM suite was run against that binary before it was deployed. `npm run check:deployment -- --rpc <url> --program <address> --binary <file>` reads the program from the network and compares; it reports that the code matches and that upgrades are possible.
 
 ## Upgrade authority
 

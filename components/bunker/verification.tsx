@@ -4,6 +4,7 @@ import { RefreshCw, ExternalLink } from "lucide-react";
 type Verification = {
   network: string;
   program: string | null;
+  sourceCommit?: string | null;
   audit: string;
   sourceVerified: boolean;
   deployment: string;
@@ -63,7 +64,13 @@ export default function Verification() {
           <div className="metric">
             <span>Source ↔ deployed binary</span>
             <b>
-              {data.sourceVerified ? "Verified" : "Not independently verified"}
+              {data.sourceVerified && data.program ? (
+                <a href={`https://verify.osec.io/status/${data.program}`} target="_blank" rel="noreferrer">
+                  Matches commit {data.sourceCommit?.slice(0, 7)}, by public rebuild
+                </a>
+              ) : (
+                "Not independently verified"
+              )}
             </b>
           </div>
           {data.program && (
@@ -87,8 +94,10 @@ export default function Verification() {
         <p>Reading configured deployment status…</p>
       )}
       <p className="micro">
-        Executable status is an RPC observation. It is not an audit or proof
-        that source matches a deployed binary.
+        Executable status is an RPC observation. A public rebuild means a
+        service outside this project built the named commit and got the
+        program that is on chain; it says nothing about whether that code is
+        correct, and it is not an audit.
       </p>
     </div>
   );
