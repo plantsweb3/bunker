@@ -1,8 +1,13 @@
 version: 2
+# Routine version updates are made by hand, in one tested change at a time:
+# the on-chain program is deployed at a published hash, and the offline tool
+# and the command-line client are published by hash too. A limit of 0 turns
+# off Dependabot's version-update pull requests and leaves its security
+# updates on. The ignore rules below still apply to those.
 updates:
   - package-ecosystem: npm
     directory: /
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     schedule:
       interval: weekly
     ignore:
@@ -14,7 +19,7 @@ updates:
         update-types: ["version-update:semver-major"]
   - package-ecosystem: cargo
     directory: /
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     schedule:
       interval: weekly
     ignore:
@@ -25,7 +30,7 @@ updates:
   # The VM test crate has its own lockfile.
   - package-ecosystem: cargo
     directory: /programs/bunker3-svm-tests
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     schedule:
       interval: weekly
     ignore:
@@ -36,6 +41,6 @@ updates:
         update-types: ["version-update:semver-minor"]
   - package-ecosystem: github-actions
     directory: /
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 0
     schedule:
       interval: weekly
