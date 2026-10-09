@@ -1,0 +1,59 @@
+/* BUNKER MODE film look: tokens lifted from the film's renderer, as delivered in
+   the film's motion kit. Only the url() paths are changed, to where this site
+   serves the files. Inter and Space Grotesk come from the @fontsource packages
+   imported in globals.css; JetBrains Mono and Barlow Condensed are served from
+   /assets/fonts with their SIL OFL licence files beside them. */
+
+@font-face { font-family: "JetBrains Mono"; src: url("/assets/fonts/JetBrainsMono-wght.ttf") format("truetype"); font-weight: 100 800; font-display: swap; }
+@font-face { font-family: "Barlow Condensed"; src: url("/assets/fonts/BarlowCondensed-SemiBold.ttf") format("truetype"); font-weight: 600; font-display: swap; }
+
+:root {
+  /* color */
+  --bm-void: #080B0E;      /* page ground, behind everything */
+  --bm-ink: #0E1012;       /* text on light, chip and ticker fill */
+  --bm-chalk: #F0F3F2;     /* text on dark */
+  --bm-cream: #EAE7DF;     /* paper cards, the one-time-key card */
+  --bm-ice: #A9DEFF;       /* THE accent: second line of big type, rings, highlights, title cards */
+  --bm-ice-ink: #3A8CC8;   /* ice that still reads on cream or white */
+  --bm-steel: #7192A5;     /* secondary labels, rules, panel borders */
+
+  /* type roles */
+  --bm-display: "Inter", system-ui, sans-serif;          /* big type: weight 800, tracking -0.03em, uppercase */
+  --bm-text: "Space Grotesk", system-ui, sans-serif;     /* lyric captions and body lines: weight 500 */
+  --bm-mono: "JetBrains Mono", ui-monospace, monospace;  /* chrome, chips, panels: 500 regular, 700 for emphasis */
+  --bm-cond: "Barlow Condensed", sans-serif;             /* optional condensed labels */
+
+  /* rhythm: the song is 135 BPM */
+  --bm-beat: 444ms;
+  --bm-bar: 1776ms;
+}
+
+/* Big two-line type: first line chalk (or reversing over the image), second line ice. */
+.bm-big { font: 800 clamp(48px, 9.4vw, 180px)/0.98 var(--bm-display); letter-spacing: -0.03em; text-transform: uppercase; color: var(--bm-chalk); }
+.bm-big .bm-accent { color: var(--bm-ice); display: block; }
+/* The film's "overprint" (letters flip light/dark against the picture) is closest to: */
+.bm-big.bm-overprint { color: #fff; mix-blend-mode: difference; }
+
+/* Chips: small mono labels on solid fills */
+.bm-chip { font: 700 15px/1 var(--bm-mono); letter-spacing: 0.02em; text-transform: uppercase; padding: 8px 12px; background: var(--bm-ink); color: var(--bm-chalk); display: inline-block; }
+.bm-chip--ice { background: var(--bm-ice-ink); }
+.bm-chip--cream { background: var(--bm-cream); color: var(--bm-ink); }
+
+/* Panels: dark glass with a steel hairline and a mono header rule */
+.bm-panel { background: rgba(8, 11, 14, 0.86); border: 1px solid rgba(113, 146, 165, 0.7); color: var(--bm-chalk); }
+.bm-panel__head { font: 500 15px var(--bm-mono); color: var(--bm-steel); text-transform: uppercase; border-bottom: 1px solid rgba(113, 146, 165, 0.6); padding: 14px 16px 10px; }
+
+/* Lyric caption: last word in ice */
+.bm-caption { font: 500 40px/1.2 var(--bm-text); color: var(--bm-chalk); }
+.bm-caption em { font-style: normal; color: var(--bm-ice); }
+
+/* Halftone print texture over photos/video */
+.bm-halftone { position: relative; }
+.bm-halftone::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: url("/assets/kit/design/halftone-tile-dark.png") repeat; background-size: 42px 42px; opacity: 0.35; mix-blend-mode: multiply; }
+
+/* Scrolling status ticker (same lines as the film) */
+.bm-ticker { background: rgba(14, 16, 18, 0.92); color: var(--bm-chalk); font: 500 13px var(--bm-mono); white-space: nowrap; overflow: hidden; }
+.bm-ticker__track { display: inline-block; animation: bm-ticker 60s linear infinite; }
+@keyframes bm-ticker { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .bm-ticker__track { animation: none; } }

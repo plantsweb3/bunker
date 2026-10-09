@@ -9,23 +9,24 @@ import {
 } from "lucide-react";
 import { Header, Footer } from "@/components/bunker/shell";
 import Story from "@/components/bunker/story";
+import { Card, Clip } from "@/components/bunker/loop";
+import FilmPlayer from "@/components/bunker/film";
 import { BIcon } from "@/components/bunker/icon";
 function Plate({
-  src,
-  alt,
+  clip,
   level,
   line,
   tall = false,
 }: {
-  src: string;
-  alt: string;
+  clip: string;
   level: string;
   line: string;
   tall?: boolean;
 }) {
   return (
     <section className={`world-plate ${tall ? "tall" : ""}`}>
-      <Image unoptimized fill sizes="100vw" src={src} alt={alt} />
+      <Clip name={clip} />
+      <span className="halftone" />
       <div>
         <span className="mono">{level}</span>
         <p>{line}</p>
@@ -53,26 +54,77 @@ const limits: [string, string][] = [
   ],
   ["A lost recovery kit.", "Nobody can reset it. Not even us."],
 ];
-const gates = [
+/** The film's status line. */
+const ticker = [
+  "NOT AUDITED",
+  "WAITING PERIOD: YOUR CHOICE",
+  "PROTECTS THE WITHDRAWAL PATH, NOT THE CHAIN",
+  "A KEY IS NOT PERMISSION",
+  "PREPARE. DON’T PANIC.",
+  "CURVE BREAK: HYPOTHETICAL",
+  "WALLET KEY: PAYS, CAN’T WITHDRAW",
+  "ONE KEY, ONE MESSAGE",
+  "REAL-FUND CUSTODY: OFF",
+];
+/** How the door works, told with the film's own cards. All of it is simulation with demo values. */
+const works: { label: string; media: React.ReactNode; title: string; body: string; cream?: boolean }[] = [
+  {
+    label: "ONE-TIME KEY",
+    media: <Clip name="key-turns-to-ash" />,
+    title: "Every key works once.",
+    body: "Use it and it is gone. The next one is already made.",
+  },
+  {
+    label: "SIGNED WITHDRAWAL",
+    media: <Card name="signed-withdrawal-form" />,
+    title: "The key signs the whole withdrawal.",
+    body: "Which coin, how much, where to. Change one digit and the signature fails. Nothing moves.",
+    cream: true,
+  },
+  {
+    label: "34 HASH CHAINS",
+    media: <Card name="34-chain-ring" />,
+    title: "A key is 34 chains of hashes.",
+    body: "One-time signatures of the kind written down in RFC 8554 (LM-OTS). Their security rests on SHA-256 alone. The rest of Solana stays as it is.",
+  },
+  {
+    label: "TRUSTED ADDRESSES",
+    media: <Card name="trusted-addresses" />,
+    title: "Up to four wallets of your own.",
+    body: "You pick them when you build the Bunker. After that they can’t be changed.",
+  },
+  {
+    label: "WAITING PERIOD",
+    media: <Card name="waiting-period-timer" />,
+    title: "Everything else waits.",
+    body: "You choose the wait: up to seven days, or off. While it runs, your stop button cancels.",
+  },
+];
+const gates: [string, string, string][] = [
   [
-    "Cryptographic review",
-    "An independent assessment of the signature construction and Bunker’s use of it.",
+    "Public source and tests",
+    "Everything that holds or moves funds is public, with the tests that attack it.",
+    "Open",
   ],
   [
-    "Program audit",
-    "An independent audit of the on-chain program that holds and releases assets.",
+    "Deployment you can verify",
+    "The published source matched to the deployed program, with a written rule that nobody can change it afterwards.",
+    "Pending",
   ],
   [
-    "Recovery and signing review",
-    "Stale backups, multiple devices, interrupted withdrawals and browser isolation.",
+    "Public beta",
+    "Real vaults, unaudited, at your own risk. Not open yet.",
+    "Pending",
   ],
   [
-    "Deployment verification",
-    "Reviewed source matched to the deployed program, with a published upgrade policy.",
+    "Bug bounties",
+    "Rewards for breaking it. The scope and the amounts are not final yet.",
+    "Planned",
   ],
   [
-    "Operational readiness",
-    "Dedicated infrastructure, monitoring, incident ownership and a scoped bounty.",
+    "Independent audit",
+    "None has been done and none is booked. If that changes, the report goes here.",
+    "Not booked",
   ],
 ];
 const faq: [string, React.ReactNode][] = [
@@ -89,8 +141,8 @@ const faq: [string, React.ReactNode][] = [
     <>
       No. This is a pre-release. The mainnet site can read balances but cannot
       create a vault or move assets, and no Bunker program is deployed on
-      mainnet. That stays true until the work on the{" "}
-      <Link href="#road">road to mainnet</Link> is complete.
+      mainnet. That stays true until the public beta opens; see the{" "}
+      <Link href="#road">road to the beta</Link>.
     </>,
   ],
   [
@@ -155,9 +207,10 @@ const faq: [string, React.ReactNode][] = [
   [
     "Has it been audited?",
     <>
-      No. The source is public so that it can be reviewed, and independent
-      review is the first gate before real funds. Readable source and passing
-      tests are not an audit. <Link href="/security">Read the limits.</Link>
+      No, and no audit is booked. The source is public so that anyone can
+      review it, and Bunker will open as a public beta with bug bounties,
+      which are not final yet. Readable source and passing tests are not an
+      audit. <Link href="/security">Read the limits.</Link>
     </>,
   ],
 ];
@@ -166,40 +219,42 @@ export default function Home() {
     <>
       <Header />
       <main className="descent">
-        <section className="hero">
-          <Image
-            fill
-            priority
-            sizes="100vw"
-            className="hero-image"
-            src="/assets/bunker-hero.png"
-            alt="A monumental concrete bunker set into a basalt landscape, with a narrow illuminated entrance"
-          />
-          {/* Mist and door light only; the still above is the poster and the
-              reduced-motion fallback. */}
-          <video
-            className="hero-image hero-loop"
-            autoPlay
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            poster="/assets/bunker-hero.png"
-            aria-hidden="true"
-          >
-            <source src="/assets/video/hero-loop.webm" type="video/webm" />
-            <source src="/assets/video/hero-loop.mp4" type="video/mp4" />
-          </video>
-          <div className="hero-shade" />
-          <div className="hero-content">
-            <div className="eyebrow">
-              <span className="tiny-line" />
-              PREPARE. DON’T PANIC.
+        <section className="hero film">
+          <div className="hero-stage">
+            {/* The film's title hit. The still is the poster, and all that a
+                visitor who asked for less motion is shown. */}
+            <Image
+              fill
+              priority
+              unoptimized
+              sizes="100vw"
+              className="hero-image"
+              src="/assets/film/poster.jpg"
+              alt="The words BUNKER MODE over a night city of data-center towers, framed like a film still and labelled as a simulation"
+            />
+            <video
+              className="hero-image hero-loop"
+              autoPlay
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              poster="/assets/film/poster.jpg"
+              aria-hidden="true"
+            >
+              <source src="/assets/film/hero-loop.webm" type="video/webm" />
+              <source src="/assets/film/hero-loop.mp4" type="video/mp4" />
+            </video>
+          </div>
+          <div className="hero-content bm-panel">
+            <div className="hero-chips">
+              <span className="bm-chip bm-chip--ice">Pre-release</span>
+              <span className="bm-chip bm-chip--cream">Real funds not accepted</span>
             </div>
             <h1>
-              One bad click
+              One bad click{" "}
               <br />
-              shouldn’t cost you
+              shouldn’t cost you{" "}
               <br />
               <em>everything.</em>
             </h1>
@@ -216,12 +271,14 @@ export default function Home() {
                 Try it yourself
               </Link>
             </div>
-            <Link className="hero-lang" href="/es" hrefLang="es" lang="es">
-              Español
-            </Link>
-            <div className="hero-note">
-              <BIcon name="bunker-key" size={15} />
-              Your wallet puts money in. A different key takes it out.
+            <div className="hero-more">
+              <div className="hero-note">
+                <BIcon name="bunker-key" size={15} />
+                Your wallet puts money in. A different key takes it out.
+              </div>
+              <Link className="hero-lang" href="/es" hrefLang="es" lang="es">
+                Español
+              </Link>
             </div>
             <div className="ca-line" aria-label="Contract address coming soon">
               <span className="ca-label">CA</span>
@@ -230,17 +287,18 @@ export default function Home() {
               </span>
             </div>
           </div>
-          <div className="architectural-label">
-            <span>00 / EXTERIOR</span>
-            <span>PRE-RELEASE · REAL FUNDS NOT ACCEPTED</span>
-          </div>
-          <div className="hero-status">
-            <span className="status-square" />
-            SOLANA / PRE-RELEASE
-            <span className="status-divider" />
-            <Link href="#road">REVIEW PENDING</Link>
-          </div>
         </section>
+        <div className="bm-ticker" aria-hidden="true">
+          <span className="bm-ticker__track">
+            {[0, 1].map((half) => (
+              <span key={half}>
+                {ticker.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </span>
+            ))}
+          </span>
+        </div>
         <section className="principles">
           <span>
             <BIcon name="everyday-wallet" />A bad click can’t empty it
@@ -308,13 +366,8 @@ export default function Home() {
           </div>
         </section>
         <section className="check-teaser section surface" data-level="01">
-          <Image
-            unoptimized
-            fill
-            sizes="100vw"
-            src="/assets/world/01-approach.webp"
-            alt=""
-          />
+          <Clip name="porch-lights-walkway" className="backdrop" />
+          <span className="halftone" />
           <div>
             <div className="eyebrow">
               <b>01 / SURFACE</b>YOUR TURN. TEN SECONDS.
@@ -349,8 +402,7 @@ export default function Home() {
         </section>
         <Plate
           tall
-          src="/assets/world/02-door.webp"
-          alt="A tall, narrow doorway recessed into a concrete wall, lit from inside with cold light"
+          clip="wallet-at-vault-door"
           level="02 / THRESHOLD"
           line="Your wallet key stops here."
         />
@@ -449,8 +501,7 @@ export default function Home() {
           </div>
         </section>
         <Plate
-          src="/assets/world/03-threshold.webp"
-          alt="A bare concrete corridor seen from inside, the open doorway a slot of grey daylight at the far end"
+          clip="key-being-cut"
           level="03 / INSIDE"
           line="Past this point, the keys are yours."
         />
@@ -511,14 +562,38 @@ export default function Home() {
             </li>
           </ol>
         </section>
+        <section className="section works" id="works">
+          <div className="eyebrow">
+            <b>03 / INSIDE</b>HOW THE DOOR WORKS
+          </div>
+          <div className="split-title">
+            <h2>
+              Five ideas.
+              <br />
+              No new cryptography.
+            </h2>
+            <p>
+              Pictures from the film. Every screen in them is a simulation
+              with made-up values. Bunker is pre-release.
+            </p>
+          </div>
+          <ol className="works-grid">
+            {works.map((w) => (
+              <li key={w.label} className={`bm-panel ${w.cream ? "cream" : ""}`}>
+                <div className="bm-panel__head">
+                  <span>{w.label}</span>
+                  <span>SIMULATION</span>
+                </div>
+                <div className="works-media">{w.media}</div>
+                <h3>{w.title}</h3>
+                <p>{w.body}</p>
+              </li>
+            ))}
+          </ol>
+        </section>
         <section className="section limits weather" id="limits">
-          <Image
-            unoptimized
-            fill
-            sizes="100vw"
-            src="/assets/world/05-weather.webp"
-            alt=""
-          />
+          <Clip name="padlocks-falling" className="backdrop" />
+          <span className="halftone" />
           <div className="eyebrow">
             <b>03 / INSIDE</b>HONEST ABOUT THE EDGES
           </div>
@@ -562,7 +637,7 @@ export default function Home() {
         </section>
         <section className="truth section" id="road" data-level="04">
           <div className="eyebrow">
-            <b>04 / FOUNDATIONS</b>ROAD TO MAINNET
+            <b>04 / FOUNDATIONS</b>ROAD TO THE BETA
           </div>
           <h2>
             Security is a process.
@@ -572,9 +647,10 @@ export default function Home() {
           <div className="truth-grid">
             <div>
               <p>
-                Real funds stay locked out until five gates are passed. None
-                has been passed yet, and none will be marked done without
-                evidence you can inspect.
+                Bunker has not been audited. It opens as a public beta
+                instead: public code, public tests, and bug bounties for
+                people who break it. Until the beta opens, this site works
+                with test money only.
               </p>
               <div className="actions road-actions">
                 <a
@@ -591,7 +667,7 @@ export default function Home() {
               </div>
             </div>
             <ol className="road-list">
-              {gates.map(([title, body], i) => (
+              {gates.map(([title, body, state], i) => (
                 <li key={title}>
                   <span className="mono">
                     {String(i + 1).padStart(2, "0")}
@@ -600,7 +676,7 @@ export default function Home() {
                     <strong>{title}</strong>
                     <span>{body}</span>
                   </div>
-                  <b>Pending</b>
+                  <b>{state}</b>
                 </li>
               ))}
             </ol>
@@ -620,14 +696,39 @@ export default function Home() {
             ))}
           </div>
         </section>
+        <section className="section film-section" id="film">
+          <div className="eyebrow">
+            <b>04 / FOUNDATIONS</b>THE FILM
+          </div>
+          <div className="film-head">
+            <h2 className="bm-big">
+              Watch
+              <span className="bm-accent">the film.</span>
+            </h2>
+            <div>
+              <div className="hero-chips">
+                <span className="bm-chip">Music video · 4:06</span>
+                <span className="bm-chip bm-chip--ice">Simulation</span>
+              </div>
+              <p>
+                A film about one-time keys. The product screens in it are a
+                simulation: Bunker is pre-release, no Bunker program is on
+                mainnet, real funds are not accepted, and it has not been
+                audited.
+              </p>
+            </div>
+          </div>
+          <FilmPlayer />
+          <p className="micro">
+            Bunker protects the way out of your vault, not the chain it lives
+            on. The pull request, the test names and “DEMO-TOKEN” in the film
+            are made up. The lyrics are in the picture; captions can be turned
+            on in the player.
+          </p>
+        </section>
         <section className="closing section room">
-          <Image
-            unoptimized
-            fill
-            sizes="100vw"
-            src="/assets/world/04-vault-room-16x9.webp"
-            alt=""
-          />
+          <Clip name="city-going-under" className="backdrop" />
+          <span className="halftone" />
           <span className="eyebrow">PREPARE. DON’T PANIC.</span>
           <h2>Step inside.</h2>
           <div className="actions">

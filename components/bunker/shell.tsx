@@ -15,7 +15,7 @@ export function Header() {
       <div className="network-bar">
         <FlaskConical size={13} />
         <strong>PRE-RELEASE</strong>
-        <span>Real funds not accepted yet. Independent review pending.</span>
+        <span>Real funds not accepted yet. Not audited.</span>
         <Link href="/security">Know the limits</Link>
       </div>
       <header className="site-header">
@@ -85,6 +85,10 @@ export function Footer() {
         EXPERIMENTAL · MAINNET CUSTODY LOCKED · BUNKER ONLY LIVES AT
         BUNKERMODE.IO
       </span>
+      <p className="footer-fine">
+        Bunker has not been audited. It is new software that will open as a
+        public beta; bug bounties are planned and not final yet.
+      </p>
     </footer>
   );
 }
