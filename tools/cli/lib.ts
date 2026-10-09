@@ -9,7 +9,7 @@
  * The recovery kit is never opened here. Making a recovery packet stays in the
  * offline tool.
  *
- * Like the site, this refuses to send anything to mainnet in this release. */
+ * Like the site, on mainnet this sends only to the published Bunker program. */
 import "../../sdk/polyfill";
 import { existsSync, openSync, closeSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { Connection, Keypair, PublicKey, Transaction, TransactionInstruction } from "@solana/web3.js";
@@ -58,7 +58,7 @@ export function readFeeWallet(path: string): Keypair {
 /** The network and program come from the Bunker's own file, never from flags:
  * the RPC must be on that network or nothing is sent. */
 export function sessionFor(
-  identity: { network: "devnet" | "localnet"; genesis: string; program: string },
+  identity: { network: BunkerConfig["network"]; genesis: string; program: string },
   rpc: string,
   payer: Keypair,
   log: (line: string) => void = console.log,
@@ -73,7 +73,7 @@ export function sessionFor(
       custodyEnabled: true,
       programId: identity.program,
       expectedGenesis: identity.genesis,
-      releaseStatus: "Test custody from the command line. Valueless assets only.",
+      releaseStatus: "Bunker from the command line.",
       alertsBot: null,
     },
     program: new PublicKey(identity.program),
@@ -83,7 +83,7 @@ export function sessionFor(
 }
 const transmit = (s: Session, label: string, ixs: TransactionInstruction[]) => {
   s.log(label);
-  // `send` checks the network, simulates, signs and confirms; it refuses mainnet.
+  // `send` checks the network and the program, simulates, signs and confirms.
   return send(s.connection, s.config, s.payer.publicKey, ixs, async (tx: Transaction) => {
     tx.partialSign(s.payer);
     return tx;

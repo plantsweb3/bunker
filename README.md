@@ -8,7 +8,7 @@
 
 Assets go into a program-owned vault from any wallet. They come out only with a one-time hash signature from a key the wallet never holds. A stolen seed phrase or a signature given to a drainer site cannot authorize a withdrawal. One recovery kit, kept offline, replaces lost or exposed keys and cancels a withdrawal that is still waiting.
 
-**Release status:** public pre-release, draft protocol. The website's mainnet configuration is read-only. No Bunker program is deployed on mainnet, no independent audit is complete, and real-fund custody is disabled. Bunker claims no end-to-end post-quantum security level. Tests and readable source are evidence for review, not a substitute for it.
+**Release status:** public beta on Solana mainnet. The program is live on Solana mainnet at `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ`, built from commit `2182e5f` (executable hash `a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7`). It holds real funds. No independent audit has been done and none is booked. The program is upgradeable by one key, `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth`, held by the maintainer on a hardware wallet. Use it only with what you could afford to lose. See [Deployment](docs/DEPLOYMENT.md) and [Security](SECURITY.md).
 
 ## Start reviewing
 
@@ -39,7 +39,7 @@ npm ci
 npm run dev
 ```
 
-Open `http://localhost:5173`. The default configuration is mainnet read-only. There are no analytics or third-party client scripts.
+Open `http://localhost:5173`. The default configuration is Solana mainnet and the one published program. There are no analytics or third-party client scripts.
 
 ## Run custody on an isolated local validator
 
@@ -76,7 +76,7 @@ npm run audit:dependencies
 
 ## Without the website
 
-`tools/cli/bunker.ts` reads a Bunker, withdraws, finishes an interrupted withdrawal, releases, clears and submits a recovery packet, using a day key file, an ordinary Solana keypair file to pay fees, and an RPC address. It shares the site's signing code and keeps its signing journal in a file beside the day key. It never opens a recovery kit, and like the site it refuses mainnet in this release.
+`tools/cli/bunker.ts` reads a Bunker, withdraws, finishes an interrupted withdrawal, releases, clears and submits a recovery packet, using a day key file, an ordinary Solana keypair file to pay fees, and an RPC address. It shares the site's signing code and keeps its signing journal in a file beside the day key. It never opens a recovery kit, and like the site, on mainnet it sends only to the published program.
 
 `npm run cli:build` bundles it into one file, `public/source/bunker-cli.mjs`, that runs with Node 22 and nothing else (`node bunker-cli.mjs help`). The site serves that file with its SHA-256, and CI rebuilds it and checks the two builds are identical.
 
@@ -84,7 +84,7 @@ npm run audit:dependencies
 
 ## Deployment
 
-[Deployment guide](docs/DEPLOYMENT.md). No production signers, wallet keys or key files belong in this repository. No environment flag can enable mainnet custody.
+[Deployment guide](docs/DEPLOYMENT.md). No production signers, wallet keys or key files belong in this repository. No environment setting can point the site at a different mainnet program.
 
 ## License and attribution
 

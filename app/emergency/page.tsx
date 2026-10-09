@@ -128,7 +128,7 @@ export default function Page() {
           everything immediately instead.
         </p>
         <p>
-          Bunker is a pre-release and does not hold real funds yet.{" "}
+          Bunker is a public beta and has not been audited.{" "}
           <Link href="/security">Read what it does and does not stop.</Link>
         </p>
       </section>

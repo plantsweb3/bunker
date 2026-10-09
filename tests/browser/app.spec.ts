@@ -13,11 +13,11 @@ test("brand, navigation, release gate, and wallet empty state", async ({
   await page.screenshot({ path: info.outputPath("bunker-preview.png") });
   await page.getByRole("link", { name: "Launch app", exact: true }).click();
   await expect(
-    page.getByText("MAINNET · READ ONLY", { exact: true }),
+    page.getByText("MAINNET · BETA", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Create Bunker", exact: true }),
-  ).toBeDisabled();
+    page.getByRole("link", { name: "Build a Bunker", exact: true }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Connect wallet", exact: true })
     .click();
@@ -85,6 +85,8 @@ test("demo has a complete, resettable journey", async ({ page }) => {
 test("security, documentation, verification and no horizontal overflow", async ({
   page,
 }) => {
+  // The verify page now reads the program from mainnet, which can be slow.
+  test.setTimeout(60_000);
   for (const path of [
     "/",
     "/vault",
@@ -114,7 +116,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     expect(overflow, `${path} overflow`).toBe(false);
   }
   await expect(
-    page.getByText("No mainnet deployment", { exact: true }),
+    page.getByText("DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ").first(),
   ).toBeVisible();
   await expect(
     page.getByText("Not independently verified", { exact: true }),
@@ -331,13 +333,13 @@ test("paths outside the page policy still cannot run anything", async ({ request
   expect(tool.headers()["content-security-policy"]).toContain("sandbox");
   expect((await request.get("/source/nope.html")).headers()["content-security-policy"]).toContain("sandbox");
 });
-test("server rejects mainnet transaction submission", async ({ request }) => {
+test("server refuses calls the app never makes", async ({ request }) => {
   const r = await request.post("/api/rpc", {
     data: {
       jsonrpc: "2.0",
       id: 1,
-      method: "sendTransaction",
-      params: ["AA=="],
+      method: "requestAirdrop",
+      params: ["11111111111111111111111111111111", 1],
     },
   });
   const body = await r.json();

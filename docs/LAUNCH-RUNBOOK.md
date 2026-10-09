@@ -1,6 +1,6 @@
 # Launch runbook: from a reviewed release to real funds
 
-**Status: a plan, not a record.** Nothing in this document has been carried out. No audit has been commissioned, no program is deployed, and real-fund custody is disabled in the source. This is the order of work for the day those things change, written in advance so that it can be reviewed too.
+**Status: superseded in part.** This was written as the plan for an audited, immutable launch. On 2026-10-09 the program was instead deployed to mainnet as an unaudited public beta, upgradeable, without the preconditions in step 0; [DEPLOYMENT.md](DEPLOYMENT.md) records what was done. Steps 2, 4, 6 and 7 still describe how the build is reproduced, how the deployment is checked and what to do if something is wrong. This is the order of work for the day those things change, written in advance so that it can be reviewed too.
 
 Every step names what is produced and what is published. A step is done when its output exists and someone other than the person who did it has checked it.
 

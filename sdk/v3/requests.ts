@@ -9,6 +9,7 @@ import { z } from "zod";
 import { hex, unhex } from "../bytes";
 import { SIGNATURE_BYTES } from "../lmots";
 import { identityOf } from "./kit";
+import { labelMatchesGenesis } from "../../lib/bunker-config";
 import {
   address as addressBytes,
   decodeRecover,
@@ -23,7 +24,7 @@ import type { VaultState } from "./protocol";
 const SIGNATURE_SIZE = SIGNATURE_BYTES;
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const address = z.string().min(32).max(44);
-const network = z.enum(["devnet", "localnet"]);
+const network = z.enum(["mainnet-beta", "devnet", "localnet"]);
 export const networkCardSchema = z
   .object({
     version: z.literal(3),
@@ -32,7 +33,8 @@ export const networkCardSchema = z
     genesis: address,
     program: address,
   })
-  .strict();
+  .strict()
+  .refine(labelMatchesGenesis);
 const identity = {
   version: z.literal(3),
   network,
@@ -51,7 +53,8 @@ export const creationRequestSchema = z
     opRoot: hex32,
     recRoot: hex32,
   })
-  .strict();
+  .strict()
+  .refine(labelMatchesGenesis);
 export const recoveryFileSchema = z
   .object({
     ...identity,
@@ -60,7 +63,8 @@ export const recoveryFileSchema = z
     payload: z.string().regex(new RegExp(`^[0-9a-f]{${RECOVER_SIZE * 2}}$`)),
     signature: z.string().regex(new RegExp(`^[0-9a-f]{${SIGNATURE_SIZE * 2}}$`)),
   })
-  .strict();
+  .strict()
+  .refine(labelMatchesGenesis);
 export type NetworkCard = z.infer<typeof networkCardSchema>;
 export type CreationRequest = z.infer<typeof creationRequestSchema>;
 export type RecoveryFile = z.infer<typeof recoveryFileSchema>;

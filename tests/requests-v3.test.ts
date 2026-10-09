@@ -39,6 +39,12 @@ describe("Public files between the offline tool and the site", () => {
     expect(() => parseNetworkCard(JSON.stringify({ ...card, master: "00" }))).toThrow("not a Bunker network card");
     expect(() => parseNetworkCard(packet(0n))).toThrow();
     expect(() => parseNetworkCard("x".repeat(9000))).toThrow("too large");
+    // The label and the genesis hash must agree: nothing can call mainnet a
+    // test network, or a test network mainnet.
+    const mainnet = { ...card, network: "mainnet-beta", genesis: "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d" };
+    expect(parseNetworkCard(JSON.stringify(mainnet))).toEqual(mainnet);
+    expect(() => parseNetworkCard(JSON.stringify({ ...mainnet, network: card.network }))).toThrow("not a Bunker network card");
+    expect(() => parseNetworkCard(JSON.stringify({ ...card, network: "mainnet-beta" }))).toThrow("not a Bunker network card");
   });
   it("validates a creation request and carries no secret", () => {
     const request = { ...identity, kind: "create", salt: hex(salt), trusted: [] as string[], delaySecs: 0, opRoot: hex(g.opRoot), recRoot: hex(g.recRoot) };
@@ -117,6 +123,7 @@ describe("Offline recovery tool page", () => {
     // The files that handle the master, and nothing that builds transactions.
     const files = [...seen].map((f) => f.slice(resolve(".").length + 1)).sort();
     expect(files).toEqual([
+      "lib/bunker-config.ts",
       "sdk/bytes.ts",
       "sdk/lmots.ts",
       "sdk/v3/core.ts",

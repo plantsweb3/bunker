@@ -80,11 +80,14 @@ function Page() {
     const card: NetworkCard = {
       version: 3,
       kind: "network",
-      network: c.network as "devnet" | "localnet",
+      network: c.network,
       genesis: c.expectedGenesis,
       program: c.programId,
     };
-    download(`bunker-test-network-card-${c.network}.json`, JSON.stringify(card, null, 2));
+    download(
+      `bunker-${c.network === "mainnet-beta" ? "" : "test-"}network-card-${c.network}.json`,
+      JSON.stringify(card, null, 2),
+    );
   }
   async function loadRequest(f: File | null) {
     const r = parseCreationRequest(await readKeyFile(f));
@@ -197,19 +200,20 @@ function Page() {
         <div className="release-gate">
           <BIcon name="review-pending" size={22} />
           <div>
-            <h2>Not available in this release.</h2>
-            <p>
-              The protocol is a draft under review. It runs only against an isolated test network. The
-              offline tool below can be inspected today.
-            </p>
-            <Link href="/verify">View release requirements</Link>
+            <h2>Not available here.</h2>
+            <p>This site is not set up to reach a Bunker program. The offline tool below still works.</p>
+            <Link href="/verify">See the deployment</Link>
           </div>
-          <span className="pill">DRAFT</span>
+          <span className="pill">UNAVAILABLE</span>
         </div>
       ) : (
         <div className="notice">
           <BIcon name="simulation" size={18} />
-          <span>Draft protocol on a test network. No real assets.</span>
+          <span>
+            {b.config.network === "mainnet-beta"
+              ? "Public beta on Solana mainnet. Not audited. Put in only what you could afford to lose."
+              : "Test network. Nothing here holds real funds."}
+          </span>
         </div>
       )}
       <Messages busy={b.busy} error={b.error} notice={b.notice} />
@@ -338,7 +342,7 @@ function Page() {
                 disabled={!can || !request}
                 onClick={() => b.task("Building your Bunker", create)}
               >
-                Build Bunker on test network
+                {b.config?.network === "mainnet-beta" ? "Build my Bunker" : "Build Bunker on test network"}
               </button>
             </>
           )}

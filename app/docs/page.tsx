@@ -6,7 +6,7 @@ export default function Page() {
     <DocumentLayout
       eyebrow="THE OPERATOR’S MANUAL"
       title="A small vault. An explicit process."
-      description="What each key does, what leaves your device, and what happens at every step. Draft protocol; real funds are not accepted yet."
+      description="What each key does, what leaves your device, and what happens at every step. Public beta, not audited."
     >
       <section>
         <h2>Three keys, three jobs</h2>
@@ -154,8 +154,7 @@ export default function Page() {
           and keep it with your day key. Its SHA-256 is in{" "}
           <a href="/source/cli-manifest.json">cli-manifest.json</a>; compare it
           with a copy built from the public source. Run{" "}
-          <code>node bunker-cli.mjs help</code> for the commands. Like the
-          rest of this release it works on test networks only.
+          <code>node bunker-cli.mjs help</code> for the commands.
         </p>
       </section>
       <section>

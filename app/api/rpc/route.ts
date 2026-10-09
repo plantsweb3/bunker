@@ -1,4 +1,4 @@
-import { getConfig, getRpcUrl, MAINNET_GENESIS } from "@/lib/bunker-config";
+import { getConfig, getRpcUrl, MAINNET_GENESIS, MAINNET_PROGRAM_ID } from "@/lib/bunker-config";
 import { boundedText, BodyLimitError } from "@/lib/bounded-body";
 import { clientOf, rateLimiter } from "@/lib/rate-limit";
 const allow = rateLimiter(300, 60_000);
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
     )
       return new Response("Origin not allowed", { status: 403 });
     if (c.custodyEnabled && !c.expectedGenesis)
-      return new Response("Test network has no pinned genesis hash", {
+      return new Response("Network has no pinned genesis hash", {
         status: 503,
       });
     if (["simulateTransaction", "sendTransaction"].includes(body.method)) {
@@ -116,10 +116,14 @@ export async function POST(request: Request) {
       const genesis = JSON.parse(await boundedText(check.body, 4096)) as {
         result?: string;
       };
+      // The network must be the pinned one, and mainnet is only ever reached
+      // by the mainnet configuration: a test setup whose "local" network turns
+      // out to be mainnet sends nothing.
       if (
         !check.ok ||
         genesis.result !== c.expectedGenesis ||
-        genesis.result === MAINNET_GENESIS
+        (genesis.result === MAINNET_GENESIS &&
+          (c.network !== "mainnet-beta" || c.programId !== MAINNET_PROGRAM_ID))
       )
         return new Response("Network mismatch: transaction blocked", {
           status: 403,

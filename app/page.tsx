@@ -64,7 +64,7 @@ const ticker = [
   "CURVE BREAK: HYPOTHETICAL",
   "WALLET KEY: PAYS, CAN’T WITHDRAW",
   "ONE KEY, ONE MESSAGE",
-  "BETA: TEST NETWORK TODAY",
+  "PUBLIC BETA: LIVE ON MAINNET",
 ];
 /** How the door works, told with the film's own cards. */
 const works: { label: string; media: React.ReactNode; title: string; body: string; cream?: boolean }[] = [
@@ -108,13 +108,13 @@ const gates: [string, string, string][] = [
   ],
   [
     "Deployment you can verify",
-    "The published source matched to the deployed program, with a written rule that nobody can change it afterwards.",
-    "Pending",
+    "The program on mainnet matches the published source, byte for byte. Its maintainer can upgrade it; that key is on a hardware wallet.",
+    "Done",
   ],
   [
     "Public beta",
-    "Real vaults, unaudited, at your own risk. Not open yet.",
-    "Pending",
+    "Real vaults, unaudited, at your own risk.",
+    "Open",
   ],
   [
     "Bug bounties",
@@ -139,11 +139,10 @@ const faq: [string, React.ReactNode][] = [
   [
     "Can I put real funds in today?",
     <>
-      Not yet. Bunker is in beta and runs on a test network today. The
-      mainnet site can read balances but cannot create a vault or move
-      assets, and the Bunker program is not on mainnet yet. That changes when
-      the public beta opens; see the{" "}
-      <Link href="#road">road to the beta</Link>.
+      Yes. Bunker is in public beta on Solana mainnet, so a Bunker you build
+      holds real funds. It has not been audited, so start small and put in
+      only what you could afford to lose. See the{" "}
+      <Link href="#road">road</Link>.
     </>,
   ],
   [
@@ -183,18 +182,18 @@ const faq: [string, React.ReactNode][] = [
     "What if Bunker goes away?",
     <>
       A vault is controlled by an on-chain program, not by this website, and
-      the program gives nobody an administrator role over a vault. The policy
-      for real funds is that the program is deployed so that nobody, us
-      included, can change it afterwards; that deployment has not happened
-      and will be published, with proof, when it does. The code that builds a withdrawal is{" "}
+      the program gives nobody an administrator role over a vault. During the
+      beta the program itself can still be upgraded, by one key that its
+      maintainer keeps on a hardware wallet; that is how a flaw gets fixed,
+      and it is a trust you are extending. The address is on the{" "}
+      <Link href="/verify">verify page</Link>. The code that builds a withdrawal is{" "}
       <a href={REPO} target="_blank" rel="noreferrer">
         public
       </a>
       . The recovery tool is a file you keep and runs without this site, and
       there is a command-line program, in one file you can download and keep,
       that withdraws and submits recovery packets with nothing but your key
-      files and a Solana connection. It needs a computer with Node, and like
-      this site it works on test networks only.
+      files and a Solana connection. It needs a computer with Node.
     </>,
   ],
   [
@@ -250,7 +249,7 @@ export default function Home() {
           <div className="hero-content">
             <div className="hero-chips">
               <span className="bm-chip bm-chip--ice">Open source</span>
-              <span className="bm-chip bm-chip--cream">Beta · test network</span>
+              <span className="bm-chip bm-chip--cream">Public beta · mainnet</span>
             </div>
             <h1>
               One bad click{" "}
@@ -359,7 +358,7 @@ export default function Home() {
                   <span className="way-num">3</span>
                   <BIcon name="vault" size={34} />
                   <b>Build</b>
-                  <span>Make your own Bunker. Today it works with test money only.</span>
+                  <span>Make your own Bunker. It is a public beta: start small.</span>
                   <em>Build my Bunker</em>
                 </Link>
               </li>
@@ -635,7 +634,7 @@ export default function Home() {
         </section>
         <section className="truth section" id="road" data-level="04">
           <div className="eyebrow">
-            <b>04 / FOUNDATIONS</b>ROAD TO THE BETA
+            <b>04 / FOUNDATIONS</b>WHERE IT STANDS
           </div>
           <h2>
             Security is a process.
@@ -647,8 +646,7 @@ export default function Home() {
               <p>
                 Bunker has not been audited. It opens as a public beta
                 instead: public code, public tests, and bug bounties for
-                people who break it. Until the beta opens, this site works
-                with test money only.
+                people who break it. The beta is open now. Start small.
               </p>
               <div className="actions road-actions">
                 <a
@@ -709,7 +707,7 @@ export default function Home() {
               </div>
               <p>
                 A film about one-time keys, and why Bunker exists. Bunker is
-                open source and in beta, on a test network today.
+                open source and in public beta on Solana mainnet.
               </p>
             </div>
           </div>

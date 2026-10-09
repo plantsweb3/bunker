@@ -14,13 +14,13 @@ export async function GET() {
     program: config.programId,
     audit: "Not completed",
     sourceVerified: false,
-    mainnetCustody: false,
+    mainnetCustody: config.custodyEnabled && config.network === "mainnet-beta",
   };
   if (!config.programId)
     return Response.json(
       {
         ...base,
-        deployment: "No mainnet deployment",
+        deployment: "No program configured",
         upgradeAuthority: "Not applicable",
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -55,7 +55,10 @@ export async function GET() {
     }
     const body = {
       ...base,
-      deployment: "Executable on configured test network",
+      deployment:
+        config.network === "mainnet-beta"
+          ? "Executable on Solana mainnet"
+          : "Executable on configured test network",
       upgradeAuthority: authority,
     };
     remembered = { at: Date.now(), body };

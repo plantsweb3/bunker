@@ -15,7 +15,7 @@ export function Header() {
       <div className="network-bar">
         <FlaskConical size={13} />
         <strong>BETA</strong>
-        <span>Open source. On a test network today.</span>
+        <span>Open source. Live on Solana mainnet.</span>
         <Link href="/security">Know the limits</Link>
       </div>
       <header className="site-header">
@@ -82,12 +82,13 @@ export function Footer() {
         </div>
       </div>
       <span className="mono footer-status">
-        OPEN SOURCE · BETA ON A TEST NETWORK · BUNKER ONLY LIVES AT
+        OPEN SOURCE · PUBLIC BETA ON SOLANA MAINNET · BUNKER ONLY LIVES AT
         BUNKERMODE.IO
       </span>
       <p className="footer-fine">
-        Bunker has not been audited. It is new software that will open as a
-        public beta; bug bounties are planned and not final yet.
+        Bunker has not been audited. It is new software in public beta, and
+        the program can be upgraded by its maintainer. Bug bounties are
+        planned and not final yet. Put in only what you could afford to lose.
       </p>
     </footer>
   );

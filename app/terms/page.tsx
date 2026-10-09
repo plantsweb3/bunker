@@ -9,14 +9,15 @@ export default function Page() {
     <DocumentLayout
       eyebrow="TERMS & RISKS"
       title="Read this before you rely on anything here."
-      description="Plain-language terms for the pre-release. They will be replaced by reviewed terms before real funds are accepted."
+      description="Plain-language terms for the public beta. They have not been reviewed by a lawyer."
     >
       <div className="document-callout">
-        <h2>This is experimental software. Do not use real funds.</h2>
+        <h2>This is beta software that has not been audited.</h2>
         <p>
-          Nothing here has completed an independent audit. Mainnet custody is
-          disabled. Anything you do with this software or its source code is
-          at your own risk.
+          Bunker runs on Solana mainnet and holds real funds. Nothing here has
+          had an independent audit. Anything you do with this software or its
+          source code is at your own risk. Put in only what you could afford
+          to lose.
         </p>
       </div>
       <section>
@@ -26,9 +27,10 @@ export default function Page() {
           library and a Solana program. It is not a bank, broker, exchange,
           custodian or wallet provider. Nobody operating this site holds your
           keys, and the program gives nobody a way to move, freeze or return
-          your assets. Whoever can upgrade a program can change that, so
-          the policy is that the program holding real funds will be deployed
-          so that nobody can upgrade it, with proof published.
+          your assets. Whoever can upgrade a program can change that. During
+          the beta one key can upgrade the Bunker program; its maintainer
+          keeps it on a hardware wallet and its address is published on the
+          verify page.
         </p>
       </section>
       <section>

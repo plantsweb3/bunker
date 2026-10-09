@@ -15,11 +15,12 @@ import {
   vaultAddressBytes,
 } from "./core";
 import { genesisVault } from "./master";
+import { labelMatchesGenesis } from "../../lib/bunker-config";
 import type { Descriptor } from "./derive";
 const hex32 = z.string().regex(/^[0-9a-f]{64}$/);
 const base = {
   version: z.literal(3),
-  network: z.enum(["devnet", "localnet"]),
+  network: z.enum(["mainnet-beta", "devnet", "localnet"]),
   genesis: z.string().min(32).max(44),
   program: z.string().min(32).max(44),
   /** Random, chosen when the kit is made. Every key is derived under it. */
@@ -36,7 +37,8 @@ export const archivalSchema = z
     delaySecs: z.number().int().min(MIN_DELAY_SECS).max(MAX_DELAY_SECS),
     master: hex32,
   })
-  .strict();
+  .strict()
+  .refine(labelMatchesGenesis);
 export const dayKeySchema = z
   .object({
     ...base,
@@ -47,7 +49,8 @@ export const dayKeySchema = z
     epoch: z.string().regex(/^(0|[1-9][0-9]*)$/),
     seed: hex32,
   })
-  .strict();
+  .strict()
+  .refine(labelMatchesGenesis);
 export type ArchivalKit = z.infer<typeof archivalSchema>;
 export type DayKey = z.infer<typeof dayKeySchema>;
 type Identity = Pick<ArchivalKit, "genesis" | "program" | "vaultId" | "vault">;
