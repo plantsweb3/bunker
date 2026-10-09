@@ -5564,8 +5564,37 @@ details.advanced .field {
   box-shadow: 0 0 0 1px rgba(113, 146, 165, 0.5);
 }
 .gauge-media .loop {
-  object-position: 32% center;
-  filter: saturate(0.75) brightness(0.8);
+  /* The film's vault door sits at the middle of its frame. */
+  object-position: 50% 44%;
+  transform: scale(1.75);
+  filter: grayscale(1) brightness(0.32);
+  transition: filter 0.8s;
+}
+.gauge[data-state="read"] .gauge-media .loop {
+  filter: none;
+}
+.gauge-note {
+  color: #6f7b7e;
+}
+.bounty-source-media {
+  position: relative;
+  isolation: isolate;
+  aspect-ratio: 16 / 8;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(113, 146, 165, 0.6);
+}
+.bounty-source-media .halftone {
+  z-index: 1;
+}
+.bounty-step-media {
+  aspect-ratio: 16 / 10;
+  margin: -22px -20px 18px;
+  overflow: hidden;
+  border-bottom: 1px solid #2b3336;
+  background: var(--bm-void);
+}
+.bounty-rules > .loop {
+  object-position: 70% center;
 }
 .gauge-door svg {
   position: absolute;

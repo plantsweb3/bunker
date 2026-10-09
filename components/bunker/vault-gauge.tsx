@@ -4,7 +4,9 @@
 // shows a number only when that read succeeded: no cached figure, no
 // placeholder. Pass `goal` to make the ring a measure against a target; with
 // no goal the ring is simply lit when the balance has been read. Whatever is
-// passed as children (a clip, a still) is shown inside the door.
+// passed as children (a clip, a still) is shown inside the door, and is dimmed
+// until a balance has been read, so that a picture of a full vault is never
+// the only thing on screen.
 import { type ReactNode, useCallback, useEffect, useState } from "react";
 
 const SEGMENTS = 34;
@@ -29,12 +31,15 @@ export default function VaultGauge({
   address,
   goal,
   label = "In the vault",
+  note,
   children,
 }: {
   address: string | null;
   /** A target in SOL. Optional. */
   goal?: number;
   label?: string;
+  /** A line under the reading, for saying what the picture is and is not. */
+  note?: string;
   children?: ReactNode;
 }) {
   const [reading, setReading] = useState<Reading>(address ? { state: "reading" } : { state: "unavailable" });
@@ -110,6 +115,7 @@ export default function VaultGauge({
             </div>
           </>
         )}
+        {note && <span className="micro gauge-note">{note}</span>}
       </div>
     </div>
   );
