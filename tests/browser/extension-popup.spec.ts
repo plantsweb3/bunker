@@ -3,6 +3,7 @@
 // these cases show what the popup does with what the background pass stored,
 // and that it asks the network for nothing but the RPC.
 import { execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
@@ -31,8 +32,13 @@ const waiting = {
   digest: "09".repeat(32),
   trusted: false,
 };
+// The popup under test is the built one. `npm run source:bundle` (or
+// `npm run extension:build`) makes it, and CI runs that before these cases;
+// it is built here only when it is missing, since the two browser projects
+// run side by side and must not both write it.
 test.beforeAll(() => {
-  execFileSync(process.execPath, ["scripts/build-extension.mjs"], { stdio: "ignore" });
+  if (!existsSync("dist/bunker-watch/popup.html"))
+    execFileSync(process.execPath, ["scripts/build-extension.mjs"], { stdio: "ignore" });
 });
 
 /** Opens the popup over `stored`, and returns what went wrong and what was asked of the network. */
@@ -56,7 +62,7 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
   await page.addInitScript(
     ({ stored, at }) => {
       // The popup's clock is the chain time of the last pass plus time since.
-      const data: Record<string, unknown> = { ...stored, status: { passAt: Date.now(), chainNow: String(at), problem: null, retryAt: 0, refusals: 0 } };
+      const data: Record<string, unknown> = { status: { passAt: Date.now(), chainNow: String(at), problem: null, retryAt: 0, refusals: 0 }, ...stored };
       const pick = (keys: string[]) => Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, data[k]]));
       const changed: (() => void)[] = [];
       (window as unknown as { chrome: unknown }).chrome = {
@@ -69,7 +75,7 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
           onChanged: { addListener: (f: () => void) => changed.push(f) },
         },
         runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.0" }) },
-        permissions: { request: async () => true },
+        permissions: { request: async () => true, remove: async () => true },
       };
     },
     { stored, at: NOW },
@@ -111,7 +117,8 @@ test("a withdrawal was announced: the cream card, and what to do", async ({ page
   const card = page.locator(`[data-waiting="${A}"]`);
   await expect(card).toHaveCSS("background-color", "rgb(234, 231, 223)");
   await expect(card).toContainText("10 SOL");
-  await expect(card).toContainText("3EKk…ezeL");
+  // The whole destination, not a shortened one.
+  await expect(card).toContainText("3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL");
   await expect(card).toContainText("Not a trusted address · it waits");
   await expect(card.locator("[data-countdown]")).toContainText(/^23:41:0\d/);
   await expect(page.getByRole("link", { name: "What to do now →" })).toHaveAttribute("href", "https://bunkermode.io/emergency");
@@ -124,6 +131,21 @@ test("a withdrawal was announced: the cream card, and what to do", async ({ page
   await expect(page.getByRole("heading")).toHaveText("Withdrawal waiting.2 Bunkers watched.");
   await expect(card).toBeVisible();
   expect(seen).toEqual({ errors: [], requests: [] });
+});
+test("it says so on every screen when it cannot see, and how old a reading is", async ({ page }) => {
+  // The last reading was four hours ago, and nothing has been read since.
+  const stale = view(A, "12400000000", "1", "12", waiting);
+  await open(page, {
+    ...quiet,
+    [`view:${A}`]: stale,
+    status: { passAt: Date.now() - 4 * 3_600_000, chainNow: String(NOW), problem: "The network could not be read.", retryAt: 0, refusals: 0, failingSince: Date.now() - 4 * 3_600_000, toldBlind: true },
+  });
+  await expect(page.getByRole("heading")).toHaveText("Withdrawalannounced.");
+  await expect(page.getByRole("alert")).toContainText("has not been able to read the network");
+  const card = page.locator(`[data-waiting="${A}"]`);
+  await expect(card).toContainText("read 4h 0m ago");
+  // The countdown keeps moving by this computer's clock: four hours have gone.
+  await expect(card.locator("[data-countdown]")).toContainText(/^19:41:0\d/);
 });
 test("check a wallet: read-only, and only the RPC is asked", async ({ page }, info) => {
   const token = (mint: string, amount: string, delegate?: string) => ({
