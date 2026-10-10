@@ -14,7 +14,7 @@ import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 
 const ROOTS = [
-  '.github', 'app', 'components', 'crates', 'docs', 'fixtures', 'lib', 'programs',
+  '.github', 'app', 'components', 'crates', 'docs', 'extension', 'fixtures', 'lib', 'programs',
   'public', 'scripts', 'sdk', 'tests', 'tools', 'vendor',
   '.env.example', '.gitignore', '.npmrc', '.nvmrc', '.vercelignore', 'CONTRIBUTING.md',
   'Cargo.lock', 'Cargo.toml', 'LICENSE', 'README.md', 'SECURITY.md', 'THIRD_PARTY.md',

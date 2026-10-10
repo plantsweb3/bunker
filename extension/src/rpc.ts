@@ -18,7 +18,8 @@ export function endpoint(raw: string): URL {
   } catch {
     throw new Error("That is not a web address.");
   }
-  const local = NETWORK.test && ["127.0.0.1", "localhost"].includes(url.hostname) && url.protocol === "http:";
+  // A test build may use its own validator, which is the one address it was built with.
+  const local = NETWORK.test && url.origin === new URL(NETWORK.defaultRpc).origin;
   if (url.protocol !== "https:" && !local) throw new Error("Use an https RPC address.");
   if (url.username || url.password) throw new Error("Put the key in the address path or query, not before an @.");
   return url;

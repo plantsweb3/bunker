@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Bunker Watch",
+  "short_name": "Bunker Watch",
+  "description": "Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys.",
+  "version": "0.1.0",
+  "minimum_chrome_version": "120",
+  "homepage_url": "https://bunkermode.io/watch",
+  "icons": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" },
+  "action": {
+    "default_title": "Bunker Watch",
+    "default_popup": "popup.html",
+    "default_icon": { "16": "icons/16.png", "32": "icons/32.png", "48": "icons/48.png", "128": "icons/128.png" }
+  },
+  "background": { "service_worker": "background.js" },
+  "permissions": ["storage", "alarms", "notifications"],
+  "host_permissions": ["https://api.mainnet-beta.solana.com/*"],
+  "optional_host_permissions": ["https://*/*"],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
+}

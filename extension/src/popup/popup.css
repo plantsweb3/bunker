@@ -1,0 +1,76 @@
+/* Bunker Watch popup, in the look of the Bunker Mode films. The colours and
+   font roles come from app/bunker-mode-tokens.css: the build puts that file's
+   :root block above this one, so there is one place they are defined. The
+   font files are in the extension; nothing is fetched. */
+@font-face { font-family: "Inter"; src: url("fonts/inter-latin-800-normal.woff2") format("woff2"); font-weight: 800; }
+@font-face { font-family: "Inter"; src: url("fonts/inter-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "Space Grotesk"; src: url("fonts/space-grotesk-latin-500-normal.woff2") format("woff2"); font-weight: 500; }
+@font-face { font-family: "JetBrains Mono"; src: url("fonts/JetBrainsMono-wght.ttf") format("truetype"); font-weight: 100 800; }
+:root { --hair: rgba(113, 146, 165, 0.7); --panel: rgba(255, 255, 255, 0.035); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 360px; height: 600px; background: var(--bm-void); color: var(--bm-chalk); font: 500 13px/1.4 var(--bm-text); overflow: hidden; }
+button, input { font: inherit; color: inherit; background: none; border: 0; border-radius: 0; }
+button { cursor: pointer; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--bm-ice); outline-offset: 2px; }
+
+.pop { position: relative; width: 360px; height: 600px; display: flex; flex-direction: column; }
+.crop { position: absolute; width: 12px; height: 12px; pointer-events: none; }
+.crop::before, .crop::after { content: ""; position: absolute; background: rgba(240, 243, 242, 0.7); }
+.crop::before { width: 12px; height: 1px; top: 5.5px; }
+.crop::after { width: 1px; height: 12px; left: 5.5px; }
+.c1 { top: 8px; left: 8px; } .c2 { top: 8px; right: 8px; } .c3 { bottom: 70px; left: 8px; } .c4 { bottom: 70px; right: 8px; }
+.head { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px 10px; border-bottom: 1px solid rgba(113, 146, 165, 0.35); }
+.brand { display: flex; align-items: center; gap: 8px; font: 700 11px var(--bm-mono); letter-spacing: 0.06em; }
+.brand svg { width: 16px; height: 16px; }
+.net { font: 500 10px var(--bm-mono); color: var(--bm-steel); border: 1px solid var(--hair); padding: 2px 6px; letter-spacing: 0.05em; }
+.body { flex: 1; min-height: 0; padding: 18px 20px 12px; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #26323a transparent; }
+.big { font: 800 31px/0.98 var(--bm-display); letter-spacing: -0.03em; text-transform: uppercase; color: var(--bm-chalk); }
+.big span { display: block; color: var(--bm-ice); }
+.chip { display: inline-block; font: 700 10px/1 var(--bm-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 5px 7px; background: var(--bm-ink); color: var(--bm-chalk); }
+.chip.ice { background: var(--bm-ice-ink); }
+.chip.cream { background: var(--bm-cream); color: var(--bm-ink); }
+.chip.line { background: transparent; border: 1px solid var(--hair); color: var(--bm-steel); }
+.panel { background: var(--panel); border: 1px solid var(--hair); }
+.ph { font: 500 10px var(--bm-mono); color: var(--bm-steel); text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px 6px; border-bottom: 1px solid rgba(113, 146, 165, 0.4); display: flex; justify-content: space-between; gap: 8px; }
+.pb { padding: 10px 12px 12px; display: grid; gap: 6px; }
+.kv { display: flex; justify-content: space-between; gap: 12px; font: 500 12px var(--bm-mono); }
+.kv .k { color: var(--bm-steel); flex: none; }
+.kv span:last-child { text-align: right; overflow-wrap: anywhere; }
+.note { font: 500 12px/1.45 var(--bm-text); color: #b9c7cf; }
+.note em { font-style: normal; color: var(--bm-ice); }
+.note.small { font-size: 11px; }
+.note.problem { color: var(--bm-cream); border-left: 2px solid var(--bm-cream); padding-left: 8px; }
+.btn { display: block; width: 100%; text-align: center; font: 700 11px var(--bm-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 11px 12px; }
+.btn.fill { background: var(--bm-ice); color: var(--bm-ink); }
+.btn.out { border: 1px solid var(--bm-ice); color: var(--bm-ice); }
+.btn.ghost { border: 1px solid var(--hair); color: var(--bm-steel); }
+.btn:disabled { opacity: 0.5; cursor: default; }
+.link { font: 500 10px var(--bm-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--bm-steel); text-decoration: underline; text-underline-offset: 3px; }
+.field { display: flex; border: 1px solid var(--hair); background: rgba(255, 255, 255, 0.02); }
+.field input { flex: 1; min-width: 0; padding: 9px 10px; font: 500 12px var(--bm-mono); }
+.field input::placeholder { color: #5d7180; }
+.field button { padding: 0 12px; font: 700 11px var(--bm-mono); letter-spacing: 0.06em; color: var(--bm-ice); text-transform: uppercase; }
+.dot { display: inline-block; width: 6px; height: 6px; background: var(--bm-ice); margin-right: 6px; vertical-align: 1px; }
+.tabs { display: flex; border-top: 1px solid rgba(113, 146, 165, 0.35); }
+.tabs button { flex: 1; text-align: center; font: 700 10px var(--bm-mono); letter-spacing: 0.05em; padding: 10px 0 9px; color: var(--bm-steel); text-transform: uppercase; }
+.tabs button[aria-selected="true"] { color: var(--bm-ice); box-shadow: inset 0 2px 0 var(--bm-ice); }
+.ticker { height: 24px; background: rgba(14, 16, 18, 0.95); border-top: 1px solid rgba(113, 146, 165, 0.3); font: 500 9.5px/24px var(--bm-mono); color: var(--bm-chalk); white-space: nowrap; overflow: hidden; letter-spacing: 0.03em; }
+.ticker > span { display: inline-block; padding-left: 10px; animation: ticker 40s linear infinite; }
+.ticker i { font-style: normal; color: var(--bm-steel); padding: 0 8px; }
+@keyframes ticker { to { transform: translateX(-50%); } }
+@media (prefers-reduced-motion: reduce) { .ticker > span { animation: none; } }
+
+/* A waiting withdrawal: the films' paper one-time-key card. Cream, never red. */
+.cream { background: var(--bm-cream); color: var(--bm-ink); }
+.cream .ph { color: #4b5a63; border-bottom-color: rgba(14, 16, 18, 0.15); }
+.cream .kv .k { color: #55646d; }
+.ringwrap { display: flex; gap: 14px; align-items: center; }
+.ring { width: 92px; height: 92px; flex: none; }
+.ringtxt { font: 700 20px var(--bm-mono); letter-spacing: -0.01em; }
+.ringtxt small { display: block; font: 500 10px var(--bm-mono); color: #55646d; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px; }
+.kit { display: block; width: 100%; height: 96px; object-fit: cover; border: 1px solid var(--hair); }
+.log { display: grid; gap: 8px; }
+.log p { font: 500 11px/1.45 var(--bm-mono); color: #9fb3bf; white-space: pre-line; overflow-wrap: anywhere; }
+.log b { display: block; color: var(--bm-chalk); font-weight: 700; }
+.row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
