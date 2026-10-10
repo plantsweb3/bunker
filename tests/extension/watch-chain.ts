@@ -120,7 +120,7 @@ try {
   const card = popup.locator(`[data-waiting="${vault.toBase58()}"]`);
   check(((await card.textContent()) ?? "").includes("2 SOL"), "the card shows the amount");
   check(((await card.textContent()) ?? "").includes("Not a trusted address"), "the card says it is not a trusted address");
-  check(((await card.textContent()) ?? "").includes(`${thief.toBase58().slice(0, 4)}…${thief.toBase58().slice(-4)}`), "the card shows where it is going");
+  check(((await card.textContent()) ?? "").includes(thief.toBase58()), "the card shows the whole address it is going to");
 
   // Cancel it with a recovery packet. The extension reports that too, and the badge goes back.
   const packet = recoveryPacket(master, g.d, 0n);

@@ -6,6 +6,7 @@ import "@/sdk/polyfill";
 import { PublicKey } from "@solana/web3.js";
 import { readExposure, TooLarge } from "@/lib/exposure-read";
 import { formatAmount } from "@/sdk/bytes";
+import { formatDuration } from "@/sdk/v3/chain";
 import type { Exposure } from "@/sdk/exposure";
 import { mintLabel } from "@/sdk/known-mints";
 import { BEST_EFFORT, MAX_WATCHED, NETWORK, NEVER_ASKS, SITE, STATUS_LINE, short } from "../config";
@@ -81,11 +82,6 @@ declare const __BUNKER_WATCH_KIT__: string[] | undefined;
 const packed = typeof __BUNKER_WATCH_KIT__ === "undefined" ? [] : __BUNKER_WATCH_KIT__;
 const kit = (name: string) => (packed.includes(`${name}.jpg`) ? h("img", { className: "kit", src: `kit/${name}.jpg`, alt: "" }) : null);
 
-/** Chain time now, from the last pass's reading and this computer's clock since. */
-function chainNow(s: store.Status): bigint {
-  if (!s.chainNow || !s.passAt) return BigInt(Math.floor(Date.now() / 1000));
-  return BigInt(s.chainNow) + BigInt(Math.max(0, Math.floor((Date.now() - s.passAt) / 1000)));
-}
 function ring(fraction: number) {
   const around = 2 * Math.PI * 38;
   return svg(
@@ -105,6 +101,12 @@ function ring(fraction: number) {
     }),
   );
 }
+/** When a Bunker was last read. An old reading says how old, because a card
+ * that looks current and is hours stale is worse than no card. */
+function readAt(view: store.View, now: bigint) {
+  const age = now - BigInt(view.checkedAt);
+  return age > 180n ? `read ${formatDuration(age)} ago` : `checked ${timeOfDay(view.checkedAt)}`;
+}
 /** The cream card for a withdrawal that is waiting. */
 function waitingCard(view: store.View, now: bigint) {
   const p = view.pending!;
@@ -113,7 +115,7 @@ function waitingCard(view: store.View, now: bigint) {
   return h(
     "div",
     { className: "panel cream", "data-waiting": view.address },
-    h("div", { className: "ph" }, h("span", {}, `Bunker ${short(view.address)}`), h("span", {}, `checked ${timeOfDay(view.checkedAt)}`)),
+    h("div", { className: "ph" }, h("span", {}, `Bunker ${short(view.address)}`), h("span", {}, readAt(view, now))),
     h(
       "div",
       { className: "pb" },
@@ -121,19 +123,21 @@ function waitingCard(view: store.View, now: bigint) {
         "div",
         { className: "ringwrap" },
         ring(view.delaySecs > 0 ? Number(left) / view.delaySecs : 0),
-        h("div", { className: "ringtxt", "data-countdown": p.opensAt }, open ? "00:00:00" : clock(left), h("small", {}, open ? "it can leave now" : "until it opens")),
+        h("div", { className: "ringtxt", "data-countdown": p.opensAt, "data-open": String(open) }, open ? "00:00:00" : clock(left), h("small", {}, open ? "it can leave now" : "until it opens")),
       ),
       kvRow("Amount", amountOf(p)),
-      kvRow("To", short(p.destination)),
+      // The whole address. A thief can make one that starts and ends like yours.
+      h("div", { className: "to" }, h("span", { className: "k" }, "To"), h("span", { className: "whole" }, p.destination)),
       h("div", {}, h("span", { className: "chip" }, p.trusted ? "A trusted address · no wait" : "Not a trusted address · it waits")),
+      view.problem ? h("p", { className: "note problem" }, view.problem) : null,
     ),
   );
 }
-function quietCard(view: store.View) {
+function quietCard(view: store.View, now: bigint) {
   return h(
     "div",
     { className: "panel", "data-bunker": view.address },
-    h("div", { className: "ph" }, h("span", {}, `Bunker ${short(view.address)}`), h("span", {}, `checked ${timeOfDay(view.checkedAt)}`)),
+    h("div", { className: "ph" }, h("span", {}, `Bunker ${short(view.address)}`), h("span", {}, readAt(view, now))),
     h(
       "div",
       { className: "pb" },
@@ -166,19 +170,27 @@ function addForm() {
 
 async function watchTab(): Promise<Node[]> {
   const [shown, status, acknowledged, recent] = await Promise.all([store.views(kv), store.status(kv), store.acknowledged(kv), store.log(kv)]);
-  const now = chainNow(status);
-  const alert = shown.find((v) => v.pending && !acknowledged.includes(v.pending.digest));
-  const problem = ui.problem || status.problem;
-  if (alert) {
-    const p = alert.pending!;
+  const now = store.chainNow(status);
+  const alerts = shown.filter((v) => v.pending && !acknowledged.includes(v.pending.digest));
+  // What it cannot see matters most when something is waiting, so it is said on every screen.
+  const problem =
+    ui.problem ||
+    (store.blind(status)
+      ? "Bunker Watch has not been able to read the network for several minutes. What is shown here may be out of date."
+      : status.problem);
+  if (alerts.length) {
     return [
-      big("Withdrawal", "announced."),
-      waitingCard(alert, now),
+      big(alerts.length === 1 ? "Withdrawal" : `${alerts.length} withdrawals`, "announced."),
+      problem ? h("p", { className: "note problem", role: "alert" }, problem) : null,
       h("p", { className: "note" }, "If this was not you, ", h("em", {}, "cancel it before it opens."), " Use your cancel file, or your recovery kit in the offline tool."),
       out("/emergency", "What to do now →", "btn fill"),
-      h("button", { className: "btn ghost", onclick: () => void run(() => store.acknowledge(kv, p.digest)) }, "It was me"),
+      // Every one that is waiting, each with its own answer.
+      ...alerts.flatMap((v) => [
+        waitingCard(v, now),
+        h("button", { className: "btn ghost", onclick: () => void run(() => store.acknowledge(kv, v.pending!.digest)) }, alerts.length === 1 ? "It was me" : `It was me (${short(v.address)})`),
+      ]),
       h("p", { className: "note small" }, NEVER_ASKS),
-    ];
+    ].filter((n) => n !== null);
   }
   const waiting = shown.filter((v) => v.pending);
   const count = `${shown.length} Bunker${shown.length === 1 ? "" : "s"} watched.`;
@@ -186,7 +198,7 @@ async function watchTab(): Promise<Node[]> {
     shown.length === 0 ? big("Nothing watched.", "Add your Bunker.") : waiting.length ? big("Withdrawal waiting.", count) : big("All quiet.", count),
     shown.length === 0 ? kit("watch-empty") : null,
     problem ? h("p", { className: "note problem", role: "alert" }, problem) : null,
-    ...shown.map((v) => (v.pending ? waitingCard(v, now) : quietCard(v))),
+    ...shown.map((v) => (v.pending ? waitingCard(v, now) : quietCard(v, now))),
     ui.adding
       ? addForm()
       : shown.length < MAX_WATCHED
@@ -264,13 +276,32 @@ async function settingsTab(): Promise<Node[]> {
   input.addEventListener("input", () => (ui.typed.rpc = input.value));
   const save = () =>
     void run(async () => {
-      if (!input.value.trim()) return store.setSettings(kv, { rpc: null }).then(pass);
+      if (!input.value.trim()) {
+        await store.setSettings(kv, { rpc: null });
+        if (current.rpc && new URL(current.rpc).origin !== new URL(NETWORK.defaultRpc).origin)
+          await chrome.permissions.remove({ origins: [`${new URL(current.rpc).origin}/*`] }).catch(() => false);
+        ui.typed.rpc = null;
+        return pass();
+      }
       const url = endpoint(input.value);
+      const origin = (u: string) => `${new URL(u).origin}/*`;
+      const standard = origin(NETWORK.defaultRpc);
       // The browser asks the user to allow this one origin. Nothing else is allowed.
-      if (!(await chrome.permissions.request({ origins: [`${url.origin}/*`] })))
+      if (!(await chrome.permissions.request({ origins: [origin(url.href)] })))
         throw new Error("The browser did not allow that address, so the setting was not changed.");
-      await assertGenesis(connect(url));
+      try {
+        await assertGenesis(connect(url));
+      } catch (e) {
+        // An endpoint that is refused does not keep the permission it was just given.
+        if (origin(url.href) !== standard && origin(url.href) !== (current.rpc && origin(current.rpc)))
+          await chrome.permissions.remove({ origins: [origin(url.href)] }).catch(() => false);
+        throw e;
+      }
       await store.setSettings(kv, { rpc: url.href });
+      // Nor does the endpoint that is no longer used.
+      if (current.rpc && origin(current.rpc) !== origin(url.href) && origin(current.rpc) !== standard)
+        await chrome.permissions.remove({ origins: [origin(current.rpc)] }).catch(() => false);
+      ui.typed.rpc = null;
       void pass();
     });
   return [
@@ -334,9 +365,11 @@ async function render() {
 }
 // The countdown moves every second without redrawing the rest.
 setInterval(async () => {
-  const now = chainNow(await store.status(kv));
+  const now = store.chainNow(await store.status(kv));
   for (const el of document.querySelectorAll<HTMLElement>("[data-countdown]")) {
     const left = BigInt(el.dataset.countdown!) - now;
+    // The moment it opens, the card is redrawn to say so.
+    if (left <= 0n && el.dataset.open === "false" && !ui.busy) return void render();
     if (el.firstChild) el.firstChild.textContent = clock(left);
   }
 }, 1000);

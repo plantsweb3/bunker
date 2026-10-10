@@ -85,8 +85,8 @@ test("demo has a complete, resettable journey", async ({ page }) => {
 test("security, documentation, verification and no horizontal overflow", async ({
   page,
 }) => {
-  // The verify page now reads the program from mainnet, which can be slow.
-  test.setTimeout(60_000);
+  // Fifteen pages, and the verify page reads the program from mainnet, which can be slow.
+  test.setTimeout(120_000);
   for (const path of [
     "/",
     "/vault",

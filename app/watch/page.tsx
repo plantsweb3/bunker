@@ -69,7 +69,8 @@ export default function Watch() {
         <ul>
           <li>It does not withdraw, deposit, cancel or recover. Those stay on this site, the offline tool and the command-line client.</li>
           <li>It runs only while your browser is running. A closed laptop sees nothing until it is opened again.</li>
-          <li>Alerts are best effort and can be late or missing. Silence is not proof that nothing happened.</li>
+          <li>Alerts are best effort and can be late or missing. Silence is not proof that nothing happened. If it cannot read the network for five minutes, its badge shows “!” and it tells you once.</li>
+          <li>It believes its RPC endpoint. An endpoint that lies can show it anything.</li>
           <li>It reports SOL arriving, not token deposits.</li>
           <li>It protects nothing by itself. Bunker protects the withdrawal path, not the chain, and this only tells you what happened on that path.</li>
         </ul>
@@ -97,8 +98,11 @@ export default function Watch() {
           The zip is built from the <a href="https://github.com/plantsweb3/bunker/tree/main/extension">public source</a>{" "}
           and comes out the same, byte for byte, on any machine:{" "}
           <code>npm ci && npm run extension:build</code>, then compare the
-          SHA-256. Fake extensions with this name will appear. The real one
-          is the file with this hash, and it never asks for a key.
+          SHA-256. A store repackages what it is given, so an installed copy
+          is checked file by file: each file’s own hash is in{" "}
+          <a href="/source/extension-manifest.json">extension-manifest.json</a>.
+          Fake extensions with this name will appear. The real one matches
+          these hashes, and it never asks for a key.
         </p>
       </section>
       <section>

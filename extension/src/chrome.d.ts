@@ -48,7 +48,7 @@ declare namespace chrome {
   }
   namespace permissions {
     function request(p: { origins: string[] }): Promise<boolean>;
-    function contains(p: { origins: string[] }): Promise<boolean>;
+    function remove(p: { origins: string[] }): Promise<boolean>;
   }
   namespace tabs {
     function create(p: { url: string }): Promise<unknown>;

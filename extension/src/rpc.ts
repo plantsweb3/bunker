@@ -25,8 +25,15 @@ export function endpoint(raw: string): URL {
   return url;
 }
 export const endpointOf = (s: Settings) => endpoint(s.rpc ?? NETWORK.defaultRpc);
+/** No request waits longer than this. An endpoint that accepts a request and
+ * never answers must count as a failure, not as silence. */
+const TIME_LIMIT_MS = 15_000;
 export const connect = (url: URL) =>
-  new Connection(url.href, { commitment: "confirmed", disableRetryOnRateLimit: true });
+  new Connection(url.href, {
+    commitment: "confirmed",
+    disableRetryOnRateLimit: true,
+    fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(TIME_LIMIT_MS) }),
+  });
 export async function assertGenesis(connection: Pick<Connection, "getGenesisHash">) {
   if ((await connection.getGenesisHash()) !== NETWORK.genesis) throw new WrongNetwork();
 }

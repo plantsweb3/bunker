@@ -29,13 +29,32 @@ if (test) {
   );
   const rpc = env.BUNKER_TEST_RPC_URL ?? "http://127.0.0.1:19099";
   if (!env.BUNKER_TEST_PROGRAM_ID || !env.BUNKER_LOCAL_GENESIS) throw new Error("Run npm run setup:local first.");
+  // A test build is for a validator on this computer and nothing else.
+  if (!["127.0.0.1", "localhost"].includes(new URL(rpc).hostname)) throw new Error("A test build may only use a local validator.");
   local = JSON.stringify({ rpc, program: env.BUNKER_TEST_PROGRAM_ID, genesis: env.BUNKER_LOCAL_GENESIS });
   manifest.name = "Bunker Watch (LOCAL TEST BUILD)";
   manifest.host_permissions = [`${new URL(rpc).origin}/*`];
   manifest.optional_host_permissions = [];
+  manifest.content_security_policy.extension_pages = manifest.content_security_policy.extension_pages.replace(
+    "connect-src https:",
+    `connect-src ${new URL(rpc).origin}`,
+  );
 }
-// Pictures from the watch kit that exist. The popup asks only for these.
-const kitPictures = (await readdir("extension/assets/kit")).filter((n) => /\.(jpg|png|webp)$/.test(n)).sort();
+// Exactly these files go in, and no others: a stray file in the checkout must
+// not change what is published. Pictures from the watch kit are the two the
+// popup knows how to show, when they exist.
+const FONTS = [
+  "JetBrainsMono-wght.ttf",
+  "inter-OFL.txt",
+  "inter-latin-500-normal.woff2",
+  "inter-latin-800-normal.woff2",
+  "jetbrainsmono-OFL.txt",
+  "space-grotesk-latin-500-normal.woff2",
+  "spacegrotesk-OFL.txt",
+];
+const ICONS = ["128.png", "16.png", "32.png", "48.png"];
+const KIT = ["watch-empty.jpg", "watch-quiet.jpg"];
+const kitPictures = (await readdir("extension/assets/kit")).filter((n) => KIT.includes(n)).sort();
 const bundle = async (entry) => {
   const result = await build({
     entryPoints: [entry],
@@ -62,9 +81,8 @@ files.set("background.js", Buffer.from(await bundle("extension/src/background.ts
 files.set("popup.js", Buffer.from(await bundle("extension/src/popup/popup.ts")));
 files.set("popup.html", await readFile("extension/src/popup/popup.html"));
 files.set("popup.css", Buffer.from(`${rootBlock}\n${await readFile("extension/src/popup/popup.css", "utf8")}`));
-for (const dir of ["fonts", "icons", "kit"])
-  for (const name of (await readdir(`extension/assets/${dir}`)).sort())
-    if (!name.startsWith(".")) files.set(`${dir}/${name}`, await readFile(`extension/assets/${dir}/${name}`));
+for (const [dir, list] of [["fonts", FONTS], ["icons", ICONS], ["kit", kitPictures]])
+  for (const name of list) files.set(`${dir}/${name}`, await readFile(`extension/assets/${dir}/${name}`));
 const names = [...files.keys()].sort();
 
 if (test) {
@@ -76,12 +94,7 @@ if (test) {
   }
   console.log(`Bunker Watch, local test build: ${names.length} files in ${out}. Not for publishing.`);
 } else {
-  // A published build can be given no network but mainnet: the test network's
-  // values exist only as a build-time substitution, which must be gone, and
-  // every address the browser will let it reach must be https.
-  for (const name of ["background.js", "popup.js"])
-    if (files.get(name).includes("__BUNKER_WATCH_TEST__"))
-      throw new Error(`${name} still refers to a test network.`);
+  // Every address the browser will let a published build reach must be https.
   for (const host of [...manifest.host_permissions, ...manifest.optional_host_permissions])
     if (!host.startsWith("https://")) throw new Error(`A published build must not be allowed to reach ${host}.`);
   // The same files unpacked, for loading into a browser by hand and for the tests.
@@ -101,6 +114,14 @@ if (test) {
     version: manifest.version,
     bytes: zip.length,
     sha256: createHash("sha256").update(zip).digest("hex"),
+    // A store repackages what it is given, so the zip's hash will not match an
+    // installed copy. Each file's hash will: compare these with the files in
+    // the browser's folder for the extension.
+    files: names.map((name) => ({
+      path: name,
+      bytes: files.get(name).length,
+      sha256: createHash("sha256").update(files.get(name)).digest("hex"),
+    })),
     permissions: manifest.permissions,
     hostPermissions: manifest.host_permissions,
     optionalHostPermissions: manifest.optional_host_permissions,

@@ -52,7 +52,7 @@ export function chain(vaultIds = [id(7)], genesis = MAINNET_GENESIS) {
   const asked: string[] = [];
   let failWith: Error | null = null;
   const clock = new Uint8Array(40);
-  const at = { now: NOW };
+  const at = { now: NOW, slot: 1000 };
   const account = (key: PublicKey) => {
     const found = state.get(key.toBase58());
     return found ? { data: Buffer.from(vaultData(found.vaultId, found.v)), owner: found.v.owner, lamports: found.v.lamports } : null;
@@ -77,7 +77,15 @@ export function chain(vaultIds = [id(7)], genesis = MAINNET_GENESIS) {
           new DataView(clock.buffer).setBigInt64(32, at.now, true);
           return { data: Buffer.from(clock), owner: PublicKey.default, lamports: 1 };
         }),
-      getMultipleAccountsInfo: async (keys: PublicKey[]) => ask("getMultipleAccountsInfo", () => keys.map(account)),
+      getMultipleAccountsInfoAndContext: async (keys: PublicKey[]) =>
+        ask("getMultipleAccountsInfoAndContext", () => ({
+          context: { slot: at.slot++ },
+          value: keys.map((key) => {
+            if (key.toBase58() !== CLOCK) return account(key);
+            new DataView(clock.buffer).setBigInt64(32, at.now, true);
+            return { data: Buffer.from(clock), owner: PublicKey.default, lamports: 1 };
+          }),
+        })),
     } as never,
   };
 }

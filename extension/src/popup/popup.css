@@ -69,6 +69,9 @@ a { color: inherit; text-decoration: none; }
 .ring { width: 92px; height: 92px; flex: none; }
 .ringtxt { font: 700 20px var(--bm-mono); letter-spacing: -0.01em; }
 .ringtxt small { display: block; font: 500 10px var(--bm-mono); color: #55646d; letter-spacing: 0.05em; text-transform: uppercase; margin-top: 2px; }
+.to { display: grid; gap: 2px; font: 500 12px var(--bm-mono); }
+.to .k { color: #55646d; }
+.to .whole { font-size: 11px; line-height: 1.35; overflow-wrap: anywhere; }
 .kit { display: block; width: 100%; height: 96px; object-fit: cover; border: 1px solid var(--hair); }
 .log { display: grid; gap: 8px; }
 .log p { font: 500 11px/1.45 var(--bm-mono); color: #9fb3bf; white-space: pre-line; overflow-wrap: anywhere; }
