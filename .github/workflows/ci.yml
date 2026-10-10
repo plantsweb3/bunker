@@ -69,6 +69,23 @@ jobs:
             public/source/cli-manifest.json
           if-no-files-found: error
           retention-days: 90
+      - name: Browser extension builds reproducibly
+        run: |
+          cp public/source/bunker-watch.zip /tmp/watch-first.zip
+          npm run extension:build
+          cmp /tmp/watch-first.zip public/source/bunker-watch.zip
+          cat public/source/extension-manifest.json
+          # The zip opens, and holds what its manifest names.
+          mkdir /tmp/watch-alone && (cd /tmp/watch-alone && unzip -q "$GITHUB_WORKSPACE/public/source/bunker-watch.zip" && test -f manifest.json -a -f background.js -a -f popup.html)
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          name: bunker-watch-extension
+          path: |
+            public/source/bunker-watch.zip
+            public/source/extension-manifest.json
+          if-no-files-found: error
+          retention-days: 90
       - run: npm run build
   # The compiled program, exercised in an in-process VM: every instruction,
   # the vault-isolation attacks, and the client's own bytes.
