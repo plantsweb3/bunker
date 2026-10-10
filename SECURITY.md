@@ -1,6 +1,6 @@
 # Security policy
 
-Bunker is in public beta on Solana mainnet and holds real funds. No independent audit has been done and none is booked. The program can be upgraded by one key, held by the maintainer on a hardware wallet. Deposit only what you could afford to lose.
+Bunker is in public beta on Solana mainnet and holds real funds. An independent audit has been commissioned. It has not been completed, and until its report is published this code is unaudited. The program can be upgraded by one key, held by the maintainer on a hardware wallet. Deposit only what you could afford to lose.
 
 ## Report privately
 

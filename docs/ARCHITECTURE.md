@@ -12,6 +12,7 @@ Status: public beta on Solana mainnet, holding real funds. No independent audit.
 | Client | `sdk/v3`, `sdk/lmots.ts` | Derivation, encodings, instructions, key files, signing journal, passkey storage |
 | Offline recovery tool | `tools/recovery` | The only code that handles the archival master |
 | Web app | `app`, `components/bunker` | Next.js App Router on Vercel |
+| Browser extension | `extension` | Bunker Watch: reads watched vaults once a minute and alerts on a change. Holds no key and sends no transaction |
 
 ## The program
 
@@ -69,6 +70,18 @@ Optional, and off unless every piece is configured (`lib/alerts/config.ts`): a T
 - **Watching.** `vercel.json` schedules `/api/cron/watch` every minute; the route requires the cron secret. Each pass takes a lock and, until it has covered up to 1,000 watched vaults or 40 seconds have gone, takes the next 100 in turn, reads their accounts and their stored snapshots in one request each, compares each with the snapshot from the previous pass (`lib/alerts/watch.ts` `diff`), and sends one plain-text message per change to each subscriber. It does not read transactions, so traffic aimed at a vault can neither bury a change nor imitate one.
 - **What is stored:** Telegram chat ids, the vault addresses each watches, and each vault's last reported public state. No keys, no wallet addresses, no message contents.
 - **Limits.** Best effort. A pass can be late or fail; an event is reported after it is confirmed, so on a vault with no waiting period the alert for a withdrawal arrives after the assets have left. A delivery Telegram refuses is not retried. A crash mid-pass can repeat an alert. Token deposits and SOL arrivals under 0.001 SOL are not reported. Two changes between passes are reported as what they add up to. Anyone can subscribe to any vault's public activity. The subscription message says that silence is not proof nothing happened.
+
+## Browser extension (Bunker Watch)
+
+`extension/` is a Manifest V3 extension that watches up to five Bunkers and does nothing else. It is the first of a planned series; a later release that signs withdrawals is not in this repository and will not be until the audit report is published and its findings are fixed.
+
+- **What it holds:** the addresses watched, the last public state of each, a short list of recent alerts and the RPC setting, in `chrome.storage.local`. No key file, seed, password or wallet connection exists anywhere in it. `tests/extension/build.test.ts` checks that none of the code that opens key files, signs or keeps the signing journal is in the build.
+- **What it reuses.** The comparing is `snapshotOf` and `diff` from `lib/alerts/watch.ts`, unchanged, so an alert comes from what the vault account is and not from which transactions mention it. Wording for everything but an announcement is `eventText` from `lib/alerts/messages.ts`. Vault reading and validation are `fetchVault`, `parseVault` and `vaultAddress` from `sdk/v3`; whether a destination is trusted is `toTrusted`. The wallet check is `lib/exposure-read.ts` and `sdk/exposure.ts`, the same code as `/check`. Nothing in `sdk/`, `programs/`, `crates/` or `tools/` was changed for it.
+- **A pass** (`extension/src/watch.ts`). The background service worker is woken by an alarm every minute. It checks the endpoint's genesis hash, reads consensus time and all watched accounts in one request, validates each as a vault of the pinned program at the address of its own identity, compares it with the stored snapshot, shows a notification for each event and sets the badge: cream with the hours left when a withdrawal is waiting, otherwise ice with the number watched. It keeps nothing in memory between wakes. If the endpoint answers 429 it waits one minute, then two, four, up to thirty.
+- **The network.** It talks to one RPC endpoint: `https://api.mainnet-beta.solana.com` by default, or one the user sets, which the browser is asked to allow for that single origin. The site's `/api/rpc` refuses other origins and is not used. `extension/src/config.ts` takes the program and genesis from `lib/bunker-config.ts`; no setting changes them.
+- **Permissions:** `storage`, `alarms`, `notifications`, and the RPC origin. No content scripts, no `tabs`, no `scripting`, no remote code; the page policy is `script-src 'self'; object-src 'self'`. The manifest lists `https://*/*` as an *optional* host permission, which is what lets a user choose their own endpoint; nothing under it is granted until the user approves one origin.
+- **The build.** `scripts/build-extension.mjs` bundles with esbuild and writes the zip itself, files in a fixed order with a fixed date and stored without compression, so the bytes do not depend on the machine. It writes `public/source/bunker-watch.zip` and `extension-manifest.json` with the SHA-256. CI builds twice and compares. `--test` makes a separate build for a local validator, with that network's values put in at build time; it is the only build that can reach anything but mainnet and is never published.
+- **Limits.** It runs only while the browser runs. Alerts are best effort and can be late or missing. It reports SOL arriving but not token deposits, as the alert service does. A waiting withdrawal that already exists when watching starts is shown, not announced.
 
 ## Release gate
 
