@@ -33,7 +33,9 @@ async function tick() {
     if (!held) return;
     const result = await runPass(kv, connect(endpointOf(await store.settings(kv))));
     const at = Date.now();
-    for (const [i, notice] of result.notices.entries()) await show(notice, at + i);
+    // A notification the browser will not show must not stop the badge and
+    // the popup from saying what happened.
+    for (const [i, notice] of result.notices.entries()) await Promise.resolve(show(notice, at + i)).catch(() => undefined);
     await chrome.action.setBadgeBackgroundColor({ color: result.badge.color });
     await chrome.action.setBadgeTextColor({ color: INK });
     await chrome.action.setBadgeText({ text: result.badge.text });
