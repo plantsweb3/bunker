@@ -34,7 +34,15 @@ export default function ExtensionBuild() {
       </div>
       <div className="metric">
         <span>Chrome Web Store item</span>
-        <b className="address">{build.storeItemId ?? "Not in the store yet. Any listing you find is not ours."}</b>
+        <b className="address">
+          {build.storeItemId ? (
+            <a href={`https://chromewebstore.google.com/detail/${build.storeItemId}`} target="_blank" rel="noreferrer">
+              {build.storeItemId}
+            </a>
+          ) : (
+            "Not in the store yet. Any listing you find is not ours."
+          )}
+        </b>
       </div>
     </div>
   );
