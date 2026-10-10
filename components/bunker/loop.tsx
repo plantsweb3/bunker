@@ -9,26 +9,46 @@ export default function Loop({
   src,
   poster,
   className = "",
+  onScreenOnly = false,
 }: {
   /** Sources in the order to offer them. */
   src: string[];
   poster: string;
   className?: string;
+  /** Play only while some of the clip is actually on screen, and start
+   * fetching it a little before that. Without this it plays from a little
+   * before it comes on screen, which suits a backdrop. */
+  onScreenOnly?: boolean;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = video.current;
     if (!el || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const watch = new IntersectionObserver(
+    const play = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) el.play().catch(() => {});
         else el.pause();
       },
-      { rootMargin: "240px 0px" },
+      { rootMargin: onScreenOnly ? "0px" : "240px 0px" },
     );
-    watch.observe(el);
-    return () => watch.disconnect();
-  }, []);
+    play.observe(el);
+    // Nothing but the poster is fetched until the clip is near the screen.
+    const near = onScreenOnly
+      ? new IntersectionObserver(
+          ([entry]) => {
+            if (!entry.isIntersecting) return;
+            el.preload = "auto";
+            near?.disconnect();
+          },
+          { rootMargin: "600px 0px" },
+        )
+      : null;
+    near?.observe(el);
+    return () => {
+      play.disconnect();
+      near?.disconnect();
+    };
+  }, [onScreenOnly]);
   return (
     <video ref={video} className={`loop ${className}`} muted loop playsInline preload="none" poster={poster} aria-hidden="true">
       {src.map((s) => (

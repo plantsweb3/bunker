@@ -101,6 +101,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/docs",
     "/bounty",
     "/watch",
+    "/roadmap",
     "/verify",
   ]) {
     const response = await page.goto(path);
@@ -302,6 +303,64 @@ test("bounty: no number without a wallet, private reports, no amounts made up", 
   // Nothing on the page sells the coin.
   expect(await page.locator('a[href*="pump.fun"], a[href*="dexscreener"], a[href*="jup.ag"]').count()).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
+test("roadmap: five doors, the first one open, and each loop plays only while it is on screen", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
+  await page.goto("/roadmap");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("The plan.Gates, not dates.");
+  const doors = page.locator(".door");
+  await expect(doors).toHaveCount(5);
+  // The wording is the film's.
+  for (const [n, name, chip, line] of [
+    [1, "Watch", "Out now", "Built. Alerts when a withdrawal is announced. Holds no keys."],
+    [2, "Signer, drawn", "Design only", "Designed while the audit runs. Not built, not shipped."],
+    [3, "The report", "When it lands", "Published in the open when the auditors finish."],
+    [4, "Signer, built", "After the red ink", "Only on the code the audit covered, plus its fixes."],
+    [5, "Build on Bunker", "Next", "Phone alerts, integrations, a cancel-file helper. Each reviewed first."],
+  ] as const) {
+    const door = doors.nth(n - 1);
+    await expect(door.getByRole("heading")).toHaveText(`Door 0${n}.${name}.`);
+    await expect(door.locator(".door-label")).toHaveText(`THE PLAN · DOOR 0${n} / 05`);
+    await expect(door.locator(".bm-chip")).toHaveText(chip);
+    await expect(door.getByText(line, { exact: true })).toBeVisible();
+    await expect(door.locator(".door-strip i.on")).toHaveCount(1);
+  }
+  // Only the first door is a way in, and the whole panel is the link.
+  await expect(page.locator("a.door-panel")).toHaveCount(1);
+  await expect(doors.first().getByRole("link")).toHaveAttribute("href", "/watch");
+  await expect(doors.first().getByRole("link")).toContainText("Open Bunker Watch →");
+  // A loop plays while its door is on screen and stops when it has left.
+  const playing = () => page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>(".door video")].map((v) => !v.paused));
+  await doors.nth(0).scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await playing())[0]).toBe(true);
+  expect((await playing())[4]).toBe(false);
+  await doors.nth(4).scrollIntoViewIfNeeded();
+  await expect.poll(async () => (await playing())[4]).toBe(true);
+  await expect.poll(async () => (await playing())[0]).toBe(false);
+  for (const video of await page.locator(".door video").all()) {
+    await expect(video).toHaveJSProperty("muted", true);
+    await expect(video).toHaveJSProperty("loop", true);
+    await expect(video).toHaveAttribute("playsinline", "");
+  }
+  await expect(page.getByText("Roadmap, not a promise of dates. Each step waits for the one before.")).toBeVisible();
+  await expect(page.locator(".roadmap-end")).toContainText("PUBLIC BETA · UNAUDITED");
+  // The words the page must not use, and no inline styles for the page policy to refuse.
+  const text = (await page.locator("main").innerText()).toLowerCase();
+  for (const never of ["chrome web store", "unhackable", "quantum", "—", "202"]) expect(text, never).not.toContain(never);
+  expect(text.replace("unaudited", "")).not.toContain("audited");
+  expect(await page.locator(".roadmap [style]").count()).toBe(0);
+  expect(await page.locator('meta[property="og:image"]').getAttribute("content")).toContain("/assets/film/while-they-read-poster.jpg");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  expect(errors).toEqual([]);
+});
+test("roadmap: with less motion asked for, the doors show their stills and nothing plays", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/roadmap");
+  for (let n = 0; n < 5; n++) await page.locator(".door").nth(n).scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => [...document.querySelectorAll<HTMLVideoElement>(".door video")].some((v) => !v.paused))).toBe(false);
+  await expect(page.locator(".door video").first()).toHaveAttribute("poster", "/assets/roadmap/door-01-watch-poster.jpg");
 });
 test("unknown paths are served with the browser policy too", async ({
   page,

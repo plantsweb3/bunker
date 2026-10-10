@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/security",
     "/verify",
     "/watch",
+    "/roadmap",
     "/vault",
     "/terms",
     "/privacy",

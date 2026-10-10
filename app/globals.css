@@ -5868,3 +5868,153 @@ details.advanced .field {
   text-align: right;
   overflow-wrap: anywhere;
 }
+
+/* ───────── The roadmap: five doors ───────── */
+.roadmap-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 48px;
+  align-items: center;
+  padding: 96px 5.5% 88px;
+  border-bottom: 1px solid #1f282b;
+}
+.roadmap-hero .bm-big {
+  font-size: clamp(44px, 6.4vw, 104px);
+  margin: 0;
+}
+.roadmap-film .bm-panel__head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  padding: 11px 14px 9px;
+}
+.roadmap-film .film-frame {
+  border: 0;
+}
+.doors {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.door {
+  border-bottom: 1px solid #1f282b;
+}
+.door-panel {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: max(80vh, 560px);
+  overflow: hidden;
+  background: var(--bm-void);
+  color: var(--bm-chalk);
+}
+/* The picture is the right half; the left is the page's ground, fading out
+   across the picture so it goes to black behind the words. */
+.door-picture {
+  position: absolute;
+  inset: 0 0 0 42%;
+  z-index: -2;
+}
+.door-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(90deg, var(--bm-void) 0%, var(--bm-void) 42%, rgba(8, 11, 14, 0.82) 54%, rgba(8, 11, 14, 0) 80%);
+}
+.door-words {
+  display: grid;
+  justify-items: start;
+  gap: 18px;
+  width: min(54%, 720px);
+  padding: 72px 0 72px 5.5%;
+}
+.door-label {
+  font: 500 12px var(--bm-mono);
+  letter-spacing: 0.14em;
+  color: var(--bm-steel);
+}
+.door-strip {
+  display: flex;
+  gap: 6px;
+}
+.door-strip i {
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(113, 146, 165, 0.7);
+}
+.door-strip i.on {
+  background: var(--bm-ice);
+  border-color: var(--bm-ice);
+}
+.door-words .bm-big {
+  font-size: clamp(40px, 6vw, 96px);
+  margin: 4px 0 2px;
+}
+.door-words .bm-chip {
+  font-size: 13px;
+}
+.door-words p {
+  max-width: 34ch;
+  font: 500 clamp(17px, 1.5vw, 22px) / 1.4 var(--bm-text);
+  color: #d3dadb;
+}
+.door-open {
+  margin-top: 8px;
+  padding: 13px 18px;
+  background: var(--bm-ice);
+  color: var(--bm-ink);
+  font: 700 13px var(--bm-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+a.door-panel:hover .door-open {
+  background: var(--bm-chalk);
+}
+a.door-panel:focus-visible {
+  outline: 3px solid var(--bm-ice);
+  outline-offset: -3px;
+}
+.roadmap-end {
+  display: grid;
+  gap: 14px;
+  padding: 72px 5.5% 96px;
+}
+.roadmap-end p {
+  font: 500 clamp(20px, 2.2vw, 30px) / 1.3 var(--bm-text);
+  color: var(--bm-chalk);
+  max-width: 30ch;
+}
+.roadmap-end .mono {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--bm-steel);
+}
+@media (max-width: 860px) {
+  .roadmap-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 56px 5.5% 56px;
+  }
+  /* On a phone the picture sits above the words, full width. */
+  .door-panel {
+    display: block;
+    min-height: 0;
+  }
+  .door-picture {
+    position: relative;
+    inset: auto;
+    aspect-ratio: 16 / 9;
+    z-index: 0;
+  }
+  .door-panel::after {
+    display: none;
+  }
+  .door-words {
+    width: auto;
+    padding: 28px 5.5% 44px;
+    gap: 14px;
+  }
+}
