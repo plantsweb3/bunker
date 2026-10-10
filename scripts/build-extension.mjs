@@ -18,6 +18,9 @@ import { resolve } from "node:path";
 const test = process.argv.includes("--test");
 const root = resolve(".");
 const manifest = JSON.parse(await readFile("extension/manifest.json", "utf8"));
+const store = JSON.parse(await readFile("extension/store.json", "utf8"));
+if (store.chromeWebStoreItemId !== null && !/^[a-p]{32}$/.test(store.chromeWebStoreItemId))
+  throw new Error("extension/store.json: a Chrome Web Store item id is 32 letters from a to p.");
 let local = "undefined";
 if (test) {
   // The values scripts/setup-local.ts wrote for the local validator.
@@ -125,8 +128,8 @@ if (test) {
     permissions: manifest.permissions,
     hostPermissions: manifest.host_permissions,
     optionalHostPermissions: manifest.optional_host_permissions,
-    /** The Chrome Web Store item this zip is published as, once it is. */
-    storeItemId: null,
+    /** The Chrome Web Store item this is published as, from extension/store.json. Null until it is. */
+    storeItemId: store.chromeWebStoreItemId,
     status: "Public beta. Not audited. Read-only: holds no keys.",
   };
   await writeFile(`${out}/extension-manifest.json`, JSON.stringify(record, null, 2) + "\n");

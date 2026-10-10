@@ -47,11 +47,37 @@ export default function Page() {
           </li>
         </ul>
       </section>
+      <section id="extension">
+        <h2>The Bunker Watch browser extension</h2>
+        <p>
+          Bunker Watch collects nothing and sends nothing to us. It has no
+          account, no analytics and no server of ours behind it.
+        </p>
+        <ul>
+          <li>
+            <strong>What it keeps, in your browser only:</strong> the Bunker
+            addresses you choose to watch, the last public state it read for
+            each, a short list of recent alerts, and the RPC address if you
+            set your own. Removing the extension removes all of it.
+          </li>
+          <li>
+            <strong>What leaves your computer:</strong> requests to one Solana
+            RPC endpoint, the public mainnet one or the one you set, asking
+            for the accounts you watch or check. That provider can see those
+            addresses and your network address, as with any use of Solana.
+          </li>
+          <li>
+            <strong>What it never has:</strong> a key, a seed phrase, a
+            recovery kit, a password or a wallet connection. It cannot read
+            or change any web page.
+          </li>
+        </ul>
+      </section>
       <section>
         <h2>What is stored on your device</h2>
         <p>
-          In test configurations that allow creating a vault, the app keeps a
-          record in this browser’s local storage of which one-time keys it
+          When you open a Bunker on this site, the app keeps a record in this
+          browser’s local storage of which one-time keys it
           has used and of a signed withdrawal that has not been announced yet,
           so that an interrupted one can be resumed. If you choose passkey
           unlock, an encrypted copy of your day key is stored there too.

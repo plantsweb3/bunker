@@ -30,6 +30,7 @@
     "tool:build": "node scripts/build-recovery-tool.mjs",
     "cli:build": "node scripts/build-cli.mjs",
     "extension:build": "node scripts/build-extension.mjs",
+    "extension:listing": "node scripts/build-extension.mjs && node scripts/store-listing.mjs",
     "test:extension": "tsx tests/extension/watch-chain.ts",
     "check:deployment": "tsx scripts/check-deployment.ts",
     "audit:dependencies": "npm audit --omit=dev --audit-level=high"
