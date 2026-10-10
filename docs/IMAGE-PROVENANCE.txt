@@ -95,3 +95,9 @@ Films, 2026-10-10 (public/assets/film): bunker-mode-film-720p.mp4 and
 poster.jpg are replaced by the film's later cut, as delivered in the site
 package. secure-the-bunker-720p.mp4 is the 1:11 bug bounty film,
 re-encoded from its 1080p master to 720p; its poster is the film's end card.
+
+Roadmap, 2026-10-10: "While They Read", the 1:51 film of the plan as five
+doors (public/assets/film/while-they-read-720p.mp4, its poster and its lyric
+captions), and five silent loops with their first frames
+(public/assets/roadmap/door-0N-*). All as delivered in the roadmap kit,
+unchanged. The loops carry no text; the page sets the wording.

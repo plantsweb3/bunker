@@ -19,6 +19,13 @@ const FILMS = {
     file: "/assets/film/secure-the-bunker-720p.mp4",
     poster: "/assets/film/secure-the-bunker-poster.jpg",
   },
+  /** "While They Read", the roadmap in five doors. Its lyrics are in the picture too. */
+  roadmap: {
+    title: "While They Read, the roadmap film",
+    file: "/assets/film/while-they-read-720p.mp4",
+    poster: "/assets/film/while-they-read-poster.jpg",
+    captions: "/assets/film/while-they-read.en.vtt",
+  },
 } satisfies Record<string, Film>;
 
 export default function FilmPlayer({ film = "main" }: { film?: keyof typeof FILMS }) {

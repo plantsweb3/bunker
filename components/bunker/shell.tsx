@@ -59,6 +59,7 @@ export function Footer() {
           <Link href="/vault">App preview</Link>
           <Link href="/recovery">Recovery tool</Link>
           <Link href="/watch">Bunker Watch extension</Link>
+          <Link href="/roadmap">Roadmap</Link>
           <Link href="/docs">How it works</Link>
           <Link href="/integrate">Bunker Mode for trading</Link>
           <Link href="/emergency">My wallet was drained</Link>
