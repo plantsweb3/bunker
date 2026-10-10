@@ -37,13 +37,26 @@ const timeOfDay = (chainSeconds: string) =>
   new Date(Number(chainSeconds) * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 const amountOf = (p: NonNullable<store.View["pending"]>) =>
   p.kind === 0 ? `${sol(BigInt(p.amount))} SOL` : `${p.amount} base units of ${mintLabel(p.mint) ?? short(p.mint)}`;
+/** Refusals written for a person to read, by this extension or by the code
+ * it shares with the site. Anything else is the network's and is not shown raw. */
+const OURS = [
+  "That is not",
+  "No Bunker found",
+  "Vault address does not match",
+  "Unrecognized Bunker account",
+  "You are already",
+  "You can watch",
+  "Use an https",
+  "Put the key",
+  "The browser did not",
+];
 function explain(e: unknown): string {
   if (e instanceof WrongNetwork) return e.message;
   if (e instanceof TooLarge) return "This wallet has more token accounts than this check can read.";
   if (refused(e)) return "The RPC endpoint is busy. Wait a few seconds and try again.";
-  const known = e instanceof Error ? e.message : "";
-  // Our own refusals are sentences; anything else is the network's and is not shown raw.
-  return /^[A-Z].*\.$/.test(known) ? known : "The network could not be read. Try again in a moment.";
+  const said = e instanceof Error ? e.message : "";
+  if (OURS.some((start) => said.startsWith(start))) return /[.!?]$/.test(said) ? said : `${said}.`;
+  return "The network could not be read. Try again in a moment.";
 }
 const connection = async () => connect(endpointOf(await store.settings(kv)));
 const pass = () => chrome.runtime.sendMessage({ type: "pass" }).catch(() => undefined);
