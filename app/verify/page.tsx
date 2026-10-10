@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 import Verification from "@/components/bunker/verification";
+import ExtensionBuild from "@/components/bunker/extension-build";
 export const metadata = { title: "Verification & review" };
 export default function Page() {
   return (
@@ -42,7 +44,7 @@ export default function Page() {
             ["02", "Built from", "Commit 2182e5f of the public repository, in the pinned container."],
             ["03", "Executable hash", "a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7"],
             ["04", "Can be upgraded by", "Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth, a hardware wallet held by the maintainer."],
-            ["05", "Audit", "None. No audit is booked. A bug bounty is open."],
+            ["05", "Audit", "Commissioned, not completed. Until the report is published this is unaudited code. A bug bounty is open."],
           ].map(([number, title, text]) => (
             <div key={number}>
               <span>{number}</span>
@@ -103,6 +105,16 @@ export default function Page() {
           authority. An Explorer link alone establishes neither source
           equivalence nor audit coverage.
         </p>
+      </section>
+      <section id="extension">
+        <h2>The browser extension</h2>
+        <p>
+          <Link href="/watch">Bunker Watch</Link> is read-only and holds no
+          keys. This is the build this site serves. Compare the hash before
+          you load it, and treat any store listing not named here as someone
+          else’s.
+        </p>
+        <ExtensionBuild />
       </section>
       <section>
         <h2>What the site will and will not do</h2>
