@@ -1,0 +1,33 @@
+/** The network connection. Bunker Watch talks to one RPC endpoint, the one
+ * the user chose or the default, and to nothing else. Before anything an
+ * endpoint says is believed, its genesis hash must be the pinned one. */
+import { Connection } from "@solana/web3.js";
+import { NETWORK } from "./config";
+import type { Settings } from "./store";
+
+export class WrongNetwork extends Error {
+  constructor() {
+    super(`That RPC endpoint is not ${NETWORK.test ? "the test network" : "Solana mainnet"}. Nothing was read from it.`);
+  }
+}
+/** An https address with nothing hidden in it. A test build may also use this computer. */
+export function endpoint(raw: string): URL {
+  let url: URL;
+  try {
+    url = new URL(raw.trim());
+  } catch {
+    throw new Error("That is not a web address.");
+  }
+  const local = NETWORK.test && ["127.0.0.1", "localhost"].includes(url.hostname) && url.protocol === "http:";
+  if (url.protocol !== "https:" && !local) throw new Error("Use an https RPC address.");
+  if (url.username || url.password) throw new Error("Put the key in the address path or query, not before an @.");
+  return url;
+}
+export const endpointOf = (s: Settings) => endpoint(s.rpc ?? NETWORK.defaultRpc);
+export const connect = (url: URL) =>
+  new Connection(url.href, { commitment: "confirmed", disableRetryOnRateLimit: true });
+export async function assertGenesis(connection: Pick<Connection, "getGenesisHash">) {
+  if ((await connection.getGenesisHash()) !== NETWORK.genesis) throw new WrongNetwork();
+}
+/** The endpoint said to slow down. */
+export const refused = (e: unknown) => /\b429\b|too many requests/i.test(e instanceof Error ? e.message : "");
