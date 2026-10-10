@@ -6018,3 +6018,33 @@ a.door-panel:focus-visible {
     gap: 14px;
   }
 }
+
+/* The extension's screenshots on /watch: one to a row, wide enough to read. */
+.document-content .watch-shots {
+  display: grid;
+  gap: 18px;
+  margin: 18px 0 14px;
+  padding: 0;
+  list-style: none;
+}
+.document-content .watch-shots li {
+  padding: 0;
+  line-height: inherit;
+}
+.watch-shots figure {
+  margin: 0;
+  border: 1px solid rgba(113, 146, 165, 0.7);
+  background: var(--bm-void);
+}
+.watch-shots img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.watch-shots figcaption {
+  padding: 10px 14px 12px;
+  border-top: 1px solid rgba(113, 146, 165, 0.4);
+  font-size: 14px;
+  line-height: 1.45;
+  color: #b9c7cf;
+}

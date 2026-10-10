@@ -101,3 +101,8 @@ doors (public/assets/film/while-they-read-720p.mp4, its poster and its lyric
 captions), and five silent loops with their first frames
 (public/assets/roadmap/door-0N-*). All as delivered in the roadmap kit,
 unchanged. The loops carry no text; the page sets the wording.
+
+Bunker Watch screenshots, 2026-10-10 (public/assets/watch): the four store
+screenshots in docs/store-listing, converted to WebP. They are drawn by
+scripts/store-listing.mjs from the built extension over made-up readings and
+are labelled SIMULATION.
