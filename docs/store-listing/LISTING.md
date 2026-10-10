@@ -15,7 +15,7 @@ The listing is published as item `hdolgpohfdllibcmceaenliegnedeafn`: https://chr
 **Summary** (132 characters at most):
 Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys.
 
-**Category:** Developer Tools (or Workflow & Planning if finance tools are not offered). **Language:** English.
+**Category:** Privacy & Security. **Language:** English.
 
 **Description:**
 
@@ -46,7 +46,7 @@ How it works and its limits: https://bunkermode.io/watch
 
 Bunker protects the withdrawal path, not the chain. Bunker has not been audited.
 
-**Pictures:** `screenshot-1-all-quiet.png` to `screenshot-4-read-only.png` (1280 x 800), `promo-small-440x280.png`, `promo-marquee-1400x560.png`. Icon: `extension/assets/icons/128.png`.
+**Pictures:** `screenshot-1-all-quiet.png` to `screenshot-4-read-only.png` (1280 x 800), `promo-small-440x280.png`, `promo-marquee-1400x560.png`. Store icon: `store-icon-128.png` (96 x 96 of artwork inside 128 x 128, on a dark tile so it shows on the store's white page).
 
 **Official URL:** bunkermode.io (verify the domain in the developer dashboard). **Homepage URL:** https://bunkermode.io/watch. **Support URL:** https://github.com/plantsweb3/bunker/issues
 
