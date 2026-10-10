@@ -5858,3 +5858,13 @@ details.advanced .field {
     padding: 64px 5.5% 60px;
   }
 }
+
+/* The published build of the browser extension, on /watch and /verify. */
+.extension-build {
+  margin: 18px 0;
+  padding: 6px 20px;
+}
+.extension-build .metric b {
+  text-align: right;
+  overflow-wrap: anywhere;
+}

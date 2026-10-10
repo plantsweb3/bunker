@@ -100,6 +100,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/security",
     "/docs",
     "/bounty",
+    "/watch",
     "/verify",
   ]) {
     const response = await page.goto(path);
