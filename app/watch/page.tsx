@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 import ExtensionBuild from "@/components/bunker/extension-build";
@@ -8,6 +9,29 @@ export const metadata: Metadata = {
   description:
     "A browser extension that shows a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys. Public beta, unaudited.",
 };
+/** The extension's popup in its four states: file, what the picture shows, and the line under it. */
+const shots: [string, string, string][] = [
+  [
+    "1-all-quiet",
+    "The Bunker Watch popup with the heading All quiet, 2 Bunkers watched, and a card for each Bunker showing its SOL balance and that no withdrawal is waiting.",
+    "All quiet. Each Bunker you watch, its balance, and when it was last read.",
+  ],
+  [
+    "2-withdrawal-announced",
+    "The popup with the heading Withdrawal announced, a cream card with a countdown ring, the amount, the whole destination address, and a button that says What to do now.",
+    "A withdrawal was announced. The amount, the whole destination, and the time left to cancel it.",
+  ],
+  [
+    "3-check-a-wallet",
+    "The popup's Check a wallet tab showing a wallet's SOL, its token accounts, and two open delegations.",
+    "Check any wallet: what one signature could move, and who can already move it.",
+  ],
+  [
+    "4-read-only",
+    "The popup's Settings tab with the heading Read-only, holds no keys, the RPC endpoint setting, and a line saying keys held: none.",
+    "Settings. It holds no keys and talks to one RPC endpoint.",
+  ],
+];
 export default function Watch() {
   return (
     <DocumentLayout
@@ -23,6 +47,23 @@ export default function Watch() {
           your recovery kit or its password, here or anywhere else.
         </p>
       </div>
+      <section>
+        <h2>What it looks like</h2>
+        <ul className="watch-shots">
+          {shots.map(([file, alt, caption]) => (
+            <li key={file}>
+              <figure>
+                <Image unoptimized src={`/assets/watch/${file}.webp`} alt={alt} width={1280} height={800} />
+                <figcaption>{caption}</figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
+        <p>
+          These are the real popup, drawn over made-up readings. Each one is
+          labelled SIMULATION.
+        </p>
+      </section>
       <section>
         <h2>What it does</h2>
         <ul>
