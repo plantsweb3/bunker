@@ -8,7 +8,7 @@
 
 Assets go into a program-owned vault from any wallet. They come out only with a one-time hash signature from a key the wallet never holds. A stolen seed phrase or a signature given to a drainer site cannot authorize a withdrawal. One recovery kit, kept offline, replaces lost or exposed keys and cancels a withdrawal that is still waiting.
 
-**Release status:** public beta on Solana mainnet. The program is live on Solana mainnet at `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ`, built from commit `2182e5f` (executable hash `a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7`). It holds real funds. No independent audit has been done and none is booked. The program is upgradeable by one key, `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth`, held by the maintainer on a hardware wallet. Use it only with what you could afford to lose. See [Deployment](docs/DEPLOYMENT.md) and [Security](SECURITY.md).
+**Release status:** public beta on Solana mainnet. The program is live on Solana mainnet at `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ`, built from commit `2182e5f` (executable hash `a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7`). It holds real funds. An independent audit has been commissioned. It has not been completed, and until its report is published this code is unaudited. The program is upgradeable by one key, `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth`, held by the maintainer on a hardware wallet. Use it only with what you could afford to lose. See [Deployment](docs/DEPLOYMENT.md) and [Security](SECURITY.md).
 
 ## Start reviewing
 
@@ -79,6 +79,8 @@ npm run audit:dependencies
 `tools/cli/bunker.ts` reads a Bunker, withdraws, finishes an interrupted withdrawal, releases, clears and submits a recovery packet, using a day key file, an ordinary Solana keypair file to pay fees, and an RPC address. It shares the site's signing code and keeps its signing journal in a file beside the day key. It never opens a recovery kit, and like the site, on mainnet it sends only to the published program.
 
 `npm run cli:build` bundles it into one file, `public/source/bunker-cli.mjs`, that runs with Node 22 and nothing else (`node bunker-cli.mjs help`). The site serves that file with its SHA-256, and CI rebuilds it and checks the two builds are identical.
+
+`extension/` is Bunker Watch, a browser extension that watches up to five Bunkers and shows a desktop alert when a withdrawal is announced, without the website and without the project's servers. It is read-only: it holds no keys and sends no transactions. `npm run extension:build` writes `public/source/bunker-watch.zip` and its SHA-256; CI builds it twice and checks the two are identical.
 
 [Testing](docs/TESTING.md) says what each covers, what CI does not run, and the known gaps.
 

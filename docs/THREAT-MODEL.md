@@ -39,10 +39,15 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Offline tool run on a compromised or online device | The tool warns when online | Not an air gap. Malware can read the kit and its password. |
 | Dishonest RPC | Genesis pinned; a recovery packet's signature is checked against the on-chain commitment before submission; the vault address is derived from the user's own files; the journal signs only for the root the day key derives, never twice for one key whatever order states are shown in, and bounds the deadline by the device clock | Can lie about balances, token decimals, state and time shown to the user, withhold transactions, and so delay or mislead. A waiting period that differs from the day key's is refused. Cannot obtain a second signature under a key or send a deposit to a vault with other keys. |
 | Token issuer freezes an account | Frozen balances are not offered; a failed release stays retryable | A frozen recipient account blocks that withdrawal until it thaws or is cancelled |
-| Program upgraded maliciously | The policy is to deploy the real-funds program immutable and publish proof ([DEPLOYMENT.md](DEPLOYMENT.md)) | None once that is done and verified. Until then nothing is deployed. An immutable program also cannot be fixed: a flaw found later is met by users withdrawing and a successor at a new address. |
+| Program upgraded maliciously | The program is upgradeable by one key, held by the maintainer on a hardware wallet ([DEPLOYMENT.md](DEPLOYMENT.md)). Upgrades are built from a public commit and the deployed build is publicly verified | Whoever holds or steals that key can change any rule, including who may withdraw. A matching build describes the code today, not after the next upgrade. The intention is to revoke the key after independent review. |
 | Solana consensus, validators, clock | Trusted | Waiting periods use validator-reported time |
 | Someone tries to hide or fake an alert with transactions | Alerts are derived from changes in the vault account itself, which only the program can change | None from traffic. Dust below 0.001 SOL is not reported. |
 | Alert service compromised or impersonated | It holds no keys and cannot move assets; messages are plain text and state that Bunker never asks for a key | Its operator, its RPC provider or Telegram can silence it or make it send false alarms. A fake bot can phish. Alerts name bunkermode.io/recovery, which never accepts a kit. |
+| Browser extension (Bunker Watch): its own code is malicious, by a compromised developer account or a bad update | It holds no key of any kind and has no instruction that moves assets, so it cannot take anything. Its permissions are storage, alarms, notifications and one RPC origin; it has no content scripts and cannot read or change any web page | It can stay silent, or show a false alert that sends the owner to a phishing page. Its alerts link only to bunkermode.io and say that Bunker never asks for a recovery kit. The published zip is reproducible from this repository and its SHA-256 is on `/verify`. |
+| A look-alike extension in the store | The official item ID and the zip's SHA-256 are published on `/verify`; the extension never asks for a key, a kit or a password | A user who installs the wrong one and gives it a key file loses what that key controls. Nothing in the real one ever asks. |
+| The extension's RPC endpoint lies or goes quiet | The endpoint's genesis hash must be mainnet's before anything it says is used; vault accounts must be owned by the published program and sit at the address of their own stored identity | An endpoint that is really mainnet can still withhold or delay answers, so a withdrawal can be announced without an alert. The popup shows when each Bunker was last read. Alerts are best effort: silence is not proof. |
+| The computer is asleep, the browser is closed, or notifications are off | Nothing: the extension runs only while the browser does | No alert until the browser runs again; the next pass then reports what changed. An owner who needs to be reached away from the desk also needs another channel. |
+| Someone else uses the browser profile | It stores only public data: the addresses watched and their last public state | They learn which Bunkers the owner watches, which links the owner to those vaults. |
 
 ## What the waiting period and trusted addresses are
 
@@ -50,7 +55,7 @@ Chosen when a vault is created, fixed for that vault and part of its address. Th
 
 ## Explicit non-goals
 
-No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary program invocation, Token-2022, multisig policy, social recovery or pre-approved destinations. No audit, insurance, formal proof or quantified post-quantum claim.
+No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary program invocation, Token-2022, multisig policy, social recovery or pre-approved destinations. No completed audit, insurance, formal proof or quantified post-quantum claim.
 
 ## Not done before real funds
 

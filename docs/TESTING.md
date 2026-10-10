@@ -14,6 +14,7 @@ Automated tests do not establish cryptographic security and are not an audit.
 | `npm run test:chain` | Repeated create, withdraw, replay and recovery cycles on the local validator through the client. `CYCLES=40` sets the count. Prints a summary. |
 | `npm run test:alerts` | The alert watcher against the compiled program on the local validator, with Telegram replaced by a list: no alert for history before subscribing, one per event, none on a repeat pass, an announcement still reported after the vault's address is flooded with transactions, no alert when a stranger's recovery merely touches the watched vault, none after `/stop` |
 | `npm run test:cli` | The command-line client on the local validator: withdraw with and without a waiting period, a stale review refused, cancel by recovery, the old day key refused, a wrong network refused, and the real program run with typed answers (the review printed, the password not echoed, anything but "sign" signing nothing) |
+| `npm run test:extension` | Bunker Watch on the local validator: the test build of the extension loaded into a real browser, a Bunker added through the popup, an address that is not a Bunker refused, a withdrawal announced with the command-line client and reported within two minutes (log, badge, a notification on screen, the cream card), a recovery reported, and nothing secret in its storage |
 | `npm run test:deploy` | `scripts/check-deployment.ts` against programs really deployed on the local validator with the Solana CLI: one deployed upgradeable (reported as replaceable, with its authority), the same one after its authority is removed, one deployed final from the start, a binary differing by one byte, and addresses that are not programs |
 | `BUNKER_CLI=public/source/bunker-cli.mjs npm run test:cli` | The same command-line suite against the single-file build |
 | `npm run test:e2e` | Browser, desktop and mobile. Always: routes, the content security policy on every page, release gate, demo, wallet check, mobile overflow. With the local validator running: the full custody flows below. |
@@ -60,6 +61,7 @@ The suites passed while two critical flaws were present, because no test put two
 - Passkeys are tested only with Chromium's virtual authenticator; no real phone or wallet in-app browser.
 - Two token tests in the VM suite (one path that succeeds, one of wrong accounts) and one scenario in the browser.
 - No test of fork, rollback or clock-drift behaviour.
+- The browser extension is tested in Chromium only, as a test build against the local validator. The published build has not been run from the Chrome Web Store, and no other browser has been tried. `npm run test:extension` is not run in CI.
 
 ## Other
 

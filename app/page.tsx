@@ -127,8 +127,8 @@ const gates: [string, string, string, string?][] = [
   ],
   [
     "Independent audit",
-    "None has been done and none is booked. If that changes, the report goes here.",
-    "Not booked",
+    "Commissioned, not completed. Until the report is published this is unaudited code; the report will be linked here in full.",
+    "Commissioned",
   ],
 ];
 const faq: [string, React.ReactNode][] = [
@@ -211,8 +211,10 @@ const faq: [string, React.ReactNode][] = [
   [
     "Has it been audited?",
     <>
-      No, and no audit is booked. The source is public so that anyone can
-      review it, and Bunker is a public beta with an open{" "}
+      Not yet. An independent audit has been commissioned and is not
+      complete; until its report is published, this is unaudited code. The
+      source is public so that anyone can review it, and Bunker is a public
+      beta with an open{" "}
       <Link href="/bounty">bug bounty</Link>. Readable source and passing
       tests are not an audit. <Link href="/security">Read the limits.</Link>
     </>,
