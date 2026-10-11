@@ -26,7 +26,8 @@ describe("Bunker Watch: the published build", () => {
     const record = JSON.parse(readFileSync("public/source/extension-manifest.json", "utf8"));
     expect(record.sha256).toBe(createHash("sha256").update(first).digest("hex"));
     expect(record.bytes).toBe(first.length);
-    expect(record.storeItemId).toBeNull();
+    // The one official listing, as extension/store.json names it.
+    expect(record.storeItemId).toBe("hdolgpohfdllibcmceaenliegnedeafn");
     // Each file's own hash is published too, for checking a copy a store has repackaged.
     expect(record.files.map((f: { path: string }) => f.path)).toEqual(names(first));
     for (const f of record.files)
