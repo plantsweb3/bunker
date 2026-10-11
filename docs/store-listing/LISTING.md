@@ -2,7 +2,7 @@
 
 Everything the store's forms ask for, written out so that what is submitted is what was reviewed here. The pictures in this folder are drawn by `npm run extension:listing` from the built extension; their numbers are made up and labelled SIMULATION.
 
-Nothing here has been submitted. `extension/store.json` holds the item ID once there is one, and `/verify` shows it.
+The listing is published as item `hdolgpohfdllibcmceaenliegnedeafn`: https://chromewebstore.google.com/detail/bunker-watch/hdolgpohfdllibcmceaenliegnedeafn. `extension/store.json` holds that ID, and `/watch` and `/verify` link to it.
 
 ## What to upload
 

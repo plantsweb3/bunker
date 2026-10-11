@@ -3,6 +3,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 import ExtensionBuild from "@/components/bunker/extension-build";
+import store from "@/extension/store.json";
+
+/** The one official listing. Built from the checked-in item ID, the same one /verify shows. */
+const storeUrl = store.chromeWebStoreItemId
+  ? `https://chromewebstore.google.com/detail/bunker-watch/${store.chromeWebStoreItemId}`
+  : null;
 
 export const metadata: Metadata = {
   title: "Bunker Watch",
@@ -47,6 +53,20 @@ export default function Watch() {
           your recovery kit or its password, here or anywhere else.
         </p>
       </div>
+      {storeUrl && (
+        <section id="install">
+          <h2>Install it</h2>
+          <p>
+            <a className="button light" href={storeUrl} target="_blank" rel="noreferrer">
+              Add to Chrome
+            </a>
+          </p>
+          <p>
+            This is the only official listing. Its item ID is{" "}
+            <code>{store.chromeWebStoreItemId}</code>; check that it is in the address bar before you install.
+          </p>
+        </section>
+      )}
       <section>
         <h2>What it looks like</h2>
         <ul className="watch-shots">
