@@ -292,6 +292,10 @@ test("bounty: no number without a wallet, private reports, no amounts made up", 
   await expect(gauge.getByText("has not been published yet", { exact: false })).toBeVisible();
   await expect(gauge).not.toContainText("SOL");
   await expect(gauge.locator("rect.lit")).toHaveCount(0);
+  // And no history: the list is read from the chain for a published wallet or not shown.
+  await expect(page.locator(".vault-ledger")).toHaveCount(0);
+  expect((await page.request.get("/api/bounty/transactions")).status()).toBe(404);
+  expect((await page.request.get("/api/bounty/transactions?before=nope")).status()).toBe(400);
   for (const link of await page.getByRole("link", { name: /Report/ }).all())
     if ((await link.getAttribute("href"))?.startsWith("http"))
       await expect(link).toHaveAttribute("href", "https://github.com/plantsweb3/bunker/security/advisories/new");
