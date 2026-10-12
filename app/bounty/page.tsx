@@ -3,9 +3,10 @@ import Link from "next/link";
 import { Header, Footer } from "@/components/bunker/shell";
 import { Clip } from "@/components/bunker/loop";
 import VaultGauge from "@/components/bunker/vault-gauge";
+import PaymentWallet from "@/components/bunker/payment-wallet";
 import VaultTransactions from "@/components/bunker/vault-transactions";
 import FilmPlayer from "@/components/bunker/film";
-import { HALL_OF_FAME, REPORT_URL, TIERS } from "@/lib/bounty";
+import { HALL_OF_FAME, PAYMENT_WALLET, REPORT_URL, TIERS } from "@/lib/bounty";
 import { getLaunch } from "@/lib/launch-config";
 import { rewardAccountsOf } from "@/lib/creator-reward-accounts";
 import { labelsFrom } from "@/lib/vault-transactions";
@@ -112,6 +113,7 @@ export default function Bounty() {
               </p>
             </div>
           </div>
+          {bountyWallet && <PaymentWallet address={PAYMENT_WALLET} />}
           {bountyWallet && <VaultTransactions intro={ledgerIntro} />}
         </section>
 
