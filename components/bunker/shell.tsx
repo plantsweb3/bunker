@@ -58,6 +58,7 @@ export function Footer() {
           <Link href="/check">Check a wallet</Link>
           <Link href="/vault">App preview</Link>
           <Link href="/recovery">Recovery tool</Link>
+          <Link href="/start">Setup guide</Link>
           <Link href="/watch">Bunker Watch extension</Link>
           <Link href="/roadmap">Roadmap</Link>
           <Link href="/docs">How it works</Link>

@@ -6026,6 +6026,52 @@ details.advanced .field {
   }
 }
 
+/* The setup guide on /start. */
+.setup-count {
+  font: 500 12.5px / 1.5 var(--bm-mono);
+  color: #9aa7ab;
+}
+.setup-steps {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid rgba(113, 146, 165, 0.35);
+}
+.setup-steps li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 0 14px;
+  padding: 24px 0;
+  border-bottom: 1px solid rgba(113, 146, 165, 0.22);
+}
+.setup-steps li > .mono {
+  font: 700 14px / 1.9 var(--bm-mono);
+  color: var(--bm-ice);
+}
+.setup-steps li[data-done="true"] > .mono {
+  color: var(--bm-steel);
+}
+.setup-steps li[data-done="true"] h2 {
+  color: #9aa7ab;
+}
+.setup-steps h2 {
+  margin: 0 0 8px;
+}
+.setup-steps p {
+  margin: 0;
+}
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  align-items: center;
+  margin-top: 16px;
+}
+.setup-actions .text-button {
+  color: var(--bm-ice);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
 /* The published build of the browser extension, on /watch and /verify. */
 .extension-build {
   margin: 18px 0;
