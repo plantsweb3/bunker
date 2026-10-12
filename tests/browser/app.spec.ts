@@ -295,6 +295,8 @@ test("bounty: no number without a wallet, private reports, no amounts made up", 
   // And no history: the list is read from the chain for a published wallet or not shown.
   await expect(page.locator(".vault-ledger")).toHaveCount(0);
   expect((await page.request.get("/api/bounty/transactions")).status()).toBe(404);
+  await expect(page.locator(".payment-wallet")).toHaveCount(0);
+  expect((await page.request.get("/api/bounty/payment-wallet")).status()).toBe(404);
   expect((await page.request.get("/api/bounty/transactions?before=nope")).status()).toBe(400);
   for (const link of await page.getByRole("link", { name: /Report/ }).all())
     if ((await link.getAttribute("href"))?.startsWith("http"))

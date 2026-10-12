@@ -5696,6 +5696,56 @@ details.advanced .field {
 .bounty-source {
   padding-bottom: 22px;
 }
+/* What the vault holds on Ethereum, for payments asked for there. */
+.payment-wallet {
+  margin-top: 28px;
+}
+.payment-wallet-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 20px 40px;
+  padding: 22px 20px;
+  align-items: start;
+}
+.payment-wallet-read {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.payment-wallet-read strong {
+  font: 700 clamp(17px, 1.9vw, 24px) / 1.2 var(--bm-mono);
+  color: var(--bm-chalk);
+  overflow-wrap: anywhere;
+}
+.payment-wallet-read strong i {
+  margin-left: 9px;
+  font: 500 0.55em / 1 var(--bm-mono);
+  letter-spacing: 0.08em;
+  color: var(--bm-ice);
+}
+.payment-wallet-read strong.quiet {
+  color: #9aa7ab;
+}
+.payment-wallet-read .micro {
+  margin-top: 4px;
+}
+.payment-wallet p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #d3dadb;
+}
+.payment-wallet .address {
+  display: block;
+  margin-bottom: 8px;
+  font: 500 11px / 1.5 var(--bm-mono);
+  color: #8fa0a6;
+}
+@media (max-width: 760px) {
+  .payment-wallet-body {
+    grid-template-columns: 1fr;
+  }
+}
 /* The vault's history. Money leaving is on the films' cream paper card, the
    same way the extension shows a waiting withdrawal. */
 .vault-ledger {

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { rewardAccountsOf } from "../lib/creator-reward-accounts";
 import { exactSol, labelsFrom, rowOf, type ChainTransaction } from "../lib/vault-transactions";
 import checkedIn from "../lib/vault-labels.json";
+import { PAYMENT_WALLET } from "../lib/bounty";
+import { balanceOfCall, exactUnits, quantity } from "../lib/payment-wallet";
 
 const vault = "4pJr11CZC8Edyjoe2A93G2myNorjVeq2o4zWHXyPqrYC";
 const rewards = rewardAccountsOf(vault);
@@ -79,5 +81,27 @@ describe("Bounty vault transactions", () => {
     expect(() => labelsFrom({ [signature]: "" })).toThrow();
     expect(() => labelsFrom({ [signature]: "Audit — paid" })).toThrow();
     expect(() => labelsFrom([])).toThrow();
+  });
+});
+
+describe("Payment wallet on Ethereum", () => {
+  it("prints every digit of a balance and never rounds", () => {
+    expect(exactUnits(6_010_010_694n, 6)).toBe("6010.010694");
+    expect(exactUnits(6_000_000_000n, 6)).toBe("6000");
+    expect(exactUnits(17_544_387_715_245_513n, 18)).toBe("0.017544387715245513");
+    expect(exactUnits(1n, 18)).toBe("0.000000000000000001");
+    expect(exactUnits(0n, 6)).toBe("0");
+    expect(() => exactUnits(-1n, 6)).toThrow();
+  });
+  it("reads a node's numbers and refuses anything else", () => {
+    expect(quantity("0x0000000000000000000000000000000000000000000000000000000166397c46")).toBe(6_010_010_694n);
+    expect(quantity("0x3e54871591a5c9")).toBe(17_544_387_715_245_513n);
+    for (const bad of ["0x", "", "166397c46", null, 5, "0xzz"]) expect(() => quantity(bad)).toThrow();
+  });
+  it("asks the token contract about the checked-in address and no other", () => {
+    expect(balanceOfCall(PAYMENT_WALLET)).toBe(
+      "0x70a082310000000000000000000000002f48613a3d1d81adfd30058f4d12b39b8f20101f",
+    );
+    expect(() => balanceOfCall("0x1234")).toThrow();
   });
 });
