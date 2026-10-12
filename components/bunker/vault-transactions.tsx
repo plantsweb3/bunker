@@ -44,7 +44,7 @@ export default function VaultTransactions({ intro }: { intro: string }) {
       </div>
       <p className="vault-ledger-intro">{intro}</p>
       {rows.length > 0 && (
-        <ol>
+        <ol className="ledger-rows">
           {rows.map((row) => (
             <li key={row.signature} className={row.direction === "OUT" ? "out" : undefined}>
               {row.time === null ? (
