@@ -48,3 +48,7 @@ export const TIERS: Tier[] = [
 ];
 /** People who reported something that was confirmed and fixed. */
 export const HALL_OF_FAME: { name: string; found: string; fixedIn: string }[] = [];
+/** The vault's payment wallet on Ethereum. Some payments are asked for in
+ * USDT there, so SOL leaves the vault, is swapped, and is paid out from this
+ * address. Public, like the vault's own address, and shown only with it. */
+export const PAYMENT_WALLET = "0x2F48613a3D1D81ADfD30058F4D12B39B8F20101f";

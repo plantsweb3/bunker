@@ -3,10 +3,14 @@ import Link from "next/link";
 import { Header, Footer } from "@/components/bunker/shell";
 import { Clip } from "@/components/bunker/loop";
 import VaultGauge from "@/components/bunker/vault-gauge";
+import PaymentWallet from "@/components/bunker/payment-wallet";
+import VaultTransactions from "@/components/bunker/vault-transactions";
 import FilmPlayer from "@/components/bunker/film";
-import { HALL_OF_FAME, REPORT_URL, TIERS } from "@/lib/bounty";
+import { HALL_OF_FAME, PAYMENT_WALLET, REPORT_URL, TIERS } from "@/lib/bounty";
 import { getLaunch } from "@/lib/launch-config";
 import { rewardAccountsOf } from "@/lib/creator-reward-accounts";
+import { paymentLabelsFrom } from "@/lib/payment-wallet";
+import paymentLabels from "@/lib/payment-labels.json";
 
 export const metadata: Metadata = {
   title: "Bug bounty",
@@ -27,6 +31,14 @@ const rules = [
   "Test on your own Bunker, with small amounts.",
   "No public disclosure before the fix ships.",
 ];
+/** The second sentence is a statement about the chain, so it is printed only
+ * once the payment it describes is a labeled transaction in the list. */
+const auditPaid = Object.values(paymentLabelsFrom(paymentLabels)).includes("Audit payment");
+const ledgerIntro =
+  "Every transaction in and out of the bounty vault, read from Solana." +
+  (auditPaid
+    ? " The vault paid for the audit; it refills from creator rewards, and the bug bounty stays open."
+    : "");
 export default function Bounty() {
   const { bountyWallet } = getLaunch();
   return (
@@ -101,6 +113,8 @@ export default function Bounty() {
               </p>
             </div>
           </div>
+          {bountyWallet && <PaymentWallet address={PAYMENT_WALLET} />}
+          {bountyWallet && <VaultTransactions intro={ledgerIntro} />}
         </section>
 
         <section className="section bounty-how" id="report">
