@@ -107,6 +107,7 @@ function App() {
   const [day, setDay] = useState<DayKey | null>(null);
   const [vault, setVault] = useState<Loaded | null>(null);
   const [wall, setWall] = useState(0);
+  const [watchCopied, setWatchCopied] = useState(false);
   const [step, setStep] = useState<Step>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
@@ -1369,6 +1370,24 @@ function App() {
                   Get Telegram alerts
                 </a>
               )}
+              {/* A new tab: leaving this one would drop the day key it holds. */}
+              <a className="button ghost passkey-offer" href="/watch#install" target="_blank" rel="noreferrer">
+                <BIcon name="alert" size={17} />
+                Get desktop alerts
+              </a>
+              <button
+                className="text-button watch-copy"
+                onClick={() =>
+                  navigator.clipboard?.writeText(day.vault).then(
+                    () => setWatchCopied(true),
+                    () => {},
+                  )
+                }
+              >
+                {watchCopied
+                  ? "Address copied. Paste it into Bunker Watch."
+                  : "Copy this Bunker’s address for Bunker Watch"}
+              </button>
               <Link className="security-link" href="/recovery">
                 <BIcon name="recovery-kit" size={16} />
                 Open the recovery tool
