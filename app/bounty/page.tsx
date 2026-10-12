@@ -9,8 +9,8 @@ import FilmPlayer from "@/components/bunker/film";
 import { HALL_OF_FAME, PAYMENT_WALLET, REPORT_URL, TIERS } from "@/lib/bounty";
 import { getLaunch } from "@/lib/launch-config";
 import { rewardAccountsOf } from "@/lib/creator-reward-accounts";
-import { labelsFrom } from "@/lib/vault-transactions";
-import vaultLabels from "@/lib/vault-labels.json";
+import { paymentLabelsFrom } from "@/lib/payment-wallet";
+import paymentLabels from "@/lib/payment-labels.json";
 
 export const metadata: Metadata = {
   title: "Bug bounty",
@@ -33,7 +33,7 @@ const rules = [
 ];
 /** The second sentence is a statement about the chain, so it is printed only
  * once the payment it describes is a labeled transaction in the list. */
-const auditPaid = Object.values(labelsFrom(vaultLabels)).includes("Audit payment");
+const auditPaid = Object.values(paymentLabelsFrom(paymentLabels)).includes("Audit payment");
 const ledgerIntro =
   "Every transaction in and out of the bounty vault, read from Solana." +
   (auditPaid

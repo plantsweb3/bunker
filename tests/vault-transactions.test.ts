@@ -3,7 +3,17 @@ import { rewardAccountsOf } from "../lib/creator-reward-accounts";
 import { exactSol, labelsFrom, rowOf, type ChainTransaction } from "../lib/vault-transactions";
 import checkedIn from "../lib/vault-labels.json";
 import { PAYMENT_WALLET } from "../lib/bounty";
-import { balanceOfCall, exactUnits, quantity } from "../lib/payment-wallet";
+import {
+  balanceOfCall,
+  exactUnits,
+  paymentLabelsFrom,
+  quantity,
+  TRANSFER_EVENT,
+  USDT_CONTRACT,
+  usdtPaid,
+  type Receipt,
+} from "../lib/payment-wallet";
+import paymentLabels from "../lib/payment-labels.json";
 
 const vault = "4pJr11CZC8Edyjoe2A93G2myNorjVeq2o4zWHXyPqrYC";
 const rewards = rewardAccountsOf(vault);
@@ -103,5 +113,35 @@ describe("Payment wallet on Ethereum", () => {
       "0x70a082310000000000000000000000002f48613a3d1d81adfd30058f4d12b39b8f20101f",
     );
     expect(() => balanceOfCall("0x1234")).toThrow();
+  });
+  const word = (address: string) => "0x" + address.slice(2).toLowerCase().padStart(64, "0");
+  const receiver = "0x" + "ab".repeat(20);
+  const transfer = (from: string, to: string, amount: bigint, contract = USDT_CONTRACT) => ({
+    address: contract.toLowerCase(),
+    topics: [TRANSFER_EVENT, word(from), word(to)],
+    data: "0x" + amount.toString(16).padStart(64, "0"),
+  });
+  const receipt = (...logs: Receipt["logs"] & object): Receipt => ({ status: "0x1", blockNumber: "0x1", logs });
+  it("reads what a payment moved from the receipt, and to whom", () => {
+    expect(usdtPaid(receipt(transfer(PAYMENT_WALLET, receiver, 6_000_010_694n)), PAYMENT_WALLET)).toEqual({
+      amount: 6_000_010_694n,
+      to: receiver,
+    });
+  });
+  it("will not describe a transaction that is not one payment out of the wallet", () => {
+    const paid = transfer(PAYMENT_WALLET, receiver, 10_000_000n);
+    // Failed, or nothing in it.
+    expect(() => usdtPaid({ ...receipt(paid), status: "0x0" }, PAYMENT_WALLET)).toThrow();
+    expect(() => usdtPaid(receipt(), PAYMENT_WALLET)).toThrow();
+    // Money coming in, another token, and the empty transfers scammers attach to a wallet's history.
+    expect(() => usdtPaid(receipt(transfer(receiver, PAYMENT_WALLET, 5n)), PAYMENT_WALLET)).toThrow();
+    expect(() => usdtPaid(receipt(transfer(PAYMENT_WALLET, receiver, 5n, "0x" + "11".repeat(20))), PAYMENT_WALLET)).toThrow();
+    expect(() => usdtPaid(receipt(transfer(PAYMENT_WALLET, receiver, 0n)), PAYMENT_WALLET)).toThrow();
+    expect(() => usdtPaid(receipt(paid, transfer(PAYMENT_WALLET, "0x" + "cd".repeat(20), 1n)), PAYMENT_WALLET)).toThrow();
+  });
+  it("accepts the checked-in payment labels and refuses anything that is not a hash and a plain label", () => {
+    expect(() => paymentLabelsFrom(paymentLabels)).not.toThrow();
+    expect(() => paymentLabelsFrom({ "0x1234": "Audit payment" })).toThrow();
+    expect(() => paymentLabelsFrom({ ["0x" + "a".repeat(64)]: "6000 USDT \u2014 paid" })).toThrow();
   });
 });
