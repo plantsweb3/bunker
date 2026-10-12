@@ -101,6 +101,7 @@ test("security, documentation, verification and no horizontal overflow", async (
     "/docs",
     "/bounty",
     "/watch",
+    "/start",
     "/roadmap",
     "/verify",
   ]) {

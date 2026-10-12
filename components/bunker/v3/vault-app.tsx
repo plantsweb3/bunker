@@ -1502,6 +1502,11 @@ function App() {
                     <Link href="/recovery">Build another Bunker</Link>
                   </p>
                 )}
+                {b.enabled && (
+                  <p className="micro">
+                    New here? <Link href="/start">Follow the setup guide</Link>.
+                  </p>
+                )}
                 {b.enabled && !b.wallet.address && (
                   <p className="micro">
                     Connect a wallet first. It pays the network fees and has no say over your
