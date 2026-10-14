@@ -165,6 +165,18 @@ test("wallet check summarises balances and open approvals without a wallet", asy
       json: { jsonrpc: "2.0", id: body.id, result: { context: { slot: 1 }, value } },
     });
   });
+  // The lookalike part, as the server route answers it for a wallet that was poisoned.
+  const real = "TXmH5552Hw7pkjBTLnoMVJkEkPTC3ZV4LY1sD1nsuio";
+  const fake = "TXmdRPtbS54LSP6wgJ5ybgLf1d5AUBqJMgf1yGNsuio";
+  await page.route("**/api/lookalikes?*", (route) =>
+    route.fulfill({
+      json: {
+        found: [{ sender: fake, imitates: real, start: 3, end: 4, signature: "5".repeat(88), time: 1791770124, received: { lamports: "1000" } }],
+        asked: 100,
+        read: 100,
+      },
+    }),
+  );
   await page.goto("/check");
   await page.getByLabel("Solana wallet address").fill("not an address");
   await page.getByRole("button", { name: "Check wallet" }).click();
@@ -179,6 +191,12 @@ test("wallet check summarises balances and open approvals without a wallet", asy
   await expect(
     page.getByRole("heading", { name: "Open approvals" }),
   ).toBeVisible();
+  const lookalikes = page.locator(".lookalikes");
+  await expect(lookalikes.getByRole("heading")).toHaveText("1 lookalike address");
+  await expect(lookalikes.locator(".lookalike-address").first()).toHaveText(fake);
+  await expect(lookalikes.locator(".lookalike-address b").first()).toHaveText("TXm");
+  await expect(lookalikes).toContainText("Sent 0.000001 SOL");
+  await expect(lookalikes).toContainText("Checked the last 100 transactions.");
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth > window.innerWidth + 1,
   );
@@ -250,8 +268,10 @@ test("wallet check reads a very large wallet and flags tokens their issuer can m
       },
     ]);
   });
+  await page.route("**/api/lookalikes?*", (route) => route.fulfill({ json: { found: [], asked: 100, read: 97 } }));
   await page.goto(`/check?a=${owner}`);
   await expect(page.locator(".check-card.exposed")).toContainText("4 token balances");
+  await expect(page.locator(".lookalikes")).toContainText("None found in 97 of the last 100 transactions (the rest could not be read).");
   // The large wallet was read again as account prefixes, and only then.
   expect(seen).toContain('classic:base64:{"offset":0,"length":129}');
   expect(seen.filter((s) => s.startsWith("2022:"))).toEqual(["2022:jsonParsed:null"]);

@@ -21,6 +21,7 @@ import { formatAmount } from "@/sdk/bytes";
 import { mintLabel } from "@/sdk/known-mints";
 import { Exposure, TokenHolding } from "@/sdk/exposure";
 import { readExposure, TooLarge } from "@/lib/exposure-read";
+import LookalikeCheck from "./lookalike-check";
 /** A non-empty balance's amount in the token's units, when they are known. */
 const amountText = (amount: bigint, decimals: number | null) =>
   decimals === null ? "amount not loaded" : formatAmount(amount, decimals);
@@ -97,7 +98,8 @@ export default function ExposureCheck() {
           </h1>
           <p>
             Paste any Solana address. Nothing to connect, nothing to sign. This
-            reads public balances and open token approvals.
+            reads public balances, open token approvals, and recent history
+            for lookalike addresses.
           </p>
         </div>
         <span className="pill">
@@ -289,6 +291,7 @@ export default function ExposureCheck() {
               )}
             </>
           )}
+          <LookalikeCheck key={result.address} address={result.address} />
           <p className="check-foot">
             {e.frozen > 0 && `${plural(e.frozen, "frozen balance")} excluded. `}
             {e.emptyAccounts > 0 &&
