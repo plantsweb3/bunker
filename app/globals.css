@@ -2856,6 +2856,50 @@ body {
   font-size: 13px;
   max-width: 640px;
 }
+/* Lookalike senders: the matching start and end bright, the middle that differs dim. */
+.lookalike-list {
+  list-style: none;
+  margin: 16px 0 10px;
+  padding: 0;
+  border: 1px solid #8a7440;
+  border-radius: 6px;
+  background: #332b1c66;
+}
+.lookalike-list li {
+  display: grid;
+  gap: 10px;
+  padding: 16px 18px;
+  border-top: 1px solid #8a744066;
+}
+.lookalike-list li:first-child {
+  border-top: 0;
+}
+.lookalike-list li > div {
+  display: grid;
+  gap: 4px;
+}
+.lookalike-list .mono {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: #d9c08f;
+}
+.lookalike-list p {
+  margin: 0;
+  font-size: 13px;
+  color: #c9c2b0;
+}
+.lookalike-address {
+  font-family: var(--bm-mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.lookalike-address b {
+  font-weight: 700;
+  color: #fff;
+}
+.lookalike-address span {
+  color: #8b8574;
+}
 .holding-list {
   list-style: none;
   margin: 16px 0 10px;
