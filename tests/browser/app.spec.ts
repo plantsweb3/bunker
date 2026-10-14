@@ -191,6 +191,9 @@ test("wallet check summarises balances and open approvals without a wallet", asy
   await expect(
     page.getByRole("heading", { name: "Open approvals" }),
   ).toBeVisible();
+  // Revoking is offered only to the wallet that owns the approvals.
+  await expect(page.getByText("Connect this wallet to revoke them here.", { exact: false })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Revoke/ })).toHaveCount(0);
   const lookalikes = page.locator(".lookalikes");
   await expect(lookalikes.getByRole("heading")).toHaveText("1 lookalike address");
   await expect(lookalikes.locator(".lookalike-address").first()).toHaveText(fake);

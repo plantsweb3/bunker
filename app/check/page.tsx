@@ -1,5 +1,6 @@
 import { Header, Footer } from "@/components/bunker/shell";
 import ExposureCheck from "@/components/bunker/exposure-check";
+import { WalletProvider } from "@/components/bunker/wallet";
 export const metadata = {
   title: "Check a wallet",
   description:
@@ -10,7 +11,9 @@ export default function Page() {
     <>
       <Header />
       <main className="page-container">
-        <ExposureCheck />
+        <WalletProvider>
+          <ExposureCheck />
+        </WalletProvider>
       </main>
       <Footer />
     </>

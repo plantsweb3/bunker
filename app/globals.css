@@ -2856,6 +2856,16 @@ body {
   font-size: 13px;
   max-width: 640px;
 }
+.revoke {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  margin-top: 6px;
+}
+.revoke .micro {
+  margin-top: 6px;
+  max-width: 640px;
+}
 /* Lookalike senders: the matching start and end bright, the middle that differs dim. */
 .lookalike-list {
   list-style: none;
