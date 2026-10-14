@@ -99,6 +99,18 @@ type Intent = {
 type Step = "idle" | "open" | "deposit" | "withdraw" | "review" | "sweep";
 /** Left in the wallet by a sweep so it can still pay fees. */
 const SWEEP_KEEP_LAMPORTS = 20_000_000n;
+/** Where the amount someone keeps out for spending is remembered, in their browser only. */
+const KEEP_KEY = "bunker-sweep-keep";
+/** What stays in the wallet: what was asked for, and never less than the fee reserve. */
+function keepOf(typed: string): bigint {
+  let asked = 0n;
+  try {
+    asked = typed.trim() ? parseAmount(typed, 9) : 0n;
+  } catch {
+    throw new Error("Enter how much SOL to keep as a number, like 0.5");
+  }
+  return asked > SWEEP_KEEP_LAMPORTS ? asked : SWEEP_KEEP_LAMPORTS;
+}
 const signed = (n: bigint, decimals: number) =>
   `${n > 0n ? "+" : "−"}${formatAmount(n < 0n ? -n : n, decimals)}`;
 const sol = (lamports: bigint) => `${formatAmount(lamports, 9)} SOL`;
@@ -108,6 +120,13 @@ function App() {
   const [vault, setVault] = useState<Loaded | null>(null);
   const [wall, setWall] = useState(0);
   const [watchCopied, setWatchCopied] = useState(false);
+  const [keepTyped, setKeepTyped] = useState("");
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(KEEP_KEY);
+      if (saved) queueMicrotask(() => setKeepTyped(saved));
+    } catch {}
+  }, []);
   const [step, setStep] = useState<Step>("idle");
   const [file, setFile] = useState<File | null>(null);
   const [password, setPassword] = useState("");
@@ -221,6 +240,11 @@ function App() {
   async function sweep() {
     const { payer } = b.live();
     if (!day) throw new Error("Open your Bunker first");
+    // Checked before anything is sent, so a typo stops the whole sweep.
+    keepOf(keepTyped);
+    try {
+      localStorage.setItem(KEEP_KEY, keepTyped.trim());
+    } catch {}
     const vaultKey = new PublicKey(day.vault);
     // Read the wallet again: amounts must be what is there now.
     const held = await assets(b.connection, payer);
@@ -247,8 +271,7 @@ function App() {
     if (!skipped.includes("SOL")) {
       // Last, so fees and token-account deposits above are already paid.
       // Also leave this transfer's own fee, so the wallet ends on the reserve.
-      const lamports =
-        BigInt(await b.connection.getBalance(payer)) - SWEEP_KEEP_LAMPORTS - 5_000n;
+      const lamports = BigInt(await b.connection.getBalance(payer)) - keepOf(keepTyped) - 5_000n;
       if (lamports > 0n)
         await b.transmit(`Moving in · ${++moved} of ${total}`, [
           SystemProgram.transfer({ fromPubkey: payer, toPubkey: vaultKey, lamports }),
@@ -691,6 +714,11 @@ function App() {
                 line: "The day key is in this tab. Seal it when you are done.",
               };
   const can = b.enabled && !!b.wallet.address && !b.busy;
+  /** The keep amount as the list shows it; a typo shows the reserve until it is fixed. */
+  let keepShown = SWEEP_KEEP_LAMPORTS;
+  try {
+    keepShown = keepOf(keepTyped);
+  } catch {}
   const unfinishedExpired = unfinished && now > decodeAnnounce(unfinished.payload).announceBy;
   return (
     <main className="vault-page">
@@ -1027,8 +1055,8 @@ function App() {
                         const id = a.mint ?? "SOL";
                         const moving = a.mint
                           ? a.amount
-                          : a.amount > SWEEP_KEEP_LAMPORTS
-                            ? a.amount - SWEEP_KEEP_LAMPORTS
+                          : a.amount > keepShown
+                            ? a.amount - keepShown
                             : 0n;
                         return (
                           <li key={a.key}>
@@ -1051,11 +1079,22 @@ function App() {
                         );
                       })}
                   </ul>
+                  <label className="field sweep-keep">
+                    <span>Keep in this wallet for spending (SOL)</span>
+                    <input
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder={formatAmount(SWEEP_KEEP_LAMPORTS, 9)}
+                      value={keepTyped}
+                      onChange={(e) => setKeepTyped(e.target.value)}
+                    />
+                  </label>
                   <p className="micro">
-                    {formatAmount(SWEEP_KEEP_LAMPORTS, 9)} SOL stays in the
-                    wallet for fees. SOL and classic SPL tokens only. One
-                    wallet approval per group of three tokens, then one for
-                    SOL.
+                    {formatAmount(keepShown, 9)} SOL stays in the wallet, and never
+                    less than {formatAmount(SWEEP_KEEP_LAMPORTS, 9)} for fees. This
+                    browser remembers the amount for next time. SOL and classic SPL
+                    tokens only. One wallet approval per group of three tokens,
+                    then one for SOL.
                   </p>
                   <div className="actions">
                     <button

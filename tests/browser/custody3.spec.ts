@@ -491,6 +491,35 @@ test("bunker mode: sweep the wallet in, then read the activity back", async ({ p
   expect(errors).toEqual([]);
 });
 
+test("bunker mode keeps the SOL you set aside for spending, and remembers it", async ({ page }, info) => {
+  const { c, errors, payer, build, unseal }: Ctx = await setup(page, info);
+  const { day0, vault } = await build(false);
+  await unseal(day0);
+  await expect(page.getByText("Unsealed", { exact: true })).toBeVisible({ timeout: 15000 });
+  // Alerts are offered for the open Bunker, in a new tab so this one keeps its day key.
+  const alerts = page.getByRole("link", { name: "Get desktop alerts" });
+  await expect(alerts).toHaveAttribute("href", "/watch#install");
+  await expect(alerts).toHaveAttribute("target", "_blank");
+  await expect(page.getByRole("button", { name: "Copy this Bunker’s address for Bunker Watch" })).toBeVisible();
+  await page.getByRole("button", { name: "Bunker Mode" }).click();
+  await page.getByLabel("Keep in this wallet for spending (SOL)").fill("0.5");
+  await expect(page.getByText("0.5 SOL stays in the wallet", { exact: false })).toBeVisible();
+  const before = BigInt(await c.getBalance(new PublicKey(vault)));
+  await page.getByRole("button", { name: "Move it all in" }).click();
+  await expect(page.getByText("Bunker Mode on.", { exact: false })).toBeVisible({ timeout: 40000 });
+  expect(await c.getBalance(payer.publicKey)).toBe(500_000_000);
+  expect(BigInt(await c.getBalance(new PublicKey(vault)))).toBeGreaterThan(before);
+  // The next sweep starts from the same amount.
+  await page.getByRole("button", { name: "Bunker Mode" }).click();
+  await expect(page.getByLabel("Keep in this wallet for spending (SOL)")).toHaveValue("0.5");
+  // A typo stops the sweep before anything is signed.
+  await page.getByLabel("Keep in this wallet for spending (SOL)").fill("half");
+  await page.getByRole("button", { name: "Move it all in" }).click();
+  await expect(page.getByText("Enter how much SOL to keep as a number", { exact: false })).toBeVisible();
+  expect(await c.getBalance(payer.publicKey)).toBe(500_000_000);
+  expect(errors).toEqual([]);
+});
+
 test("passkey: save a day key to the device and unseal with it", async ({ page }, info) => {
   // WebAuthn needs a registrable host name; an IP address cannot be an RP ID.
   const { c, recipient, errors, vaultState, build, unseal, deposit }: Ctx = await setup(page, info, "http://localhost:5173");
