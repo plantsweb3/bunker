@@ -22,6 +22,7 @@ import { mintLabel } from "@/sdk/known-mints";
 import { Exposure, TokenHolding } from "@/sdk/exposure";
 import { readExposure, TooLarge } from "@/lib/exposure-read";
 import LookalikeCheck from "./lookalike-check";
+import RevokeApprovals from "./revoke-approvals";
 /** A non-empty balance's amount in the token's units, when they are known. */
 const amountText = (amount: bigint, decimals: number | null) =>
   decimals === null ? "amount not loaded" : formatAmount(amount, decimals);
@@ -81,6 +82,12 @@ export default function ExposureCheck() {
     } finally {
       setBusy(false);
     }
+  }
+  /** Reads the wallet again after a change, keeping the result on screen meanwhile. */
+  async function reread(address: string) {
+    try {
+      setResult({ address, exposure: await readExposure(connection, new PublicKey(address)) });
+    } catch {}
   }
   const e = result?.exposure;
   const nothing = e && e.lamports === 0n && e.movable.length === 0;
@@ -262,11 +269,16 @@ export default function ExposureCheck() {
                 <div className="check-table">
                   <h2>Open approvals</h2>
                   <p>
-                    Revoke any you do not recognise from your wallet or a
-                    revoke tool you trust. Bunker never asks you to approve
-                    anything to do this.
+                    Revoke any you do not recognise. Revoking only takes the
+                    approval back; no tokens move. Bunker never asks you to
+                    approve anything to do this.
                   </p>
                   <Holdings rows={e.approvals} approvals />
+                  <RevokeApprovals
+                    owner={result.address}
+                    approvals={e.approvals}
+                    onDone={() => void reread(result.address)}
+                  />
                 </div>
               )}
               {e.issuerMovable.length > 0 && (
