@@ -33,6 +33,8 @@
     "extension:listing": "node scripts/build-extension.mjs && node scripts/store-listing.mjs",
     "test:extension": "tsx tests/extension/watch-chain.ts",
     "check:deployment": "tsx scripts/check-deployment.ts",
+    "check:independent": "python3 scripts/independent-check.py",
+    "check:all": "./scripts/full-check.sh",
     "audit:dependencies": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {

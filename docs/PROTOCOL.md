@@ -352,7 +352,7 @@ In the browser suite the offline tool is opened as a local `file://` page, every
 
 The client and the Rust check share one author and one reading of this document; agreement between them shows consistency, not correctness of the design.
 
-Known gaps: the fuzzing is from a fixed seed and is not coverage-guided; the cross-program tests use one forwarding program, not a real integration; no independent implementation of the encodings by a second author; SPL coverage is two VM tests and one browser scenario; passkey unlock is tested with a simulated authenticator only, not on real phones. None of this is an audit.
+Known gaps: the fuzzing is from a fixed seed and is not coverage-guided; the cross-program tests use one forwarding program, not a real integration; no implementation by a second author (the Python check in `scripts/independent-check.py` is a third implementation from this document, by the same project); SPL coverage is two VM tests and one browser scenario; passkey unlock is tested with a simulated authenticator only, not on real phones. None of this is an audit.
 
 ## Open questions
 
