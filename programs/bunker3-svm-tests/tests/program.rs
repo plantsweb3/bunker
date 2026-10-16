@@ -59,6 +59,8 @@ struct Env {
     vault: Pubkey,
     /// Trusted wallets the next vault is created with. Unused slots are zero.
     trusted: [[u8; 32]; 4],
+    /// The vault's token account a token announcement names as able to pay.
+    token_source: Pubkey,
 }
 #[derive(Clone)]
 struct Withdrawal {
@@ -84,7 +86,7 @@ impl Env {
             .expect("build bunker3_cpi_probe.so first: cargo-build-sbf --manifest-path programs/bunker3-cpi-probe/Cargo.toml --sbf-out-dir target/deploy");
         let payer = Keypair::new();
         svm.airdrop(&payer.pubkey(), 100 * SOL).unwrap();
-        let mut env = Self { svm, program, payer, salt: common::SALT, id: [0; 32], chain: common::CHAIN, vault: Pubkey::default(), trusted: [[0; 32]; 4] };
+        let mut env = Self { svm, program, payer, salt: common::SALT, id: [0; 32], chain: common::CHAIN, vault: Pubkey::default(), trusted: [[0; 32]; 4], token_source: Pubkey::default() };
         env.adopt(root(1), root(100), DAY as u32);
         env.set_time(T0);
         env
@@ -258,10 +260,14 @@ impl Env {
                 AccountMeta::new_readonly(system(), false),
             ]
             .into_iter()
-            // A token announcement also names its mint.
+            // A token announcement also names its mint, and the vault's token
+            // account that holds what it asks for.
             .chain((payload[82] == 1).then(|| {
-                AccountMeta::new_readonly(Pubkey::new_from_array(payload[83..115].try_into().unwrap()), false)
-            }))
+                [
+                    AccountMeta::new_readonly(Pubkey::new_from_array(payload[83..115].try_into().unwrap()), false),
+                    AccountMeta::new_readonly(self.token_source, false),
+                ]
+            }).into_iter().flatten())
             .collect(),
             data: [vec![2u8], payload.to_vec()].concat(),
         }
@@ -678,20 +684,31 @@ fn execution_is_bound_to_the_recorded_destination_and_the_rent_reserve() {
     let destination = Pubkey::new_unique();
     let rent = e.svm.minimum_balance_for_rent_exemption(VAULT_LEN);
     let available = e.lamports(&e.vault) - rent;
-    // One lamport more than the vault can release.
-    let w = e.sol(destination, available + 1, 0, 2);
+    // One lamport more than the vault can release is refused when announced:
+    // nothing is recorded and the key is not used up.
+    let too_much = e.sol(destination, available + 1, 0, 2);
+    assert!(e.announce(1, &too_much).is_err());
+    assert!(!e.pending() && !e.spent(&root(1)) && e.op_index() == 0);
+    // Exactly what it can release is accepted.
+    let w = e.sol(destination, available, 0, 2);
     e.announce(1, &w).unwrap();
     e.set_time(T0 + DAY);
     let thief = Pubkey::new_unique();
     assert!(e.execute(thief).is_err(), "a different destination account");
     assert_eq!(e.lamports(&thief), 0);
+    // Should the vault ever hold less by release time, execution still keeps
+    // the reserve. Nothing in the program can take from a vault in between, so
+    // the test lowers the balance directly.
+    let mut account = e.svm.get_account(&e.vault).unwrap();
+    account.lamports -= 1;
+    e.svm.set_account(e.vault, account).unwrap();
     assert!(e.execute(destination).is_err(), "would breach the vault's rent reserve");
     assert!(e.pending(), "a failed execution leaves the record retryable");
     // Top the vault up by one lamport and the same record now executes.
     let top_up = system_instruction::transfer(&e.payer.pubkey(), &e.vault, 1);
     e.send(&[top_up]).unwrap();
     e.execute(destination).unwrap();
-    assert_eq!(e.lamports(&destination), available + 1);
+    assert_eq!(e.lamports(&destination), available);
     assert_eq!(e.lamports(&e.vault), rent);
 }
 
@@ -809,6 +826,7 @@ fn classic_token_withdrawal_waits_executes_once_and_survives_a_frozen_destinatio
     let vault = e.vault;
     put(&mut e, mint, mint_data(6));
     put(&mut e, source, token_data(&mint, &vault, 900, false));
+    e.token_source = source;
     put(&mut e, destination, token_data(&mint, &owner, 0, true));
     let w = Withdrawal {
         epoch: 0,
@@ -865,6 +883,7 @@ fn a_token_withdrawal_accepts_only_the_recorded_mint_destination_and_a_clean_vau
     let vault = e.vault;
     put(&mut e, mint, mint_data(6));
     put(&mut e, source, token_data(&mint, &vault, 900, false));
+    e.token_source = source;
     put(&mut e, destination, token_data(&mint, &owner, 0, false));
     let w = Withdrawal {
         epoch: 0,
@@ -964,6 +983,10 @@ fn a_token_announcement_is_checked_against_its_mint() {
         announce_by: T0 + 3600,
         next: root(2),
     };
+    // A token account of the vault's that can pay, named after the mint.
+    let source = Pubkey::new_unique();
+    let vault = e.vault;
+    put(&mut e, source, token_data(&mint, &vault, 900, false), token_program());
     // Signs `payload` with the current key and announces with `accounts` after the usual six.
     let attempt = |e: &mut Env, payload: Vec<u8>, extra: Vec<AccountMeta>| {
         let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
@@ -981,7 +1004,8 @@ fn a_token_announcement_is_checked_against_its_mint() {
         e.send(&[close]).unwrap();
         result
     };
-    let named = |key: Pubkey| vec![AccountMeta::new_readonly(key, false)];
+    // A mint, then the paying source after it.
+    let named = |key: Pubkey| vec![AccountMeta::new_readonly(key, false), AccountMeta::new_readonly(source, false)];
     let good = e.announce_payload(&w);
     // No mint account exists yet.
     assert!(attempt(&mut e, good.clone(), named(mint)).is_err(), "a mint that does not exist");
@@ -998,17 +1022,19 @@ fn a_token_announcement_is_checked_against_its_mint() {
     let other = Pubkey::new_unique();
     put(&mut e, other, mint_data(TOKEN_DECIMALS), token_program());
     assert!(attempt(&mut e, good.clone(), named(other)).is_err(), "another mint's account");
-    assert!(attempt(&mut e, good.clone(), [named(mint), named(other)].concat()).is_err(), "an extra account");
+    assert!(
+        attempt(&mut e, good.clone(), [named(mint), vec![AccountMeta::new_readonly(other, false)]].concat()).is_err(),
+        "an extra account"
+    );
     // A token account is not a mint.
     let account = Pubkey::new_unique();
-    let vault = e.vault;
     put(&mut e, account, token_data(&mint, &vault, 900, false), token_program());
     let mut as_mint = w.clone();
     as_mint.mint = account.to_bytes();
     let payload = e.announce_payload(&as_mint);
     assert!(attempt(&mut e, payload, named(account)).is_err(), "a token account named as the mint");
     assert!(!e.pending() && !e.spent(&root(1)) && e.op_index() == 0);
-    // SOL takes no seventh account.
+    // SOL takes no mint or source.
     let sol = e.sol(destination, SOL, 0, 2);
     let payload = e.announce_payload(&sol);
     assert!(attempt(&mut e, payload, named(mint)).is_err(), "SOL with a mint account");
@@ -1044,6 +1070,7 @@ fn a_token_withdrawal_is_instant_only_to_a_trusted_wallets_associated_account() 
     let vault = e.vault;
     put(&mut e, mint, mint_data(TOKEN_DECIMALS));
     put(&mut e, source, token_data(&mint, &vault, 900, false));
+    e.token_source = source;
     put(&mut e, associated, token_data(&mint, &wallet, 0, false));
     put(&mut e, other_account_of_wallet, token_data(&mint, &wallet, 0, false));
     let to = |destination: Pubkey, index: u64, next: u32| Withdrawal {
@@ -1132,11 +1159,19 @@ fn the_program_says_why_it_refused() {
     reuse.announce_by = T0 + DAY + WINDOW + 3600;
     let r = e.announce(2, &reuse);
     refused(r, 114, "a next root that already signed");
-    // More than the vault can pay while keeping its reserve.
+    // More than the vault can pay while keeping its reserve: refused at once.
     let mut all = e.sol(destination, 0, 1, 3);
     all.amount = e.lamports(&e.vault);
     all.announce_by = T0 + DAY + WINDOW + 3600;
-    e.announce(2, &all).unwrap();
+    let r = e.announce(2, &all);
+    refused(r, 126, "more than the vault can pay");
+    // The reserve is still kept at release, should the balance ever be lower then.
+    let mut payable = all.clone();
+    payable.amount = SOL;
+    e.announce(2, &payable).unwrap();
+    let mut account = e.svm.get_account(&e.vault).unwrap();
+    account.lamports = e.svm.minimum_balance_for_rent_exemption(VAULT_LEN) + SOL - 1;
+    e.svm.set_account(e.vault, account).unwrap();
     e.set_time(T0 + 3 * DAY + WINDOW);
     let r = e.execute(destination);
     refused(r, 124, "below the rent reserve");
@@ -1316,6 +1351,7 @@ fn the_heaviest_client_transaction_fits_the_requested_compute_limit() {
         let lamports = e.svm.minimum_balance_for_rent_exemption(data.len());
         e.svm.set_account(key, Account { lamports, data, owner: token_program(), executable: false, rent_epoch: 0 }).unwrap();
     }
+    e.token_source = source;
     let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination: associated, amount: 100, announce_by: T0 + 3600, next: root(2) };
     let payload = e.announce_payload(&w);
     let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
@@ -1385,6 +1421,7 @@ impl Env {
             chain: self.chain,
             vault: self.vault,
             trusted: self.trusted,
+            token_source: self.token_source,
         }
     }
     fn snapshot(&self, keys: &[Pubkey]) -> Snapshot {
@@ -1579,6 +1616,7 @@ fn fuzz_cases() -> Vec<Case> {
         let vault = e.vault;
         e.plant(mint, token_program(), mint_data(TOKEN_DECIMALS));
         e.plant(source, token_program(), token_data(&mint, &vault, 900, false));
+        e.token_source = source;
         e.plant(destination, token_program(), token_data(&mint, &owner, 0, false));
         let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination, amount: 100, announce_by: T0 + 3600, next: root(2) };
         let payload = e.announce_payload(&w);
@@ -1753,6 +1791,7 @@ fn a_token_withdrawal_is_released_when_called_by_another_program() {
     let vault = e.vault;
     e.plant(mint, token_program(), mint_data(TOKEN_DECIMALS));
     e.plant(source, token_program(), token_data(&mint, &vault, 900, false));
+    e.token_source = source;
     e.plant(destination, token_program(), token_data(&mint, &owner, 0, false));
     let w = Withdrawal { epoch: 0, index: 0, kind: 1, mint: mint.to_bytes(), destination, amount: 100, announce_by: T0 + 3600, next: root(2) };
     let payload = e.announce_payload(&w);
@@ -1791,4 +1830,72 @@ fn a_clock_that_goes_backwards_releases_nothing_early() {
     e.set_time(T0 + DAY + 5);
     e.execute(destination).unwrap();
     assert_eq!(e.lamports(&destination), SOL);
+}
+
+/// BUN-03: a token announcement must name a token account of the vault's that
+/// can pay it, by the rules `execute` will apply. Every other source is
+/// refused with code 126; nothing is recorded and no key is used up.
+#[test]
+fn a_token_announcement_must_name_a_vault_account_that_can_pay() {
+    let mut e = Env::new();
+    e.init();
+    let (mint, other_mint, destination, owner) =
+        (Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique(), Pubkey::new_unique());
+    let vault = e.vault;
+    e.plant(mint, token_program(), mint_data(TOKEN_DECIMALS));
+    e.plant(other_mint, token_program(), mint_data(TOKEN_DECIMALS));
+    e.plant(destination, token_program(), token_data(&mint, &owner, 0, false));
+    let account = |e: &mut Env, data: Vec<u8>, program: Pubkey| {
+        let key = Pubkey::new_unique();
+        e.plant(key, program, data);
+        key
+    };
+    let short = account(&mut e, token_data(&mint, &vault, 399, false), token_program());
+    let strangers = account(&mut e, token_data(&mint, &owner, 900, false), token_program());
+    let wrong_mint = account(&mut e, token_data(&other_mint, &vault, 900, false), token_program());
+    let frozen = account(&mut e, token_data(&mint, &vault, 900, true), token_program());
+    let mut d = token_data(&mint, &vault, 900, false);
+    d[72..76].copy_from_slice(&1u32.to_le_bytes());
+    d[76..108].copy_from_slice(owner.as_ref());
+    d[121..129].copy_from_slice(&900u64.to_le_bytes());
+    let delegated = account(&mut e, d, token_program());
+    let mut d = token_data(&mint, &vault, 900, false);
+    d[129..133].copy_from_slice(&1u32.to_le_bytes());
+    d[133..165].copy_from_slice(owner.as_ref());
+    let closable = account(&mut e, d, token_program());
+    let imitation = account(&mut e, token_data(&mint, &vault, 900, false), system());
+    let w = Withdrawal {
+        epoch: 0,
+        index: 0,
+        kind: 1,
+        mint: mint.to_bytes(),
+        destination,
+        amount: 400,
+        announce_by: T0 + 3600,
+        next: root(2),
+    };
+    for (what, source) in [
+        ("a source holding less than the amount", short),
+        ("a source owned by someone else", strangers),
+        ("a source of another mint", wrong_mint),
+        ("a frozen source", frozen),
+        ("a source with a delegate", delegated),
+        ("a source with a close authority", closable),
+        ("a source not owned by the token program", imitation),
+        ("an account that does not exist", Pubkey::new_unique()),
+    ] {
+        e.token_source = source;
+        let payload = e.announce_payload(&w);
+        let message = e.message(b"BUNKER3_ANNOUNCE", &payload);
+        let proof = e.stage(1, &message);
+        let ix = e.announce_ix(&payload, proof, &root(1), &w.next);
+        let got = format!("{:?}", e.send(&[ix]).expect_err(what).err);
+        assert!(got.contains("Custom(126)"), "{what}: expected code 126, got {got}");
+        assert!(!e.pending() && !e.spent(&root(1)) && e.op_index() == 0, "{what}");
+    }
+    // Exactly the amount, in a clean account of the vault's: accepted.
+    let exact = account(&mut e, token_data(&mint, &vault, 400, false), token_program());
+    e.token_source = exact;
+    e.announce(1, &w).unwrap();
+    assert!(e.pending() && e.spent(&root(1)));
 }

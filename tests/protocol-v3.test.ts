@@ -164,10 +164,14 @@ describe("Protocol 3 encodings", () => {
     expect([encoded.length, encoded[195], decodeAnnounce(encoded).decimals]).toEqual([196, 6, 6]);
     expect(() => encodeAnnounce({ ...token, decimals: 256 })).toThrow();
     expect(() => encodeAnnounce({ ...token, decimals: -1 })).toThrow();
-    // Its instruction names the mint as a seventh account; SOL's has six.
-    const tokenIx = announceIx(program, payer, encoded, unhex(fixture.epoch0.opRoot));
-    expect(tokenIx.keys.length).toBe(7);
+    // Its instruction names the mint and the vault's paying token account,
+    // read-only, after the six SOL's has. Without the source it is not built.
+    const source = new PublicKey(new Uint8Array(32).fill(5));
+    expect(() => announceIx(program, payer, encoded, unhex(fixture.epoch0.opRoot))).toThrow("Token source required");
+    const tokenIx = announceIx(program, payer, encoded, unhex(fixture.epoch0.opRoot), source);
+    expect(tokenIx.keys.length).toBe(8);
     expect(tokenIx.keys[6].pubkey.equals(token.mint) && !tokenIx.keys[6].isWritable).toBe(true);
+    expect(tokenIx.keys[7].pubkey.equals(source) && !tokenIx.keys[7].isWritable).toBe(true);
   });
   it("round-trips a recovery packet and keeps the roles apart", () => {
     const bytes = unhex(fixture.recover.payload);
