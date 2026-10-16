@@ -286,8 +286,9 @@ fn stage(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
 fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult {
     let a = decode_announce(data)?;
     // A token withdrawal also names its mint, so the mint can be checked now
-    // rather than discovered to be unusable when the withdrawal is released.
-    require(accounts.len() == if a.kind == 1 { 7 } else { 6 })?;
+    // rather than discovered to be unusable when the withdrawal is released,
+    // and a token account of the vault's that holds the amount.
+    require(accounts.len() == if a.kind == 1 { 8 } else { 6 })?;
     let it = &mut accounts.iter();
     let vault = next_account_info(it)?;
     let proof = next_account_info(it)?;
@@ -295,6 +296,7 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
     let spent = next_account_info(it)?;
     let next_spent = next_account_info(it)?;
     let system = next_account_info(it)?;
+    let mut source = None;
     if a.kind == 1 {
         let mint = next_account_info(it)?;
         // A classic mint can never be closed or change owner, so what is
@@ -304,8 +306,38 @@ fn announce(id: &Pubkey, accounts: &[AccountInfo], data: &[u8]) -> ProgramResult
         let m = spl_token::state::Mint::unpack(&mint.try_borrow_data()?)
             .map_err(|_| Refusal::MintNotSupported)?;
         need(m.decimals == a.decimals, Refusal::WrongDecimals)?;
+        source = Some(next_account_info(it)?);
     }
     let mut v = load_vault(id, vault)?;
+    // The vault must be able to pay what is announced, by the same rules
+    // `execute` applies. A record it could not pay would hold the one pending
+    // slot until it expired. Nothing but `execute` takes from a vault, and
+    // `execute` needs this record, so what can be paid now can be paid then.
+    // (A token's issuer can still freeze the vault's account in between;
+    // that is outside the vault's control.)
+    match source {
+        None => {
+            let reserve = Rent::get()?.minimum_balance(VAULT_LEN);
+            need(
+                vault.lamports().checked_sub(a.amount).is_some_and(|left| left >= reserve),
+                Refusal::NotPayable,
+            )?;
+        }
+        Some(source) => {
+            need(source.owner == &spl_token::id(), Refusal::NotPayable)?;
+            let s = spl_token::state::Account::unpack(&source.try_borrow_data()?)
+                .map_err(|_| Refusal::NotPayable)?;
+            need(
+                s.owner == *vault.key
+                    && s.mint.to_bytes() == a.mint
+                    && s.delegate.is_none()
+                    && s.close_authority.is_none()
+                    && !s.is_frozen()
+                    && s.amount >= a.amount,
+                Refusal::NotPayable,
+            )?;
+        }
+    }
     for reserved in [vault.key, proof.key, spent.key, next_spent.key] {
         need(a.destination != reserved.to_bytes(), Refusal::DestinationNotAllowed)?;
     }

@@ -546,7 +546,7 @@ function App() {
           : "Approval 3 of 3 · announcing the withdrawal",
         [
           computeIx(),
-          announceIx(program, payer, signed.payload, state.opRoot),
+          announceIx(program, payer, signed.payload, state.opRoot, source),
           ...setup,
           // With no waiting period the withdrawal is released in the same
           // transaction; either both happen or neither does.

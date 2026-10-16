@@ -294,13 +294,17 @@ export function stageIxs(
     );
   });
 }
+/** `sourceToken` is the vault's token account that holds the amount, for a
+ * token announcement: the program refuses one the vault could not pay. */
 export function announceIx(
   program: PublicKey,
   payer: PublicKey,
   payload: Uint8Array,
   currentOpRoot: Uint8Array,
+  sourceToken?: PublicKey,
 ) {
   const a = decodeAnnounce(payload);
+  if (a.kind === 1 && !sourceToken) throw new Error("Token source required");
   const vault = vaultAddress(program, a.vaultId);
   return ix(
     program,
@@ -311,8 +315,9 @@ export function announceIx(
       meta(spentAddress(program, vault, currentOpRoot), true),
       meta(spentAddress(program, vault, a.nextOpRoot)),
       meta(SystemProgram.programId),
-      // A token announcement names its mint so the program can check it now.
-      ...(a.kind === 1 ? [meta(a.mint)] : []),
+      // A token announcement names its mint, and the vault's account that pays,
+      // so the program can check both now.
+      ...(a.kind === 1 ? [meta(a.mint), meta(sourceToken!)] : []),
     ],
     2,
     payload,
