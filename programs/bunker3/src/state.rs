@@ -73,6 +73,9 @@ pub enum Refusal {
     BelowRentReserve = 124,
     /// The token accounts supplied do not fit the announced withdrawal.
     WrongTokenAccounts = 125,
+    /// The vault does not hold what the announcement asks for, so it could
+    /// never be released. Refused before it can occupy the pending slot.
+    NotPayable = 126,
     /// The pending withdrawal has not passed its deadline yet.
     NotExpired = 130,
     /// The recovery packet is for another key generation.

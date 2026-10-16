@@ -291,7 +291,7 @@ async function publish(s: Session, day: DayKey, signed: SignedAnnouncement): Pro
     for (let i = 0; i < stages.length; i++) await transmit(s, `Step ${i + 1} of 3: publishing the authorization`, [stages[i]]);
     await transmit(s, instant ? "Step 3 of 3: sending" : "Step 3 of 3: announcing", [
       computeIx(),
-      announceIx(s.program, s.payer.publicKey, signed.payload, state.opRoot),
+      announceIx(s.program, s.payer.publicKey, signed.payload, state.opRoot, source),
       ...setup,
       ...(instant ? [executeIx(s.program, vault, { kind: a.kind, mint: a.mint, destination: a.destination }, source)] : []),
       closeProofIx(s.program, s.payer.publicKey, signed.message),

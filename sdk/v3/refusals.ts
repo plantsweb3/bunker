@@ -16,6 +16,7 @@ export const REFUSALS: Record<number, string> = {
   123: "That is not the destination this withdrawal was announced for.",
   124: "That amount would leave your Bunker below the small balance every Bunker must keep. Withdraw slightly less.",
   125: "The token accounts for this withdrawal cannot be used. The recipient’s token account may have been closed or frozen, or your Bunker’s own balance changed.",
+  126: "Your Bunker does not hold that much right now, so the withdrawal was not announced and nothing left it. Check the balance and try a smaller amount. If this authorization was already published, its key cannot sign again: install new keys in the recovery tool.",
   130: "That withdrawal has not expired yet, so it cannot be cleared. It can still be released.",
   140: "This recovery packet is for a different key generation than your Bunker is on.",
   150: "The authorization was not fully uploaded. Try again; the same upload continues.",
