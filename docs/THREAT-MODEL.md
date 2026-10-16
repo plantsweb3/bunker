@@ -1,6 +1,6 @@
 # Threat model
 
-Status: public beta on Solana mainnet, holding real funds. No independent audit. The program is upgradeable by its maintainer (docs/DEPLOYMENT.md).
+Status: public beta on Solana mainnet, holding real funds. No independent audit. The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
 
 ## What is protected, and by what
 
@@ -39,7 +39,7 @@ A vault's SOL and classic SPL assets. Three secrets exist, with different reach:
 | Offline tool run on a compromised or online device | The tool warns when online | Not an air gap. Malware can read the kit and its password. |
 | Dishonest RPC | Genesis pinned; a recovery packet's signature is checked against the on-chain commitment before submission; the vault address is derived from the user's own files; the journal signs only for the root the day key derives, never twice for one key whatever order states are shown in, and bounds the deadline by the device clock | Can lie about balances, token decimals, state and time shown to the user, withhold transactions, and so delay or mislead. A waiting period that differs from the day key's is refused. Cannot obtain a second signature under a key or send a deposit to a vault with other keys. |
 | Token issuer freezes an account | Frozen balances are not offered; a failed release stays retryable | A frozen recipient account blocks that withdrawal until it thaws or is cancelled |
-| Program upgraded maliciously | The program is upgradeable by one key, held by the maintainer on a hardware wallet ([DEPLOYMENT.md](DEPLOYMENT.md)). Upgrades are built from a public commit and the deployed build is publicly verified | Whoever holds or steals that key can change any rule, including who may withdraw. A matching build describes the code today, not after the next upgrade. The intention is to revoke the key after independent review. |
+| Program upgraded maliciously | The upgrade authority has been renounced ([DEPLOYMENT.md](DEPLOYMENT.md)); the program-data account shows none, and the deployed build is publicly verified | None by upgrade. The cost is the reverse: a flaw cannot be fixed in place, and holders would have to move to a new program. |
 | Solana consensus, validators, clock | Trusted | Waiting periods use validator-reported time |
 | Someone tries to hide or fake an alert with transactions | Alerts are derived from changes in the vault account itself, which only the program can change | None from traffic. Dust below 0.001 SOL is not reported. |
 | Alert service compromised or impersonated | It holds no keys and cannot move assets; messages are plain text and state that Bunker never asks for a key | Its operator, its RPC provider or Telegram can silence it or make it send false alarms. A fake bot can phish. Alerts name bunkermode.io/recovery, which never accepts a kit. |

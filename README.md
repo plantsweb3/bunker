@@ -8,7 +8,7 @@
 
 Assets go into a program-owned vault from any wallet. They come out only with a one-time hash signature from a key the wallet never holds. A stolen seed phrase or a signature given to a drainer site cannot authorize a withdrawal. One recovery kit, kept offline, replaces lost or exposed keys and cancels a withdrawal that is still waiting.
 
-**Release status:** public beta on Solana mainnet. The program is live on Solana mainnet at `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ`, built from commit `9bb0856` (executable hash `161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518`). It holds real funds. An independent audit has been commissioned. It has not been completed, and until its report is published this code is unaudited. The program is upgradeable by one key, `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth`, held by the maintainer on a hardware wallet. Use it only with what you could afford to lose. See [Deployment](docs/DEPLOYMENT.md) and [Security](SECURITY.md).
+**Release status:** public beta on Solana mainnet. The program is live on Solana mainnet at `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ`, built from commit `9bb0856` (executable hash `161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518`). It holds real funds. An independent audit has been commissioned. It has not been completed, and until its report is published this code is unaudited. Its upgrade authority has been renounced, so nobody can change the program, and a flaw cannot be fixed in place. Use it only with what you could afford to lose. See [Deployment](docs/DEPLOYMENT.md) and [Security](SECURITY.md).
 
 ## Start reviewing
 

@@ -1,6 +1,6 @@
 # Architecture
 
-Status: public beta on Solana mainnet, holding real funds. No independent audit. The program is upgradeable by its maintainer (docs/DEPLOYMENT.md).
+Status: public beta on Solana mainnet, holding real funds. No independent audit. The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
 
 ## Parts
 

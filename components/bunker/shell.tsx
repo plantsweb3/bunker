@@ -91,7 +91,7 @@ export function Footer() {
       </span>
       <p className="footer-fine">
         Bunker has not been audited. It is new software in public beta, and
-        the program can be upgraded by its maintainer. Real funds are at
+        its program can no longer be changed or fixed by anyone. Real funds are at
         risk: put in only what you could afford to lose. A bug bounty is open.
       </p>
     </footer>

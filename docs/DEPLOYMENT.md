@@ -58,23 +58,17 @@ Deployed 2026-10-09 as a public beta. Nothing here has been audited. Upgraded 20
 | Executable hash | `161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518` |
 | Upgrade transaction | `2MS6LVHbKJ99S7TnbC1qzbeB8hN9i62vDeEuf2wK7D5jikov5wkgkKW4eey7wAgEiVQTnFGJQVTHnFSLBAWk9hTr` (2026-10-19) |
 | First deployment | `2A9ztQPhJCG5VUCf3NwJG9gG8d6nek4rJbtMieuRDEZWVPDSU2VaX6Fzmhmc3hEYMKDsF6MJhEoDizVjpGCWTEhj` (2026-10-09, commit `2182e5f`, executable hash `a7f39161…f08f7`) |
-| Upgrade authority | `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth` |
+| Upgrade authority | None (renounced 2026-10-19, transaction `5JMmTMa7KCtmjxNUzqDJv1CyCna3QzNiNHsMd1ir4PXWFR4KZV4UqiugA4VfPQhsiVeThaTJxnRbnzFBFZZ1KtAA`) |
 
 The upgrade authority has recorded this commit on chain (with the build image, because the public verifier does not yet choose one for Solana 4.3.0), and the public verified-builds service rebuilt it and reports a match: https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ. The same hash was produced twice in the pinned container for that commit, and the upgrade checked the uploaded copy against it before it was swapped in; the program's VM suite and the local-validator suites were run against that code before the upgrade. `npm run check:deployment -- --rpc <url> --program <address> --binary <file>` reads the program from the network and compares; it reports that the code matches and that upgrades are possible.
 
 ## Upgrade authority
 
-**The program is upgradeable.** One key can replace it: the address above, held by the maintainer on a hardware wallet. It was deployed from a throwaway key and the authority was moved to the hardware wallet in the next transaction.
+**The program is permanent.** Its upgrade authority has been renounced: the program-data account names none, and no key, including the maintainer's, can replace the program. It was deployed from a throwaway key, the authority was moved to a hardware wallet, used once to deploy the fixes from the independent review, and then renounced.
 
-This is a deliberate choice for an unaudited beta, and it has a cost. A flaw found after launch can be fixed in place instead of by asking every holder to withdraw. In exchange, every vault is only as safe as that one key and the person holding it: an upgrade can change any rule, including who may withdraw. That is the kind of key this product exists to get away from, and holders should weigh it. A matching executable hash describes the code today, not after the next upgrade.
+This removes the largest trust a holder had to extend: that one key could change any rule, including who may withdraw. The cost is the reverse. A flaw found from now on cannot be fixed in place; the answer would be a new program, and holders moving their assets to it, which only works while withdrawals still do. A matching executable hash now describes the program for good.
 
-What is promised about upgrades:
-
-- An upgrade is built from a public commit, in the pinned container, and its commit and executable hash are published before or with it.
-- The upgrade authority stays on a hardware wallet and is not shared with any service.
-- The intention is to revoke the authority once the program has been independently reviewed. No date is promised.
-
-The program has no administrator role over any vault and cannot be paused. Short of an upgrade, a problem is met by stopping new deposits in the interface and by holders withdrawing; the command-line client exists so that does not depend on this website.
+The program has no administrator role over any vault and cannot be paused. A problem is met by stopping new deposits in the interface and by holders withdrawing; the command-line client exists so that does not depend on this website.
 
 A website rollback cannot undo a transaction.
 
