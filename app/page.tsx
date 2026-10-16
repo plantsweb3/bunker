@@ -111,7 +111,7 @@ const gates: [string, string, string, string?][] = [
   ],
   [
     "Deployment you can verify",
-    "The program on mainnet matches the published source, byte for byte. Its maintainer can upgrade it; that key is on a hardware wallet.",
+    "The program on mainnet matches the published source, byte for byte, and nobody can change it: its upgrade key was given up for good.",
     "Done",
   ],
   [
@@ -186,10 +186,11 @@ const faq: [string, React.ReactNode][] = [
     "What if Bunker goes away?",
     <>
       A vault is controlled by an on-chain program, not by this website, and
-      the program gives nobody an administrator role over a vault. During the
-      beta the program itself can still be upgraded, by one key that its
-      maintainer keeps on a hardware wallet; that is how a flaw gets fixed,
-      and it is a trust you are extending. The address is on the{" "}
+      the program gives nobody an administrator role over a vault. Nobody can
+      change the program itself either: its upgrade key was given up for good.
+      The other side of that is that a flaw found now cannot be fixed in
+      place; the answer would be a new program you move into. Details are on
+      the{" "}
       <Link href="/verify">verify page</Link>. The code that builds a withdrawal is{" "}
       <a href={REPO} target="_blank" rel="noreferrer">
         public

@@ -9,13 +9,14 @@ export default function Page() {
       description="What the design aims to protect, what it cannot protect, and what still needs review."
     >
       <div className="document-callout">
-        <h2>Public beta. Unaudited. Upgradeable.</h2>
+        <h2>Public beta. Unaudited. Permanent.</h2>
         <p>
           Bunker runs on Solana mainnet and holds real funds. The
           implementation has automated tests, but no completed independent
           cryptographic review or program audit. One has been commissioned.
-          The program can be
-          upgraded by one key, held by its maintainer on a hardware wallet. No
+          Nobody can change the
+          program: its upgrade key was renounced, so a flaw found now cannot be
+          fixed in place either. No
           security certification or quantum-resistance level is claimed. Put
           in only what you could afford to lose.
         </p>
@@ -137,9 +138,10 @@ export default function Page() {
             value while held in a vault.
           </li>
           <li>
-            <strong>Upgrade authority or deployment compromise.</strong> An
-            upgradeable program can change its rules. The current authority must
-            be inspected for each deployment.
+            <strong>A flaw that cannot be patched.</strong> The program’s
+            upgrade key was renounced, so nobody can change its rules, and
+            nobody can fix them either. A serious flaw would mean moving funds
+            to a new program, which only works while withdrawals still do.
           </li>
         </ul>
       </section>

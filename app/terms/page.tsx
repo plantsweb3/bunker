@@ -27,10 +27,10 @@ export default function Page() {
           library and a Solana program. It is not a bank, broker, exchange,
           custodian or wallet provider. Nobody operating this site holds your
           keys, and the program gives nobody a way to move, freeze or return
-          your assets. Whoever can upgrade a program can change that. During
-          the beta one key can upgrade the Bunker program; its maintainer
-          keeps it on a hardware wallet and its address is published on the
-          verify page.
+          your assets. Nobody can change that by upgrading the program
+          either: its upgrade key was renounced, and the verify page shows it
+          has no upgrade authority. For the same reason a flaw cannot be fixed
+          in place.
         </p>
       </section>
       <section>

@@ -43,7 +43,7 @@ export default function Page() {
             ["01", "Program", "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ"],
             ["02", "Built from", "Commit 9bb0856 of the public repository, in the pinned container. Live since the upgrade of 19 October 2026: the program code of commit f6a37ce plus one change, which refuses a withdrawal announcement the vault cannot pay."],
             ["03", "Executable hash", "161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518"],
-            ["04", "Can be upgraded by", "Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth, a hardware wallet held by the maintainer."],
+            ["04", "Upgrade authority", "None. It was renounced on 19 October 2026, so the program can never be changed."],
             ["05", "Audit", "Commissioned, not completed. Until the report is published this is unaudited code. A bug bounty is open."],
           ].map(([number, title, text]) => (
             <div key={number}>
@@ -66,9 +66,9 @@ export default function Page() {
           program’s test suite passes against that exact binary.
         </p>
         <p>
-          <strong>Checked by a public service:</strong> the upgrade
-          authority recorded on chain which commit the program was built
-          from, and{" "}
+          <strong>Checked by a public service:</strong> before the upgrade
+          key was renounced, it recorded on chain which commit the program was
+          built from, and{" "}
           <a
             href="https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ"
             target="_blank"
@@ -121,9 +121,8 @@ export default function Page() {
         <p>
           On mainnet this site, the offline tool and the command-line client
           send transactions to that one program address and to no other; no
-          environment setting can change which. The program can be upgraded
-          by the key above, so a matching hash describes today’s code, not
-          tomorrow’s: check it again before you rely on it.
+          environment setting can change which. The program has no upgrade
+          authority, so a matching hash describes it for good.
         </p>
       </section>
     </DocumentLayout>
