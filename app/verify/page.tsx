@@ -41,8 +41,8 @@ export default function Page() {
         <div className="review-list">
           {[
             ["01", "Program", "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ"],
-            ["02", "Built from", "Commit 2182e5f of the public repository, in the pinned container."],
-            ["03", "Executable hash", "a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7"],
+            ["02", "Built from", "Commit 9bb0856 of the public repository, in the pinned container. Live since the upgrade of 19 October 2026: the program code of commit f6a37ce plus one change, which refuses a withdrawal announcement the vault cannot pay."],
+            ["03", "Executable hash", "161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518"],
             ["04", "Can be upgraded by", "Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth, a hardware wallet held by the maintainer."],
             ["05", "Audit", "Commissioned, not completed. Until the report is published this is unaudited code. A bug bounty is open."],
           ].map(([number, title, text]) => (

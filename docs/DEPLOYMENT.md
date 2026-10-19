@@ -48,18 +48,19 @@ Before any test deployment elsewhere, run the workspace Rust tests, regenerate a
 
 ## The mainnet program
 
-Deployed 2026-10-09 as a public beta. Nothing here has been audited.
+Deployed 2026-10-09 as a public beta. Nothing here has been audited. Upgraded 2026-10-19 to commit `9bb0856`: the program code of commit `f6a37ce` plus one change, which refuses a withdrawal announcement the vault cannot pay (refusal code 126).
 
 | | |
 |---|---|
 | Program | `DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ` |
 | Program data | `Ga1huSvpvaKFg7jiZnRoL89154MbypVdgBQ516UkCV1k` |
-| Built from | commit `2182e5f`, `solana-verify build --library-name bunker3` (solana-verify 0.5.2, Solana 4.3.0) |
-| Executable hash | `a7f39161fd812132e1e43a9a942cbda6b2fcc62bbc8235b0bca72f9bafbf08f7` |
-| Deployment transaction | `2A9ztQPhJCG5VUCf3NwJG9gG8d6nek4rJbtMieuRDEZWVPDSU2VaX6Fzmhmc3hEYMKDsF6MJhEoDizVjpGCWTEhj` |
+| Built from | commit `9bb08566514b7107f5d226cbf8e591da22092786`, `solana-verify build --library-name bunker3` (solana-verify 0.5.2, Solana 4.3.0) |
+| Executable hash | `161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518` |
+| Upgrade transaction | `2MS6LVHbKJ99S7TnbC1qzbeB8hN9i62vDeEuf2wK7D5jikov5wkgkKW4eey7wAgEiVQTnFGJQVTHnFSLBAWk9hTr` (2026-10-19) |
+| First deployment | `2A9ztQPhJCG5VUCf3NwJG9gG8d6nek4rJbtMieuRDEZWVPDSU2VaX6Fzmhmc3hEYMKDsF6MJhEoDizVjpGCWTEhj` (2026-10-09, commit `2182e5f`, executable hash `a7f39161…f08f7`) |
 | Upgrade authority | `Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth` |
 
-The upgrade authority has recorded this commit on chain (with the build image, because the public verifier does not yet choose one for Solana 4.3.0), and the public verified-builds service rebuilt it and reports a match: https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ. The same hash was produced by the `verified-build` job in CI for that commit, twice, and by a container build on a second machine; the program's VM suite was run against that binary before it was deployed. `npm run check:deployment -- --rpc <url> --program <address> --binary <file>` reads the program from the network and compares; it reports that the code matches and that upgrades are possible.
+The upgrade authority has recorded this commit on chain (with the build image, because the public verifier does not yet choose one for Solana 4.3.0), and the public verified-builds service rebuilt it and reports a match: https://verify.osec.io/status/DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ. The same hash was produced twice in the pinned container for that commit, and the upgrade checked the uploaded copy against it before it was swapped in; the program's VM suite and the local-validator suites were run against that code before the upgrade. `npm run check:deployment -- --rpc <url> --program <address> --binary <file>` reads the program from the network and compares; it reports that the code matches and that upgrades are possible.
 
 ## Upgrade authority
 
