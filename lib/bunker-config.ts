@@ -3,7 +3,7 @@ export const MAINNET_GENESIS = "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d";
 export const DEVNET_GENESIS = "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG";
 /** The one Bunker program on Solana mainnet. Nothing in this repository sends
  * a transaction to mainnet for any other program address, and no environment
- * variable can change which one this is. Deployed from commit 2182e5f;
+ * variable can change which one this is. Deployed from commit 2182e5f and upgraded to 9bb0856;
  * docs/DEPLOYMENT.md records the build hash and who can upgrade it. */
 export const MAINNET_PROGRAM_ID = "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ";
 /** A file's network label is a convenience for people; the genesis hash is
