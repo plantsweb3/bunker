@@ -1,6 +1,6 @@
 # External review request
 
-No reviewer has been engaged, no report has been obtained, and no audit badge may be displayed.
+CertiK is auditing the program and signature verifier (commit `f6a37ce`); its final report is not out. No audit badge may be displayed until it is published.
 
 Suggested in two phases.
 

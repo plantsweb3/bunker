@@ -52,8 +52,8 @@ const steps: Step[] = [
     title: "Open it and start small",
     body: (
       <>
-        Open your Bunker with the day key and its password, then deposit a small amount first. This is a public beta
-        and it has not been audited.
+        Open your Bunker with the day key and its password, then deposit a small amount first. This is a public beta,
+        and its audit is not finished yet.
       </>
     ),
     href: "/vault",

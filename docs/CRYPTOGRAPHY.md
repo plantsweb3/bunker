@@ -1,6 +1,6 @@
 # Cryptographic construction and provenance
 
-Status: experimental, unaudited. No production or post-quantum security level is asserted.
+Status: experimental. The on-chain verifier (`crates/bunker-lmots`) is in CertiK's audit, final report pending; the TypeScript signer and key derivation are not. No production or post-quantum security level is asserted.
 
 ## Signature primitive
 
@@ -65,7 +65,7 @@ Two message types, each `domain || program id || vault address || payload`, with
 - an **announcement**, signed by the current operational key, fixing asset, mint, destination, amount, a deadline for landing, and the next operational root;
 - a **recovery packet**, signed by the current epoch's recovery key, naming only the next recovery root and next operational root. For a given vault and epoch there is exactly one valid packet, and producing it again yields identical bytes. That determinism is what makes retrying it safe, and it is an assumption for review, not a proven property.
 
-The hash signature authorizes these two instructions only. Fee payment, account creation and every other Solana transaction use ordinary Ed25519 signatures, as do validators, destination wallets, token authorities and, if the program is deployed upgradeable, the authority that can replace the program and with it every rule. **No end-to-end post-quantum security is claimed, and none may be.** What can be said: withdrawals and recovery are authorized by hash-based one-time signatures (the LM-OTS construction of RFC 8554) whose security rests only on SHA-256; the system as a whole is not quantum-resistant; unaudited. What cannot: "quantum-safe", any security level, "LMS", "NIST", or "implements" or "complies with" any standard.
+The hash signature authorizes these two instructions only. Fee payment, account creation and every other Solana transaction use ordinary Ed25519 signatures, as do validators, destination wallets, token authorities and, if the program is deployed upgradeable, the authority that can replace the program and with it every rule. **No end-to-end post-quantum security is claimed, and none may be.** What can be said: withdrawals and recovery are authorized by hash-based one-time signatures (the LM-OTS construction of RFC 8554) whose security rests only on SHA-256; the system as a whole is not quantum-resistant; the program's audit is in progress and its final report is not out. What cannot: "quantum-safe", any security level, "LMS", "NIST", or "implements" or "complies with" any standard.
 
 ## Encrypted files
 

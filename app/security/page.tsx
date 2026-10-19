@@ -9,11 +9,14 @@ export default function Page() {
       description="What the design aims to protect, what it cannot protect, and what still needs review."
     >
       <div className="document-callout">
-        <h2>Public beta. Unaudited. Permanent.</h2>
+        <h2>Public beta. Audit in progress. Permanent.</h2>
         <p>
           Bunker runs on Solana mainnet and holds real funds. The
-          implementation has automated tests, but no completed independent
-          cryptographic review or program audit. One has been commissioned.
+          implementation has automated tests. CertiK is auditing the on-chain
+          program and its signature verifier. The preliminary findings were
+          minor, with nothing critical, and each has been addressed. The final
+          report will be published here in full. The website, offline tool and
+          command-line client are not part of that audit.
           Nobody can change the
           program: its upgrade key was renounced, so a flaw found now cannot be
           fixed in place either. No

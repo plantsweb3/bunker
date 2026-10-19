@@ -48,7 +48,7 @@ Before any test deployment elsewhere, run the workspace Rust tests, regenerate a
 
 ## The mainnet program
 
-Deployed 2026-10-09 as a public beta. Nothing here has been audited. Upgraded 2026-10-19 to commit `9bb0856`: the program code of commit `f6a37ce` plus one change, which refuses a withdrawal announcement the vault cannot pay (refusal code 126).
+Deployed 2026-10-09 as a public beta, before any audit. CertiK is auditing the program and its signature verifier at commit `f6a37ce`; the final report is pending. Upgraded 2026-10-19 to commit `9bb0856`: the program code of commit `f6a37ce` plus one change, which refuses a withdrawal announcement the vault cannot pay (refusal code 126). That change is the fix for the audit's one code finding.
 
 | | |
 |---|---|
@@ -74,4 +74,4 @@ A website rollback cannot undo a transaction.
 
 ## What has not been done
 
-The preconditions in [LAUNCH-RUNBOOK.md](LAUNCH-RUNBOOK.md) step 0 were not met before launch: no completed independent cryptographic review or program audit (one has since been commissioned), no completed [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md), no legal review of the terms, and no run of the whole flow on real phones and in wallet apps' browsers. A bug bounty is open (`/bounty`, terms in `lib/bounty.ts`); its payout amounts are not set. These remain the work that would justify removing the word "unaudited" anywhere.
+The preconditions in [LAUNCH-RUNBOOK.md](LAUNCH-RUNBOOK.md) step 0 were not met before launch: no completed independent cryptographic review or program audit (CertiK's audit of the program is now in progress), no completed [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md), no legal review of the terms, and no run of the whole flow on real phones and in wallet apps' browsers. A bug bounty is open (`/bounty`, terms in `lib/bounty.ts`); its payout amounts are not set. These remain the work that would justify removing the word "unaudited" anywhere.

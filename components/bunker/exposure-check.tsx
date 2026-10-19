@@ -222,8 +222,8 @@ export default function ExposureCheck() {
                   </div>
                 </div>
                 <p>
-                  Design goal, not a guarantee. Bunker is a public beta and
-                  has not been audited.{" "}
+                  Design goal, not a guarantee. Bunker is a public beta, and
+                  its audit is not finished yet.{" "}
                   <Link href="/#limits">Where the protection stops.</Link>
                 </p>
               </div>
@@ -261,7 +261,7 @@ export default function ExposureCheck() {
                     {e.unsupported.length
                       ? `${plural(e.unsupported.length, "Token-2022 balance")} here is not supported.`
                       : "Everything movable here is a supported type."}{" "}
-                    Public beta, not audited.
+                    Public beta, audit in progress.
                   </p>
                 </section>
               </div>
