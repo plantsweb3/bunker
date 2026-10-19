@@ -72,7 +72,7 @@ export function configFromEnv(
     custodyEnabled: true,
     programId: MAINNET_PROGRAM_ID,
     expectedGenesis: MAINNET_GENESIS,
-    releaseStatus: "Public beta on Solana mainnet. Not audited.",
+    releaseStatus: "Public beta on Solana mainnet. Audit in progress.",
     alertsBot,
   };
 }

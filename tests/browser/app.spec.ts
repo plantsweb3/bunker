@@ -346,7 +346,7 @@ test("roadmap: five doors, the first one open, and each loop plays only while it
   for (const [n, name, chip, line] of [
     [1, "Watch", "Out now", "Built. Alerts when a withdrawal is announced. Holds no keys."],
     [2, "Signer, drawn", "Design only", "Designed while the audit runs. Not built, not shipped."],
-    [3, "The report", "When it lands", "Published in the open when the auditors finish."],
+    [3, "The report", "In progress", "Under review now. The final report will be published in the open, in full."],
     [4, "Signer, built", "After the red ink", "Only on the code the audit covered, plus its fixes."],
     [5, "Build on Bunker", "Next", "Phone alerts, integrations, a cancel-file helper. Each reviewed first."],
   ] as const) {
@@ -375,7 +375,7 @@ test("roadmap: five doors, the first one open, and each loop plays only while it
     await expect(video).toHaveAttribute("playsinline", "");
   }
   await expect(page.getByText("Roadmap, not a promise of dates. Each step waits for the one before.")).toBeVisible();
-  await expect(page.locator(".roadmap-end")).toContainText("PUBLIC BETA · UNAUDITED");
+  await expect(page.locator(".roadmap-end")).toContainText("PUBLIC BETA · AUDIT IN PROGRESS");
   // The words the page must not use, and no inline styles for the page policy to refuse.
   const text = (await page.locator("main").innerText()).toLowerCase();
   for (const never of ["chrome web store", "unhackable", "quantum", "—", "202"]) expect(text, never).not.toContain(never);

@@ -30,7 +30,7 @@ export async function GET() {
   const base = {
     network: config.network,
     program: config.programId,
-    audit: "Not completed",
+    audit: "In progress (CertiK: program and signature verifier; final report pending)",
     sourceVerified: false,
     mainnetCustody: config.custodyEnabled && config.network === "mainnet-beta",
   };

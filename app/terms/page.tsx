@@ -12,10 +12,11 @@ export default function Page() {
       description="Plain-language terms for the public beta. They have not been reviewed by a lawyer."
     >
       <div className="document-callout">
-        <h2>This is beta software that has not been audited.</h2>
+        <h2>This is beta software whose audit is not finished.</h2>
         <p>
-          Bunker runs on Solana mainnet and holds real funds. Nothing here has
-          had an independent audit. Anything you do with this software or its
+          Bunker runs on Solana mainnet and holds real funds. Its on-chain
+          program is being audited and the final report is not out yet; the
+          website and tools are not part of that audit. Anything you do with this software or its
           source code is at your own risk. Put in only what you could afford
           to lose.
         </p>

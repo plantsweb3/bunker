@@ -44,7 +44,7 @@ export default function Page() {
             ["02", "Built from", "Commit 9bb0856 of the public repository, in the pinned container. Live since the upgrade of 19 October 2026: the program code of commit f6a37ce plus one change, which refuses a withdrawal announcement the vault cannot pay."],
             ["03", "Executable hash", "161e6b4caac746dc35115910c2b4d50fe319b97d5a3a4ec39f9b6350adf14518"],
             ["04", "Upgrade authority", "None. It was renounced on 19 October 2026, so the program can never be changed."],
-            ["05", "Audit", "Commissioned, not completed. Until the report is published this is unaudited code. A bug bounty is open."],
+            ["05", "Audit", "In progress, by CertiK: the program and its signature verifier at commit f6a37ce. Preliminary findings were minor, with nothing critical, and each has been addressed; the one code fix is the change in commit 9bb0856 above. The final report will be linked here in full. A bug bounty is open."],
           ].map(([number, title, text]) => (
             <div key={number}>
               <span>{number}</span>
@@ -81,10 +81,10 @@ export default function Page() {
           show the code is correct.
         </p>
         <p>
-          <strong>Not independently verified:</strong> nobody has audited the
-          program or reviewed the cryptography. The site’s own code, the
-          offline tool and the command-line client have had no outside
-          review.
+          <strong>Not yet independently confirmed:</strong> the program and
+          its signature verifier are being audited, and the final report is
+          not out. The site’s own code, the offline tool and the command-line
+          client are not part of that audit and have had no outside review.
         </p>
       </section>
       <section>

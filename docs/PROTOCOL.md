@@ -1,6 +1,6 @@
 # Bunker protocol: byte-level specification (draft)
 
-**Status: not audited. Deployed on Solana mainnet as a public beta on 2026-10-09 (docs/DEPLOYMENT.md), as specified here.** This is the only protocol in this repository. The protocol version byte is `0x03`; versions 1 and 2 were earlier experiments with a different design (no recovery authority, a new backup after every withdrawal) and have been removed. `docs/RECOVERY-POLICY-PROPOSAL.md` is the design rationale this document made concrete. It holds real funds.
+**Status: program audit by CertiK in progress (commit `f6a37ce`); final report pending. Deployed on Solana mainnet as a public beta on 2026-10-09 (docs/DEPLOYMENT.md), as specified here.** This is the only protocol in this repository. The protocol version byte is `0x03`; versions 1 and 2 were earlier experiments with a different design (no recovery authority, a new backup after every withdrawal) and have been removed. `docs/RECOVERY-POLICY-PROPOSAL.md` is the design rationale this document made concrete. It holds real funds.
 
 The implementation is `programs/bunker3` (on-chain), `sdk/v3` (client), `tools/recovery` (offline tool) and `components/bunker/v3` (web app); see [Implementation status](#implementation-status).
 

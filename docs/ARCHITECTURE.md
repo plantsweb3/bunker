@@ -1,6 +1,6 @@
 # Architecture
 
-Status: public beta on Solana mainnet, holding real funds. No independent audit. The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
+Status: public beta on Solana mainnet, holding real funds. Program audit by CertiK in progress; final report pending. The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
 
 ## Parts
 
@@ -58,7 +58,7 @@ Passkey storage (`sdk/v3/passkey.ts`) encrypts a day key with a key derived from
 
 - `/api/config` reports network and release status, never credentials.
 - `/api/rpc` proxies an allowlist of read methods (balances, accounts, token accounts, signatures for an address, and single transactions for the activity log) to one server-configured endpoint, refuses write methods in the production release, checks origin and request size, bounds list-shaped reads and the size of an answer, and applies timeouts. It limits each client address (as the platform reports it; an IPv6 /64 counts as one) to 300 requests a minute per server instance, which is a floor and not a firewall; add edge limits and a dedicated provider before wider use.
-- `/api/verify` reports executable and upgrade-authority state for a configured test program. Source equivalence and audit status are reported as unverified until real evidence exists.
+- `/api/verify` reports executable and upgrade-authority state for a configured test program. Source equivalence comes from the public verified-builds service; audit status is the project's own statement until the final report is published.
 - `proxy.ts` attaches a per-request nonce Content Security Policy to every page. Paths it does not handle (`/api`, `/_next`, `/assets`, `/brand`, `/source`, share images, and exactly `/favicon.ico`, `/sitemap.xml` and `/robots.txt`) get a fixed policy from `next.config.ts` that runs and loads nothing, so their not-found pages are covered too. Everything under `/source` is served as a sandboxed download.
 - The public source archive (`scripts/bundle-source.mjs`) is built from an allow-list of top-level entries and stops if anything inside them looks like key material.
 

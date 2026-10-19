@@ -1,6 +1,6 @@
 # Contributing
 
-Bunker is an open-source project in public beta on Solana mainnet. Nothing here has been independently audited, and it holds real funds.
+Bunker is an open-source project in public beta on Solana mainnet. It holds real funds. CertiK is auditing the on-chain program and its signature verifier; the final report is not out yet, and nothing else here has been independently reviewed.
 
 ## Security issues
 
