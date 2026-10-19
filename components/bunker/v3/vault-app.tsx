@@ -813,7 +813,7 @@ function App() {
           <BIcon name="simulation" size={18} />
           <span>
             {b.config.network === "mainnet-beta"
-              ? "Public beta on Solana mainnet. Not audited. Put in only what you could afford to lose."
+              ? "Public beta on Solana mainnet. Audit in progress. Put in only what you could afford to lose."
               : "Test network. Nothing here holds real funds."}
           </span>
         </div>
@@ -1379,7 +1379,7 @@ function App() {
               </div>
               <div className="metric">
                 <span>Audit</span>
-                <b className="amber">None</b>
+                <b className="amber">In progress</b>
               </div>
               {canPasskey &&
                 !stale &&
@@ -1553,7 +1553,7 @@ function App() {
                   </p>
                 )}
                 <span className="micro">
-                  {b.config?.network === "mainnet-beta" ? "PUBLIC BETA · NOT AUDITED" : "TEST ASSETS ONLY"}
+                  {b.config?.network === "mainnet-beta" ? "PUBLIC BETA · AUDIT IN PROGRESS" : "TEST ASSETS ONLY"}
                 </span>
               </>
             )}

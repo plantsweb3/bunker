@@ -58,7 +58,7 @@ const limits: [string, string][] = [
 /** The film's status line. */
 const ticker = [
   "OPEN SOURCE",
-  "NOT AUDITED",
+  "AUDIT IN PROGRESS",
   "START SMALL",
   "WAITING PERIOD: YOUR CHOICE",
   "PROTECTS THE WITHDRAWAL PATH, NOT THE CHAIN",
@@ -116,7 +116,7 @@ const gates: [string, string, string, string?][] = [
   ],
   [
     "Public beta",
-    "Real vaults holding real funds, unaudited, at your own risk. Start with small amounts.",
+    "Real vaults holding real funds, at your own risk. Start with small amounts.",
     "Live",
   ],
   [
@@ -126,9 +126,9 @@ const gates: [string, string, string, string?][] = [
     "/bounty",
   ],
   [
-    "Independent audit",
-    "Commissioned, not completed. Until the report is published this is unaudited code; the report will be linked here in full.",
-    "Commissioned",
+    "Audit by CertiK",
+    "The on-chain program is being audited. Preliminary findings were minor, with nothing critical, and each has been addressed. The final report will be linked here in full.",
+    "In progress",
   ],
 ];
 const faq: [string, React.ReactNode][] = [
@@ -144,8 +144,8 @@ const faq: [string, React.ReactNode][] = [
     "Can I put real funds in today?",
     <>
       Yes. Bunker is in public beta on Solana mainnet, so a Bunker you build
-      holds real funds, and those funds are at risk. It has not been audited,
-      so start with small amounts and put in only what you could afford to
+      holds real funds, and those funds are at risk. Its audit is not finished
+      yet, so start with small amounts and put in only what you could afford to
       lose. See <Link href="#road">where it stands</Link>.
     </>,
   ],
@@ -212,9 +212,10 @@ const faq: [string, React.ReactNode][] = [
   [
     "Has it been audited?",
     <>
-      Not yet. An independent audit has been commissioned and is not
-      complete; until its report is published, this is unaudited code. The
-      source is public so that anyone can review it, and Bunker is a public
+      It is being audited now. CertiK is auditing the on-chain program and
+      its signature verifier. The preliminary findings were minor, with nothing critical, and each has been addressed. The final report will be
+      published here in full. The website, offline tool and command-line
+      client are not part of that audit. The source is public so that anyone can review it, and Bunker is a public
       beta with an open{" "}
       <Link href="/bounty">bug bounty</Link>. Readable source and passing
       tests are not an audit. <Link href="/security">Read the limits.</Link>
@@ -640,8 +641,8 @@ export default function Home() {
             </div>
           </div>
           <p className="limits-note">
-            This is what it is built to do. Outside experts have not checked
-            it yet. <Link href="/security">Read every limit.</Link>
+            This is what it is built to do. Outside experts are checking it
+            now; the final report is not out yet. <Link href="/security">Read every limit.</Link>
           </p>
         </section>
         <section className="truth section" id="road" data-level="04">
@@ -656,8 +657,9 @@ export default function Home() {
           <div className="truth-grid">
             <div>
               <p>
-                Bunker has not been audited. It is a public beta instead:
-                public code, public tests, and bug bounties for people who
+                Bunker’s audit is in progress, and until the final report is
+                out it is a public beta: public code, public tests, and bug
+                bounties for people who
                 break it. It is live on Solana mainnet and real funds are at
                 risk. Start with small amounts.
               </p>

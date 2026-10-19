@@ -13,7 +13,7 @@ const storeUrl = store.chromeWebStoreItemId
 export const metadata: Metadata = {
   title: "Bunker Watch",
   description:
-    "A browser extension that shows a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys. Public beta, unaudited.",
+    "A browser extension that shows a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys. Public beta.",
 };
 /** The extension's popup in its four states: file, what the picture shows, and the line under it. */
 const shots: [string, string, string][] = [
@@ -41,7 +41,7 @@ const shots: [string, string, string][] = [
 export default function Watch() {
   return (
     <DocumentLayout
-      eyebrow="BUNKER WATCH · PUBLIC BETA · UNAUDITED"
+      eyebrow="BUNKER WATCH · PUBLIC BETA · READ-ONLY"
       title="Know when a withdrawal is announced."
       description="A browser extension that watches your Bunker and tells you when something changes. It reads. It cannot move anything."
     >
