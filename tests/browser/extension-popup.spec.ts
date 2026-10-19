@@ -74,7 +74,7 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
           },
           onChanged: { addListener: (f: () => void) => changed.push(f) },
         },
-        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.0" }) },
+        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.1" }) },
         permissions: { request: async () => true, remove: async () => true },
       };
     },
@@ -82,7 +82,8 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
   );
   await page.setViewportSize({ width: 360, height: 600 });
   await page.goto(POPUP);
-  await expect(page.locator(".ticker")).toContainText("PUBLIC BETA · UNAUDITED");
+  await expect(page.locator(".ticker")).toContainText("PUBLIC BETA");
+  await expect(page.locator(".ticker")).not.toContainText("UNAUDITED");
   return { errors, requests };
 }
 const quiet = {

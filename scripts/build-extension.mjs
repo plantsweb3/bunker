@@ -130,7 +130,7 @@ if (test) {
     optionalHostPermissions: manifest.optional_host_permissions,
     /** The Chrome Web Store item this is published as, from extension/store.json. Null until it is. */
     storeItemId: store.chromeWebStoreItemId,
-    status: "Public beta. Not audited. Read-only: holds no keys.",
+    status: "Public beta. Read-only: holds no keys.",
   };
   await writeFile(`${out}/extension-manifest.json`, JSON.stringify(record, null, 2) + "\n");
   console.log(`Bunker Watch: ${record.bytes} bytes, sha256 ${record.sha256}`);

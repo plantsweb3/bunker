@@ -21,7 +21,7 @@ export const NETWORK = test
     };
 export const MAX_WATCHED = 5;
 export const SITE = "https://bunkermode.io";
-export const STATUS_LINE = "PUBLIC BETA · UNAUDITED";
+export const STATUS_LINE = "PUBLIC BETA";
 /** Said on every alert and every screen, because fake "Bunker" alerts will be used for phishing. */
 export const NEVER_ASKS = "Bunker never asks for your recovery kit or its password.";
 export const BEST_EFFORT = "Alerts are best effort. Silence is not proof nothing happened.";
