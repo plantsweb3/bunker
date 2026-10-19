@@ -21,7 +21,7 @@ Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: 
 
 Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys.
 
-PUBLIC BETA · UNAUDITED
+PUBLIC BETA · READ-ONLY
 
 Bunker is an open-source vault for Solana. A withdrawal to an address you did not list as trusted waits before it can leave, and you can cancel it while it waits. That only helps if you find out in time. Bunker Watch does the finding out, in your own browser.
 
@@ -44,7 +44,7 @@ Source: https://github.com/plantsweb3/bunker (the extension is in /extension)
 The published build and its SHA-256: https://bunkermode.io/verify
 How it works and its limits: https://bunkermode.io/watch
 
-Bunker protects the withdrawal path, not the chain. Bunker has not been audited.
+Bunker protects the withdrawal path, not the chain. Its on-chain program is being audited by CertiK.
 
 **Pictures:** `screenshot-1-all-quiet.png` to `screenshot-4-read-only.png` (1280 x 800), `promo-small-440x280.png`, `promo-marquee-1400x560.png`. Store icon: `store-icon-128.png` (96 x 96 of artwork inside 128 x 128, on a dark tile so it shows on the store's white page).
 

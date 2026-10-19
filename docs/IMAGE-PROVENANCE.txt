@@ -106,3 +106,5 @@ Bunker Watch screenshots, 2026-10-10 (public/assets/watch): the four store
 screenshots in docs/store-listing, converted to WebP. They are drawn by
 scripts/store-listing.mjs from the built extension over made-up readings and
 are labelled SIMULATION.
+Redrawn 2026-10-19 for version 0.1.1, whose status line no longer says
+unaudited.

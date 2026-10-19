@@ -37,7 +37,7 @@ p { color: #b9c7cf; margin: 26px 0 34px; max-width: 520px; }
 iframe { width: 360px; height: 600px; border: 1px solid #1b2329; box-shadow: 0 0 0 8px #0b0f12; }
 .row { display: flex; gap: 12px; align-items: center; }</style>
 <div><div class="big">${headline}<span>${second}</span></div><p>${line}</p>
-<div class="row"><span class="mono chip sim">Simulation</span><span class="mono status">Public beta · unaudited · read-only: holds no keys</span></div></div>
+<div class="row"><span class="mono chip sim">Simulation</span><span class="mono status">Public beta · read-only: holds no keys</span></div></div>
 <iframe src="${ext}/popup.html"></iframe>`;
 const promo = (w, h, size) => `<!doctype html><meta charset="utf-8"><style>${css}
 body { width: ${w}px; height: ${h}px; position: relative; }
@@ -47,7 +47,7 @@ body { width: ${w}px; height: ${h}px; position: relative; }
 .in { position: absolute; inset: 0; padding: ${Math.round(h * 0.13)}px ${Math.round(w * 0.07)}px; display: flex; flex-direction: column; justify-content: space-between; }
 .big { font-size: ${size}px; } .mono { font-size: ${Math.max(10, Math.round(size / 5.4))}px; }</style>
 <div class="bg"></div><div class="shade"></div><div class="tile"></div>
-<div class="in"><div class="mono">Bunker · Watch</div><div class="big">Watch<span>your Bunker.</span></div><div class="mono status">Public beta · unaudited · read-only: holds no keys</div></div>`;
+<div class="in"><div class="mono">Bunker · Watch</div><div class="big">Watch<span>your Bunker.</span></div><div class="mono status">Public beta · read-only: holds no keys</div></div>`;
 
 const browser = await chromium.launch();
 await mkdir(out, { recursive: true });
@@ -71,7 +71,7 @@ async function draw(name, html, width, height, stored, after) {
       const data = { status: { passAt: Date.now(), chainNow: String(at), problem: null, retryAt: 0, refusals: 0 }, ...stored };
       window.chrome = {
         storage: { local: { get: async (keys) => Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, data[k]])), set: async (items) => void Object.assign(data, items), remove: async () => {} }, onChanged: { addListener() {} } },
-        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.0" }) },
+        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.1" }) },
         permissions: { request: async () => true, remove: async () => true },
       };
     },
