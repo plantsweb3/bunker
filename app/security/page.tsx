@@ -1,3 +1,4 @@
+import { AUDIT } from "@/lib/audit";
 import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 export const metadata = { title: "Security & limitations" };
@@ -9,14 +10,14 @@ export default function Page() {
       description="What the design aims to protect, what it cannot protect, and what still needs review."
     >
       <div className="document-callout">
-        <h2>Public beta. Audit in progress. Permanent.</h2>
+        <h2>Public beta. Program audited. Permanent.</h2>
         <p>
           Bunker runs on Solana mainnet and holds real funds. The
-          implementation has automated tests. CertiK is auditing the on-chain
-          program and its signature verifier. The preliminary findings were
-          minor, with nothing critical, and each has been addressed. The final
-          report will be published here in full. The website, offline tool and
-          command-line client are not part of that audit.
+          implementation has automated tests, and CertiK audited the on-chain
+          program and its signature verifier:{" "}
+          <a href={AUDIT.url} target="_blank" rel="noreferrer">read the report</a>.
+          No critical, high or medium issues. Of its four findings, three are resolved and one is acknowledged. The website, offline tool and
+          command-line client were not part of that audit.
           Nobody can change the
           program: its upgrade key was renounced, so a flaw found now cannot be
           fixed in place either. No

@@ -4,12 +4,12 @@ import SetupGuide from "@/components/bunker/setup-guide";
 
 export const metadata: Metadata = {
   title: "Set up a Bunker",
-  description: "Six steps from nothing to a Bunker that is built, funded with a small amount, watched and rehearsed. Public beta, audit in progress.",
+  description: "Six steps from nothing to a Bunker that is built, funded with a small amount, watched and rehearsed. Public beta.",
 };
 export default function Start() {
   return (
     <DocumentLayout
-      eyebrow="SETUP GUIDE · PUBLIC BETA · AUDIT IN PROGRESS"
+      eyebrow="SETUP GUIDE · PUBLIC BETA"
       title="Set up a Bunker."
       description="Six steps, in order. Your keys are made offline and never touch this website."
     >

@@ -1,6 +1,6 @@
 # Threat model
 
-Status: public beta on Solana mainnet, holding real funds. Program audit by CertiK in progress; final report pending. The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
+Status: public beta on Solana mainnet, holding real funds. Program and signature verifier audited by CertiK (report published 2026-10-20). The program's upgrade authority has been renounced: nobody can change it (docs/DEPLOYMENT.md).
 
 ## What is protected, and by what
 
@@ -61,4 +61,4 @@ No Bitcoin custody, private balances, swaps, yield, staking, relayer, arbitrary 
 
 The beta opened on 2026-10-09 without the following. They remain the outstanding work.
 
-The final program audit report and its remediation; independent review of the client, offline tool and extension; a decision on the open questions in [PROTOCOL.md](PROTOCOL.md); distribution of the offline tool independent of the website; testing on real devices; an independently reproducible deployed binary; a published upgrade-authority policy; and a named incident owner. Public source alone satisfies none of these.
+Independent review of the client, offline tool and extension (the program audit is complete); a decision on the open questions in [PROTOCOL.md](PROTOCOL.md); distribution of the offline tool independent of the website; testing on real devices; an independently reproducible deployed binary; a published upgrade-authority policy; and a named incident owner. Public source alone satisfies none of these.

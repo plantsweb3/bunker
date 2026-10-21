@@ -1,6 +1,6 @@
 # Security policy
 
-Bunker is in public beta on Solana mainnet and holds real funds. CertiK is auditing the on-chain program and its signature verifier (commit `f6a37ce`). The preliminary findings were minor, with nothing critical, and each has been addressed: the one code fix is live in commit `9bb0856`, and the upgrade authority has been renounced. The final report will be published in full when it is out. The website, offline tool, command-line client and browser extension are not part of that audit. Its upgrade authority has been renounced: nobody can change the program, and a flaw cannot be fixed in place. Deposit only what you could afford to lose.
+Bunker is in public beta on Solana mainnet and holds real funds. CertiK audited the on-chain program and its signature verifier (commit `f6a37ce`) and published its report on 2026-10-20: https://skynet.certik.com/projects/bunker-mode. No critical, high or medium issues; of its four findings, three are resolved and one is acknowledged. The one code fix is live in commit `9bb0856`, and the upgrade authority has been renounced. The website, offline tool, command-line client and browser extension were not part of that audit. Its upgrade authority has been renounced: nobody can change the program, and a flaw cannot be fixed in place. Deposit only what you could afford to lose.
 
 ## Report privately
 
@@ -16,4 +16,4 @@ Read [THREAT-MODEL.md](docs/THREAT-MODEL.md), [PROTOCOL.md](docs/PROTOCOL.md), [
 
 ## Supported release
 
-Only the latest revision of `main` is maintained. Only the program and signature verifier are under independent review (CertiK, at commit `f6a37ce`, with the fix for its one code finding in `9bb0856`; final report pending). This is a public beta: software holding real funds at its users' own risk. Security fixes are published with explicit affected revisions and migration guidance where applicable. A public verified-builds service reports that the deployed program matches commit `9bb0856` (docs/DEPLOYMENT.md); that is a statement about which code is deployed, not about whether it is correct.
+Only the latest revision of `main` is maintained. Only the program and signature verifier have been independently reviewed (CertiK, at commit `f6a37ce`, with the fix for its one code finding in `9bb0856`; report published 2026-10-20). This is a public beta: software holding real funds at its users' own risk. Security fixes are published with explicit affected revisions and migration guidance where applicable. A public verified-builds service reports that the deployed program matches commit `9bb0856` (docs/DEPLOYMENT.md); that is a statement about which code is deployed, not about whether it is correct.

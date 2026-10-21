@@ -1,3 +1,4 @@
+import { AUDIT } from "@/lib/audit";
 import Link from "next/link";
 import { DocumentLayout } from "@/components/bunker/document-layout";
 export const metadata = { title: "How Bunker works" };
@@ -6,7 +7,7 @@ export default function Page() {
     <DocumentLayout
       eyebrow="THE OPERATOR’S MANUAL"
       title="A small vault. An explicit process."
-      description="What each key does, what leaves your device, and what happens at every step. Public beta, audit in progress."
+      description="What each key does, what leaves your device, and what happens at every step. Public beta; program audited by CertiK."
     >
       <section>
         <h2>Three keys, three jobs</h2>
@@ -183,8 +184,8 @@ export default function Page() {
           The repository holds the program, the client, the offline tool, the
           byte-level specification, the tests and what they do not cover. No
           wallet credentials are shipped. It runs on Solana mainnet as a public
-          beta. Its on-chain program is being audited by CertiK; the final
-          report will be published here in full.
+          beta. Its on-chain program was audited by CertiK;{" "}
+          <a href={AUDIT.url} target="_blank" rel="noreferrer">read the report</a>.
         </p>
         <a href="https://github.com/plantsweb3/bunker" className="button light">
           Get the working repository

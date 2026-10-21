@@ -1,6 +1,6 @@
 # External review request
 
-CertiK is auditing the program and signature verifier (commit `f6a37ce`); its final report is not out. No audit badge may be displayed until it is published.
+CertiK audited the program and signature verifier (commit `f6a37ce`) and published its report on 2026-10-20. The client, offline tool and extension have not been reviewed; any badge or claim must name the program as what was audited.
 
 Suggested in two phases.
 

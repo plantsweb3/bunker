@@ -13,11 +13,10 @@ export default function Page() {
       description="A trading wallet has to be fast, so its key lives somewhere exposed. A Bunker is where the money goes when it is no longer in play."
     >
       <div className="document-callout">
-        <h2>Public beta. Audit in progress.</h2>
+        <h2>Public beta. Program audited.</h2>
         <p>
           This page describes how Bunker sits beside a trading setup. The
-          program is live on Solana mainnet, and its audit is not finished
-          yet. Send
+          program is live on Solana mainnet and was audited by CertiK. Send
           assets only to a Bunker you built yourself, never to an address
           someone gives you.
         </p>

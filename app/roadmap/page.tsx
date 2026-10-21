@@ -8,10 +8,10 @@ const POSTER = "/assets/film/while-they-read-poster.jpg";
 export const metadata: Metadata = {
   title: "Roadmap",
   description:
-    "The plan for Bunker, as five doors. Gates, not dates: each step waits for the one before. Public beta, audit in progress.",
+    "The plan for Bunker, as five doors. Gates, not dates: each step waits for the one before. Public beta.",
   openGraph: {
     title: "Bunker roadmap: gates, not dates",
-    description: "Five doors. Each step waits for the one before. Public beta, audit in progress.",
+    description: "Five doors. Each step waits for the one before. Public beta.",
     images: [{ url: POSTER, width: 1280, height: 720, alt: "Door 01 of the plan: a steel door standing open on a lit room." }],
   },
   twitter: { card: "summary_large_image", images: [POSTER] },
@@ -19,8 +19,8 @@ export const metadata: Metadata = {
 /** The five steps, in the film's words. */
 const doors: { file: string; name: string; chip: string; line: string }[] = [
   { file: "door-01-watch", name: "Watch", chip: "Out now", line: "Built. Alerts when a withdrawal is announced. Holds no keys." },
-  { file: "door-02-signer-drawn", name: "Signer, drawn", chip: "Design only", line: "Designed while the audit runs. Not built, not shipped." },
-  { file: "door-03-the-report", name: "The report", chip: "In progress", line: "Under review now. The final report will be published in the open, in full." },
+  { file: "door-02-signer-drawn", name: "Signer, drawn", chip: "Design only", line: "Designed. Not built, not shipped." },
+  { file: "door-03-the-report", name: "The report", chip: "Published", line: "Out in the open. Every finding resolved or acknowledged, and the one fix is live." },
   { file: "door-04-signer-built", name: "Signer, built", chip: "After the red ink", line: "Only on the code the audit covered, plus its fixes." },
   { file: "door-05-build-on-bunker", name: "Build on Bunker", chip: "Next", line: "Phone alerts, integrations, a cancel-file helper. Each reviewed first." },
 ];
@@ -89,7 +89,7 @@ export default function Roadmap() {
         </ol>
         <section className="roadmap-end">
           <p>Roadmap, not a promise of dates. Each step waits for the one before.</p>
-          <span className="mono">PUBLIC BETA · AUDIT IN PROGRESS</span>
+          <span className="mono">PUBLIC BETA · PROGRAM AUDITED BY CERTIK</span>
         </section>
       </main>
       <Footer />

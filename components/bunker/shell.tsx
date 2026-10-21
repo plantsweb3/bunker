@@ -15,7 +15,7 @@ export function Header() {
       <div className="network-bar">
         <FlaskConical size={13} />
         <strong>PUBLIC BETA</strong>
-        <span>Live on Solana mainnet. Audit in progress. Start small.</span>
+        <span>Live on Solana mainnet. Program audited by CertiK. Start small.</span>
         <Link href="/security">Know the limits</Link>
       </div>
       <header className="site-header">
@@ -90,8 +90,9 @@ export function Footer() {
         BUNKERMODE.IO
       </span>
       <p className="footer-fine">
-        Bunker’s audit is in progress; the final report is not out yet. It is
-        new software in public beta, and its program can no longer be changed
+        Bunker’s on-chain program was audited by CertiK; the website and tools
+        were not part of that audit. It is new software in public beta, and its
+        program can no longer be changed
         or fixed by anyone. Real funds are at
         risk: put in only what you could afford to lose. A bug bounty is open.
       </p>

@@ -2,7 +2,7 @@
   "name": "bunker",
   "version": "0.1.0",
   "private": true,
-  "description": "Hash-authorized Solana custody. Public beta on mainnet; audit in progress.",
+  "description": "Hash-authorized Solana custody. Public beta on mainnet; program audited by CertiK.",
   "license": "MIT",
   "repository": {
     "type": "git",

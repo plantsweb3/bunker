@@ -15,7 +15,7 @@ import paymentLabels from "@/lib/payment-labels.json";
 export const metadata: Metadata = {
   title: "Bug bounty",
   description:
-    "Break Bunker, report it privately, and get paid from the bounty vault. Public beta on Solana mainnet, audit in progress.",
+    "Break Bunker, report it privately, and get paid from the bounty vault. Public beta on Solana mainnet; its program is audited by CertiK.",
 };
 /** Each step, with the clip from the bounty film that shows it. */
 const steps: [string, string, string][] = [
@@ -51,15 +51,16 @@ export default function Bounty() {
           <div>
             <div className="hero-chips">
               <span className="bm-chip bm-chip--ice">Bug bounty</span>
-              <span className="bm-chip bm-chip--cream">Public beta · audit in progress</span>
+              <span className="bm-chip bm-chip--cream">Public beta · program audited</span>
             </div>
             <h1 className="bm-big">
               It’s not a bug.
               <span className="bm-accent">It’s a bounty.</span>
             </h1>
             <p>
-              Bunker holds real funds on Solana mainnet and nobody has audited
-              it. If you can break it, tell us first and get paid for it.
+              Bunker holds real funds on Solana mainnet. Its program has been
+              audited, and no audit catches everything. If you can break it,
+              tell us first and get paid for it.
             </p>
             <div className="actions">
               <a className="button light" href={REPORT_URL} target="_blank" rel="noreferrer">
