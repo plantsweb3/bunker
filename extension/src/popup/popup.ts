@@ -13,6 +13,7 @@ import { BEST_EFFORT, MAX_WATCHED, NETWORK, NEVER_ASKS, SITE, STATUS_LINE, short
 import { assertGenesis, connect, endpoint, endpointOf, refused, WrongNetwork } from "../rpc";
 import * as store from "../store";
 import { addVault } from "../watch";
+import { readProgramStatus, type ProgramStatus } from "../program";
 import { h, svg } from "./dom";
 
 type Tab = "watch" | "check" | "settings";
@@ -23,10 +24,16 @@ const ui: {
   adding: boolean;
   busy: boolean;
   problem: string;
-  check: { address: string; exposure: Exposure } | null;
+  check: { address: string; exposure: Exposure; lookalikes?: Lookalike[] } | null;
+  /** Read once per opening of the popup, when Settings is first shown. */
+  program: ProgramStatus | "reading" | "unavailable" | null;
   /** What is typed in each field, kept across redraws so a refusal does not erase it. */
   typed: { add: string; check: string; rpc: string | null };
-} = { tab: "watch", adding: false, busy: false, problem: "", check: null, typed: { add: "", check: "", rpc: null } };
+} = { tab: "watch", adding: false, busy: false, problem: "", check: null, program: null, typed: { add: "", check: "", rpc: null } };
+/** One sender the site's lookalike check found, as /api/lookalikes sends it. */
+type Lookalike = { sender: string; imitates: string; start: number; end: number; signature: string; time: number | null };
+/** The site that runs the lookalike check. Asked only when the user presses the button. */
+const LOOKALIKE_ORIGIN = `${SITE}/*`;
 
 const sol = (lamports: bigint) => formatAmount(lamports, 9);
 const clock = (seconds: bigint) => {
@@ -265,9 +272,60 @@ function checkTab(): Node[] {
           h("div", { className: "pb" }, ...e.approvals.slice(0, 6).map((t) => kvRow(mintLabel(t.mint) ?? `Mint ${short(t.mint)}`, t.delegate ? short(t.delegate) : "unknown"))),
         )
       : null,
-    h("p", { className: "note" }, "Revoke delegations in your wallet. This check ", h("em", {}, "connects no wallet"), " and stores nothing."),
+    e && e.approvals.length ? out(`/check?a=${ui.check!.address}`, "Revoke them on bunkermode.io →", "btn out") : null,
+    e ? lookalikePanel() : null,
+    h("p", { className: "note" }, "This check ", h("em", {}, "connects no wallet"), " and stores nothing."),
     out("/check", "The full check on bunkermode.io"),
   ].filter((n) => n !== null);
+}
+
+/** Draws a part of an address bright and the middle, where a fake differs, dim. */
+const marked = (address: string, start: number, end: number) =>
+  h("span", { className: "addr" }, h("b", {}, address.slice(0, start)), address.slice(start, address.length - end), h("b", {}, address.slice(address.length - end)));
+function lookalikePanel(): Node {
+  const found = ui.check!.lookalikes;
+  if (!found)
+    return h(
+      "div",
+      { className: "panel" },
+      h("div", { className: "ph" }, h("span", {}, "Lookalike addresses"), h("span", {}, "not checked")),
+      h(
+        "div",
+        { className: "pb" },
+        h("p", { className: "note small" }, "Looks through this wallet's last 100 transactions for senders that start and end like an address it paid. This sends the address to bunkermode.io."),
+        h("button", { className: "btn out", disabled: ui.busy, onclick: () => void run(checkLookalikes) }, "Check for lookalikes"),
+      ),
+    );
+  return h(
+    "div",
+    { className: found.length ? "panel cream" : "panel", "data-lookalikes": String(found.length) },
+    h("div", { className: "ph" }, h("span", {}, "Lookalike addresses"), h("span", {}, found.length ? `${found.length} found` : "none found")),
+    h(
+      "div",
+      { className: "pb" },
+      found.length
+        ? h("p", { className: "note small" }, "These sent this wallet something and look like an address it paid. Never copy an address from your history.")
+        : h("p", { className: "note small" }, "None in the last 100 transactions. Older history was not checked."),
+      ...found.slice(0, 5).flatMap((f) => [
+        h("div", { className: "look" }, h("span", { className: "k" }, "Fake"), marked(f.sender, f.start, f.end)),
+        h("div", { className: "look" }, h("span", { className: "k" }, "Real"), marked(f.imitates, f.start, f.end)),
+      ]),
+    ),
+  );
+}
+async function checkLookalikes() {
+  const address = ui.check!.address;
+  // The browser asks the user to allow this one site. Nothing else is allowed.
+  if (!(await chrome.permissions.request({ origins: [LOOKALIKE_ORIGIN] })))
+    throw new Error("The browser did not allow bunkermode.io, so the check was not run.");
+  const r = await fetch(`${SITE}/api/lookalikes?a=${address}`, { signal: AbortSignal.timeout(60_000) });
+  if (r.status === 429) throw new Error("That is not available just now. Too many wallets were checked in the last minute; try again shortly.");
+  const body = (await r.json().catch(() => null)) as { found?: Lookalike[] } | null;
+  const ok = (f: Lookalike) =>
+    [f?.sender, f?.imitates].every((a) => typeof a === "string" && /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(a)) &&
+    Number.isInteger(f.start) && Number.isInteger(f.end) && f.start >= 0 && f.end >= 0;
+  if (!r.ok || !Array.isArray(body?.found) || !body.found.every(ok)) throw new Error("That is not available just now. Try again in a moment.");
+  if (ui.check?.address === address) ui.check.lookalikes = body.found;
 }
 
 async function settingsTab(): Promise<Node[]> {
@@ -306,6 +364,7 @@ async function settingsTab(): Promise<Node[]> {
     });
   return [
     big("Read-only.", "Holds no keys."),
+    programPanel(),
     h(
       "div",
       { className: "panel" },
@@ -326,7 +385,8 @@ async function settingsTab(): Promise<Node[]> {
         "div",
         { className: "pb" },
         kvRow("Keys held", "none"),
-        kvRow("Talks to", "your RPC endpoint only"),
+        kvRow("Talks to", "your RPC endpoint"),
+        kvRow("Only if you ask", "bunkermode.io"),
         kvRow("Checks", "once a minute"),
         kvRow("Status", STATUS_LINE),
       ),
@@ -334,6 +394,40 @@ async function settingsTab(): Promise<Node[]> {
     h("p", { className: "note" }, BEST_EFFORT, " ", NEVER_ASKS),
     h("div", { className: "row" }, out("/verify", "Verify this build"), out("/recovery", "Recovery"), out("/emergency", "Emergency")),
   ].filter((n) => n !== null);
+}
+
+/** The Bunker program, as the chain says it is now. Read when Settings is first shown. */
+function programPanel(): Node {
+  const p = ui.program;
+  if (p === null) {
+    ui.program = "reading";
+    void connection()
+      .then(async (c) => {
+        await assertGenesis(c);
+        ui.program = await readProgramStatus(c, NETWORK.program);
+      })
+      .catch(() => {
+        ui.program = "unavailable";
+      })
+      .then(() => {
+        if (ui.tab === "settings" && !ui.busy) void render();
+      });
+  }
+  const changeable = typeof p === "object" && p !== null && p.authority !== null;
+  return h(
+    "div",
+    { className: changeable ? "panel cream" : "panel", "data-program": typeof p === "object" && p ? (p.authority ? "upgradeable" : "permanent") : String(p) },
+    h("div", { className: "ph" }, h("span", {}, "Bunker program"), h("span", {}, short(NETWORK.program))),
+    h(
+      "div",
+      { className: "pb" },
+      kvRow(
+        "Can be changed",
+        p === "reading" || p === null ? "reading…" : p === "unavailable" ? "could not read" : p.authority ? `yes, by ${short(p.authority)}` : "no, key renounced",
+      ),
+      NETWORK.test ? null : kvRow("Audited by", "CertiK"),
+    ),
+  );
 }
 
 /** Runs something the user asked for, showing that it is busy and any refusal. */
@@ -349,7 +443,7 @@ async function run(job: () => Promise<unknown>) {
   ui.busy = false;
   await render();
 }
-const TICKER = [STATUS_LINE, "READ-ONLY: HOLDS NO KEYS", "ALERTS ARE BEST EFFORT", "BUNKER NEVER ASKS FOR A RECOVERY KIT"];
+const TICKER = [STATUS_LINE, "READ-ONLY: HOLDS NO KEYS", ...(NETWORK.test ? [] : ["PROGRAM AUDITED BY CERTIK"]), "ALERTS ARE BEST EFFORT", "BUNKER NEVER ASKS FOR A RECOVERY KIT"];
 const tickerRun = () => TICKER.flatMap((line) => [line, h("i", {}, "✦")]);
 async function render() {
   const body = ui.tab === "watch" ? await watchTab() : ui.tab === "check" ? checkTab() : await settingsTab();
