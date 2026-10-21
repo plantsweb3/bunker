@@ -1,6 +1,6 @@
 # Reviewer guide
 
-This repository is the source of a public beta running on Solana mainnet and holding real funds (program and build in [DEPLOYMENT.md](DEPLOYMENT.md)). An audit of the program and signature verifier by CertiK is in progress and its final report is not out; assume no security level has been established.
+This repository is the source of a public beta running on Solana mainnet and holding real funds (program and build in [DEPLOYMENT.md](DEPLOYMENT.md)). CertiK audited the program and signature verifier (report published 2026-10-20, https://skynet.certik.com/projects/bunker-mode); nothing else has been independently reviewed, and no security level is established.
 
 ## Read in this order
 

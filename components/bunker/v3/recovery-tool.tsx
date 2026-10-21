@@ -211,7 +211,7 @@ function Page() {
           <BIcon name="simulation" size={18} />
           <span>
             {b.config.network === "mainnet-beta"
-              ? "Public beta on Solana mainnet. Audit in progress. Put in only what you could afford to lose."
+              ? "Public beta on Solana mainnet. Program audited by CertiK. Put in only what you could afford to lose."
               : "Test network. Nothing here holds real funds."}
           </span>
         </div>
