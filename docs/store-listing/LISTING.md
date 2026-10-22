@@ -21,7 +21,7 @@ Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: 
 
 Get a desktop alert when a withdrawal is announced from your Bunker. Read-only: holds no keys.
 
-PUBLIC BETA · READ-ONLY
+PUBLIC BETA · READ-ONLY · PROGRAM AUDITED BY CERTIK
 
 Bunker is an open-source vault for Solana. A withdrawal to an address you did not list as trusted waits before it can leave, and you can cancel it while it waits. That only helps if you find out in time. Bunker Watch does the finding out, in your own browser.
 
@@ -30,21 +30,25 @@ What it does
 - Reads each one once a minute and compares it with the minute before.
 - When a withdrawal is announced: a desktop notification with the amount and the whole destination address, the hours left on the toolbar badge, and a countdown in the popup.
 - Also tells you when SOL arrives, when a withdrawal leaves, and when a Bunker's keys are replaced.
-- Checks any wallet: what one signature could move, and who can already move it.
+- Checks any wallet: what one signature could move, and who can already move it, with a link to revoke those approvals on bunkermode.io.
+- Spots lookalike addresses, if you ask: senders in a wallet's recent history whose address starts and ends like one it paid. That is address poisoning, and it is how people get tricked into copying a fake address.
+- Shows, read live from the chain, that the Bunker program can no longer be changed by anyone.
 
 What it does not do
 - It holds no keys and cannot send a transaction. It never asks for a key, a seed phrase, a recovery kit or a password. Bunker never does.
-- It does not withdraw, cancel or recover. For those it links to bunkermode.io.
+- It does not withdraw, cancel, recover or revoke. For those it links to bunkermode.io.
 - It runs only while your browser is running.
 - Alerts are best effort and can be late or missing. Silence is not proof that nothing happened. If it cannot read the network for five minutes, it tells you.
 - It believes the Solana RPC endpoint it talks to.
+- The lookalike check sends the wallet address to bunkermode.io, only when you press the button and allow it.
 
-Open source and verifiable
+Open source, verifiable, audited
 Source: https://github.com/plantsweb3/bunker (the extension is in /extension)
 The published build and its SHA-256: https://bunkermode.io/verify
 How it works and its limits: https://bunkermode.io/watch
+Audit of Bunker's on-chain program by CertiK: https://skynet.certik.com/projects/bunker-mode
 
-Bunker protects the withdrawal path, not the chain. Its on-chain program is being audited by CertiK.
+Bunker protects the withdrawal path, not the chain. The audit covers the on-chain program, not this extension.
 
 **Pictures:** `screenshot-1-all-quiet.png` to `screenshot-4-read-only.png` (1280 x 800), `promo-small-440x280.png`, `promo-marquee-1400x560.png`. Store icon: `store-icon-128.png` (96 x 96 of artwork inside 128 x 128, on a dark tile so it shows on the store's white page).
 
@@ -63,11 +67,11 @@ Watch the public state of Solana vault accounts the user chooses and notify the 
 | `alarms` | To wake once a minute and read the watched accounts. |
 | `notifications` | To show a desktop alert when a withdrawal is announced or another watched change happens. |
 | Host permission `https://api.mainnet-beta.solana.com/*` | The public Solana RPC endpoint the extension reads account data from. |
-| Optional host permission `https://*/*` | So a user can choose their own Solana RPC endpoint instead of the public one. Nothing is granted at install. The extension requests one origin, the one the user typed, when they save it, and gives up an origin that is refused or no longer used. No content scripts are injected and no page is read. |
+| Optional host permission `https://*/*` | So a user can choose their own Solana RPC endpoint instead of the public one, and run the lookalike check on bunkermode.io. Nothing is granted at install. The extension requests one origin when the user asks for it: the endpoint they typed when they save it, or `https://bunkermode.io` when they press "Check for lookalikes". It gives up an endpoint that is refused or no longer used. No content scripts are injected and no page is read. |
 
 **Remote code:** No. All code is in the package. The page policy is `default-src 'none'` with only the extension's own scripts.
 
-**Data usage:** the extension does not collect or transmit any of the listed categories of user data. It has no server. The addresses a user watches are sent only to the Solana RPC endpoint the user uses, as queries for public account data. Tick all three certifications (no sale, no unrelated use, no creditworthiness use).
+**Data usage:** the extension does not collect or transmit any of the listed categories of user data. It has no server. The addresses a user watches are sent only to the Solana RPC endpoint the user uses, as queries for public account data. A wallet address the user checks for lookalikes is sent to bunkermode.io, only when they press that button. Tick all three certifications (no sale, no unrelated use, no creditworthiness use).
 
 **Privacy policy URL:** https://bunkermode.io/privacy#extension
 

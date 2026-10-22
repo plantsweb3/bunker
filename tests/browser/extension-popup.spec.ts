@@ -55,9 +55,12 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
     if (url !== RPC) return route.abort();
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers: cors });
-    const body = request.postDataJSON() as { id: unknown; method: string };
+    const body = request.postDataJSON() as { id: unknown; method: string; params?: unknown[] };
     if (!(body.method in answers)) return route.fulfill({ status: 500, headers: cors, body: `unexpected ${body.method}` });
-    return route.fulfill({ status: 200, headers: cors, json: { jsonrpc: "2.0", id: body.id, result: answers[body.method] } });
+    const answer = answers[body.method];
+    // An answer can depend on what was asked, for a method asked about more than one account.
+    const result = typeof answer === "function" ? (answer as (params: unknown[]) => unknown)(body.params ?? []) : answer;
+    return route.fulfill({ status: 200, headers: cors, json: { jsonrpc: "2.0", id: body.id, result } });
   });
   await page.addInitScript(
     ({ stored, at }) => {
@@ -74,7 +77,7 @@ async function open(page: Page, stored: Record<string, unknown>, answers: Record
           },
           onChanged: { addListener: (f: () => void) => changed.push(f) },
         },
-        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.1" }) },
+        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.2.0" }) },
         permissions: { request: async () => true, remove: async () => true },
       };
     },
@@ -91,6 +94,35 @@ const quiet = {
   [`view:${A}`]: view(A, "12400000000", "1", "11"),
   [`view:${B}`]: view(B, "3050000000", "2", "4"),
 };
+
+/** The Bunker program and its program-data header, as getAccountInfo returns them. */
+const PROGRAM_ID = "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ";
+const PROGRAM_DATA = "Ga1huSvpvaKFg7jiZnRoL89154MbypVdgBQ516UkCV1k";
+const LOADER = "BPFLoaderUpgradeab1e11111111111111111111111";
+function programAnswers(authority: string | null) {
+  const account = (data: Buffer) => ({ context: { slot: 1 }, value: { data: [data.toString("base64"), "base64"], executable: false, lamports: 1, owner: LOADER, rentEpoch: 0, space: data.length } });
+  const program = Buffer.alloc(36);
+  program.writeUInt32LE(2, 0);
+  bs58decode(PROGRAM_DATA).copy(program, 4);
+  const header = Buffer.alloc(45);
+  header.writeUInt32LE(3, 0);
+  header.writeBigUInt64LE(458_939_976n, 4);
+  if (authority) {
+    header[12] = 1;
+    bs58decode(authority).copy(header, 13);
+  }
+  return {
+    getGenesisHash: MAINNET,
+    getAccountInfo: (params: unknown[]) => (params[0] === PROGRAM_ID ? account(program) : params[0] === PROGRAM_DATA ? account(header) : { context: { slot: 1 }, value: null }),
+  };
+}
+function bs58decode(s: string): Buffer {
+  const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+  let n = 0n;
+  for (const c of s) n = n * 58n + BigInt(alphabet.indexOf(c));
+  const hex = n.toString(16).padStart(64, "0");
+  return Buffer.from(hex, "hex");
+}
 
 test("first run: nothing watched, and it says what it is", async ({ page }, info) => {
   const seen = await open(page, {});
@@ -186,7 +218,7 @@ test("check a wallet: read-only, and only the RPC is asked", async ({ page }, in
   expect([...new Set(seen.requests)]).toEqual([RPC]);
 });
 test("settings: an endpoint that is not mainnet is refused", async ({ page }) => {
-  const seen = await open(page, quiet);
+  const seen = await open(page, quiet, programAnswers(null));
   // An endpoint that answers, and is devnet.
   await page.route("https://rpc.example/**", (route) => {
     const cors = { "access-control-allow-origin": "*", "access-control-allow-headers": "*" };
@@ -202,8 +234,73 @@ test("settings: an endpoint that is not mainnet is refused", async ({ page }) =>
   await page.getByLabel("RPC endpoint").fill("https://rpc.example/key");
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("alert")).toContainText("is not Solana mainnet");
-  await expect(page.locator(".ph").first()).toContainText("default");
+  await expect(page.locator(".ph", { hasText: "RPC endpoint" })).toContainText("default");
   // What was typed is still there to be corrected.
   await expect(page.getByLabel("RPC endpoint")).toHaveValue("https://rpc.example/key");
   expect(seen.errors).toEqual([]);
+});
+
+test("settings: the program is read from the chain and shown as permanent, or not", async ({ page }) => {
+  const seen = await open(page, quiet, programAnswers(null));
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const panel = page.locator("[data-program]");
+  await expect(panel).toHaveAttribute("data-program", "permanent");
+  await expect(panel).toContainText("no, key renounced");
+  await expect(panel).toContainText("CertiK");
+  await expect(page.locator(".ticker")).toContainText("PROGRAM AUDITED BY CERTIK");
+  expect(seen.errors).toEqual([]);
+  expect([...new Set(seen.requests)]).toEqual([RPC]);
+});
+test("settings: a program that someone could still change is shown on the cream card", async ({ page }) => {
+  await open(page, quiet, programAnswers("Ci5cG8d6MvU5ykKkQhN3LHnPN2VCmwZuotRNLqA9SYth"));
+  await page.getByRole("tab", { name: "Settings" }).click();
+  const panel = page.locator("[data-program]");
+  await expect(panel).toHaveAttribute("data-program", "upgradeable");
+  await expect(panel).toHaveClass(/cream/);
+  await expect(panel).toContainText("yes, by Ci5c…SYth");
+});
+test("check a wallet: lookalikes are asked of bunkermode.io only when the user presses the button", async ({ page }) => {
+  const real = "TXmH5552Hw7pkjBTLnoMVJkEkPTC3ZV4LY1sD1nsuio";
+  const fake = "TXmdRPtbS54LSP6wgJ5ybgLf1d5AUBqJMgf1yGNsuio";
+  const seen = await open(page, quiet, {
+    getGenesisHash: MAINNET,
+    getBalance: { context: { slot: 1 }, value: 1_000_000_000 },
+    getTokenAccountsByOwner: { context: { slot: 1 }, value: [] },
+    getMultipleAccounts: { context: { slot: 1 }, value: [] },
+  });
+  const asked: string[] = [];
+  await page.route("https://bunkermode.io/api/lookalikes?*", (route) => {
+    asked.push(route.request().url());
+    return route.fulfill({ json: { found: [{ sender: fake, imitates: real, start: 3, end: 4, signature: "5".repeat(88), time: 1, received: { lamports: "1000" } }], asked: 100, read: 100 } });
+  });
+  await page.getByRole("tab", { name: "Check a wallet" }).click();
+  await page.getByLabel("Wallet address").fill(waiting.destination);
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.locator("[data-exposure]")).toContainText("1");
+  // Nothing has gone to the site yet.
+  expect(asked).toEqual([]);
+  await page.getByRole("button", { name: "Check for lookalikes" }).click();
+  const found = page.locator("[data-lookalikes]");
+  await expect(found).toHaveAttribute("data-lookalikes", "1");
+  await expect(found).toHaveClass(/cream/);
+  await expect(found.locator(".addr").first()).toHaveText(fake);
+  await expect(found.locator(".addr b").first()).toHaveText("TXm");
+  expect(asked).toEqual([`https://bunkermode.io/api/lookalikes?a=${waiting.destination}`]);
+  expect(seen.errors).toEqual([]);
+});
+test("check a wallet: open approvals link to revoking them on bunkermode.io", async ({ page }) => {
+  const token = {
+    pubkey: A,
+    account: { executable: false, lamports: 2_039_280, owner: "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA", rentEpoch: 0, space: 165, data: { program: "spl-token", space: 165, parsed: { type: "account", info: { mint: A, state: "initialized", tokenAmount: { amount: "5", decimals: 0 }, delegate: B, delegatedAmount: { amount: "5" } } } } },
+  };
+  await open(page, quiet, {
+    getGenesisHash: MAINNET,
+    getBalance: { context: { slot: 1 }, value: 0 },
+    getTokenAccountsByOwner: { context: { slot: 1 }, value: [token] },
+    getMultipleAccounts: { context: { slot: 1 }, value: [] },
+  });
+  await page.getByRole("tab", { name: "Check a wallet" }).click();
+  await page.getByLabel("Wallet address").fill(waiting.destination);
+  await page.getByRole("button", { name: "Check", exact: true }).click();
+  await expect(page.getByRole("link", { name: "Revoke them on bunkermode.io →" })).toHaveAttribute("href", `https://bunkermode.io/check?a=${waiting.destination}`);
 });

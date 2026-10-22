@@ -108,3 +108,5 @@ scripts/store-listing.mjs from the built extension over made-up readings and
 are labelled SIMULATION.
 Redrawn 2026-10-19 for version 0.1.1, whose status line no longer says
 unaudited.
+Redrawn 2026-10-21 for version 0.2.0 (the Bunker program panel, the revoke
+link and the lookalike check).

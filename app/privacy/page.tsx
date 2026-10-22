@@ -67,6 +67,13 @@ export default function Page() {
             addresses and your network address, as with any use of Solana.
           </li>
           <li>
+            <strong>Only if you ask for it:</strong> when you press “Check for
+            lookalikes” on a wallet, the extension asks your browser to allow
+            bunkermode.io and sends it that one wallet address. This site
+            reads the wallet’s recent public transactions and does not store
+            the address beyond a five-minute cache.
+          </li>
+          <li>
             <strong>What it never has:</strong> a key, a seed phrase, a
             recovery kit, a password or a wallet connection. It cannot read
             or change any web page.

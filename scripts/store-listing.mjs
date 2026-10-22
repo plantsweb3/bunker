@@ -5,6 +5,7 @@
 //   npm run extension:build && node scripts/store-listing.mjs
 //   writes docs/store-listing/*.png
 import { chromium } from "@playwright/test";
+import { PublicKey } from "@solana/web3.js";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -13,6 +14,8 @@ const ext = `file://${resolve("dist/bunker-watch")}`;
 const still = `file://${resolve("public/assets/kit/clips/datacenter-city-flyover-poster.jpg")}`;
 const tile = `file://${resolve("public/assets/kit/design/halftone-tile-dark.png")}`;
 const NOW = 1_800_000_000;
+const PROGRAM = "DGXACBwbUqRKRVR1TQojZBoRuV2TZJ8wVnQSuLKm2nJJ";
+const PROGRAM_DATA = "Ga1huSvpvaKFg7jiZnRoL89154MbypVdgBQ516UkCV1k";
 const A = "36VASLSKLFD2KokjXG7V28veZvXEsyHRKefLonPaAKzv";
 const B = "3AQTaduKvYWFTu1ExZSQK1hQp5jSZ2yEt4KzsASAufKd";
 const C = "3EKkiwNLWqoUbzFkPrmKbtUB4EweE6f4STzevYUmezeL";
@@ -63,15 +66,31 @@ async function draw(name, html, width, height, stored, after) {
       getBalance: { context: { slot: 1 }, value: 3_210_000_000 },
       getTokenAccountsByOwner: { context: { slot: 1 }, value: [token(A, "5000000", B), token(B, "7000000")] },
       getMultipleAccounts: { context: { slot: 1 }, value: [null, null] },
+      // The Bunker program and its program-data header: nobody can upgrade it.
+      getAccountInfo: (params) => {
+        const loader = "BPFLoaderUpgradeab1e11111111111111111111111";
+        const account = (data) => ({ context: { slot: 1 }, value: { data: [Buffer.from(data).toString("base64"), "base64"], executable: false, lamports: 1, owner: loader, rentEpoch: 0, space: data.length } });
+        if (params[0] === PROGRAM) {
+          const d = Buffer.alloc(36);
+          d.writeUInt32LE(2, 0);
+          Buffer.from(new PublicKey(PROGRAM_DATA).toBytes()).copy(d, 4);
+          return account(d);
+        }
+        const d = Buffer.alloc(45);
+        d.writeUInt32LE(3, 0);
+        return account(d);
+      },
     };
-    return route.fulfill({ status: 200, headers: cors, json: { jsonrpc: "2.0", id: body.id, result: answers[body.method] } });
+    const answer = answers[body.method];
+    const result = typeof answer === "function" ? answer(body.params ?? []) : answer;
+    return route.fulfill({ status: 200, headers: cors, json: { jsonrpc: "2.0", id: body.id, result } });
   });
   await page.addInitScript(
     ({ stored, at }) => {
       const data = { status: { passAt: Date.now(), chainNow: String(at), problem: null, retryAt: 0, refusals: 0 }, ...stored };
       window.chrome = {
         storage: { local: { get: async (keys) => Object.fromEntries(keys.filter((k) => k in data).map((k) => [k, data[k]])), set: async (items) => void Object.assign(data, items), remove: async () => {} }, onChanged: { addListener() {} } },
-        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.1.1" }) },
+        runtime: { sendMessage: async () => ({ ok: true }), getManifest: () => ({ version: "0.2.0" }) },
         permissions: { request: async () => true, remove: async () => true },
       };
     },

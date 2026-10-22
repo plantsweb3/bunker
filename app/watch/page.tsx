@@ -35,7 +35,7 @@ const shots: [string, string, string][] = [
   [
     "4-read-only",
     "The popup's Settings tab with the heading Read-only, holds no keys, the RPC endpoint setting, and a line saying keys held: none.",
-    "Settings. It holds no keys and talks to one RPC endpoint.",
+    "Settings. It holds no keys, talks to one RPC endpoint, and shows that the Bunker program can no longer be changed.",
   ],
 ];
 export default function Watch() {

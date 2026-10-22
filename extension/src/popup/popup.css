@@ -77,3 +77,11 @@ a { color: inherit; text-decoration: none; }
 .log p { font: 500 11px/1.45 var(--bm-mono); color: #9fb3bf; white-space: pre-line; overflow-wrap: anywhere; }
 .log b { display: block; color: var(--bm-chalk); font-weight: 700; }
 .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+/* Lookalike addresses: the matching start and end bright, the middle that differs dim. */
+.look { display: grid; grid-template-columns: 34px 1fr; gap: 6px; align-items: baseline; margin-top: 6px; }
+.look .k { font: 700 9px var(--bm-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--bm-steel); }
+.addr { font: 500 10.5px/1.4 var(--bm-mono); color: rgba(240, 243, 242, 0.45); overflow-wrap: anywhere; }
+.addr b { font-weight: 700; color: var(--bm-chalk); }
+.cream .addr { color: rgba(14, 16, 18, 0.45); }
+.cream .addr b { color: var(--bm-ink); }
+.cream .look .k { color: #55646d; }
