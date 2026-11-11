@@ -32,6 +32,9 @@ jobs:
       - run: cargo test --workspace --locked
       - run: npx tsx scripts/v3-vectors.ts > /tmp/bunker-v3.json
       - run: diff fixtures/bunker-v3.json /tmp/bunker-v3.json
+      # A third implementation, in Python from the specification alone, must
+      # reproduce the same vectors.
+      - run: python3 scripts/independent-check.py
       - run: npm run source:bundle
       - name: Offline recovery tool builds reproducibly
         run: |
